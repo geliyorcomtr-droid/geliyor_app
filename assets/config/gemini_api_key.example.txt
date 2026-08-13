@@ -1,0 +1,6 @@
+# Google AI Studio'dan aldiginiz Gemini API anahtarini asagidaki dosyaya yapistirin:
+# 1) Bu dosyayi kopyalayin: gemini_api_key.txt
+# 2) Tek satira API key yazin
+# 3) Uygulamayi hot restart yapin
+# https://aistudio.google.com/apikey
+

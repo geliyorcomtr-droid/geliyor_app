@@ -1,0 +1,25 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "geliyor_app (Chrome, HTML renderer)",
+      "request": "launch",
+      "type": "dart",
+      "args": [
+        "-d",
+        "chrome",
+        "--web-renderer",
+        "html"
+      ]
+    },
+    {
+      "name": "geliyor_app (Chrome, CanvasKit)",
+      "request": "launch",
+      "type": "dart",
+      "args": [
+        "-d",
+        "chrome"
+      ]
+    }
+  ]
+}
