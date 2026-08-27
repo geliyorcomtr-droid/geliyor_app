@@ -1,4 +1,5 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:geliyor_app/data/banner_repository.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/screens/emergency_support_screen.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
@@ -8,6 +9,7 @@ import 'package:geliyor_app/screens/vaccine_calendar_screen.dart';
 import 'package:geliyor_app/state/notification_settings_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
+import 'package:geliyor_app/widgets/app_banner_slider.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
 import 'package:geliyor_app/widgets/app_pressable_button.dart';
@@ -213,9 +215,9 @@ class _HealthScreenState extends State<HealthScreen> {
   }
 
   void _openVaccineCalendar() {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const VaccineCalendarScreen()),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const VaccineCalendarScreen()));
   }
 
   @override
@@ -273,10 +275,7 @@ class _HealthScreenState extends State<HealthScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text(
-                  'Pet E-nabız',
-                  style: AppTextStyles.pageHeader,
-                ),
+                const Text('Pet E-nabız', style: AppTextStyles.pageHeader),
                 const SizedBox(width: 4),
                 const Icon(
                   Icons.favorite_rounded,
@@ -293,60 +292,16 @@ class _HealthScreenState extends State<HealthScreen> {
   }
 
   Widget _buildTopBanner() {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: Image.asset(
-        'assets/images/saglik_banner.png',
-        width: double.infinity,
-        height: 118,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) {
-          return Container(
-            height: 118,
-            decoration: BoxDecoration(
-              color: AppColors.selected,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: AppColors.border),
-            ),
-            alignment: Alignment.center,
-            child: const Icon(
-              Icons.health_and_safety_rounded,
-              color: AppColors.primary,
-              size: 36,
-            ),
-          );
-        },
-      ),
+    return const AppBannerSlot(
+      placement: BannerPlacement.healthTop,
+      fallbackAssets: ['assets/images/saglik_banner.png'],
     );
   }
 
   Widget _buildBottomBanner() {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.border, width: 1.4),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Image.asset(
-        'assets/images/saglik_alt_banner.png',
-        width: double.infinity,
-        fit: BoxFit.fitWidth,
-        alignment: Alignment.center,
-        errorBuilder: (context, error, stackTrace) {
-          return Container(
-            height: 78,
-            alignment: Alignment.center,
-            color: AppColors.selected,
-            child: const Icon(
-              Icons.image_outlined,
-              color: AppColors.subText,
-              size: 28,
-            ),
-          );
-        },
-      ),
+    return const AppBannerSlot(
+      placement: BannerPlacement.healthBottom,
+      fallbackAssets: ['assets/images/saglik_alt_banner.png'],
     );
   }
 
@@ -381,9 +336,7 @@ class _HealthScreenState extends State<HealthScreen> {
             color: _mama,
             onTap: () {
               Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const SpecialFoodsScreen(),
-                ),
+                MaterialPageRoute(builder: (_) => const SpecialFoodsScreen()),
               );
             },
           ),
@@ -542,32 +495,19 @@ class _HealthScreenState extends State<HealthScreen> {
   }) {
     return Row(
       children: [
-        Expanded(
-          child: Text(
-            title,
-            style: const TextStyle(
-              color: AppColors.text,
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
+        Expanded(child: Text(title, style: AppTextStyles.sectionHeader)),
         GestureDetector(
           onTap: onAction,
           child: Row(
             children: [
               Text(
                 action,
-                style: const TextStyle(
-                  color: AppColors.primary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: AppTextStyles.seeAllAction,
               ),
               const Icon(
                 Icons.chevron_right_rounded,
                 color: AppColors.primary,
-                size: 18,
+                size: 20,
               ),
             ],
           ),
@@ -801,7 +741,9 @@ class _HealthScreenState extends State<HealthScreen> {
 
   Widget _pastItem(_HealthProcedure item) {
     final done = item.lastDoneDate!;
-    final daysAgo = _dateOnly(DateTime.now()).difference(_dateOnly(done)).inDays;
+    final daysAgo = _dateOnly(
+      DateTime.now(),
+    ).difference(_dateOnly(done)).inDays;
     final softBorder = _softBorderColor(AppColors.success);
 
     return IntrinsicHeight(
@@ -1077,7 +1019,10 @@ class _HealthScreenState extends State<HealthScreen> {
                           child: const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.notifications_active_rounded, size: 16),
+                              Icon(
+                                Icons.notifications_active_rounded,
+                                size: 16,
+                              ),
                               SizedBox(width: 6),
                               Text(
                                 'Hatırlatıcıyı Kaydet',
@@ -1145,7 +1090,9 @@ class _HealthScreenState extends State<HealthScreen> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: selected ? AppColors.primary : AppColors.text,
+                            color: selected
+                                ? AppColors.primary
+                                : AppColors.text,
                             fontSize: 10,
                             fontWeight: FontWeight.w800,
                           ),
@@ -1313,8 +1260,11 @@ class _HealthScreenState extends State<HealthScreen> {
 
   Widget _buildCalendar() {
     final first = DateTime(_visibleMonth.year, _visibleMonth.month, 1);
-    final daysInMonth =
-        DateTime(_visibleMonth.year, _visibleMonth.month + 1, 0).day;
+    final daysInMonth = DateTime(
+      _visibleMonth.year,
+      _visibleMonth.month + 1,
+      0,
+    ).day;
     final startWeekday = first.weekday;
     const weekDays = ['Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct', 'Pz'];
 
@@ -1415,7 +1365,8 @@ class _HealthScreenState extends State<HealthScreen> {
                   _visibleMonth.month,
                   day,
                 );
-                final selected = date.year == _selectedDate.year &&
+                final selected =
+                    date.year == _selectedDate.year &&
                     date.month == _selectedDate.month &&
                     date.day == _selectedDate.day;
 

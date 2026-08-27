@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
@@ -185,15 +185,7 @@ class ArticleDetailScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: const TextStyle(
-            color: AppColors.text,
-            fontSize: 19,
-            fontWeight: FontWeight.w900,
-            height: 1.22,
-          ),
-        ),
+        Text(title, style: AppTextStyles.sectionHeader),
         const SizedBox(height: 8),
         Row(
           children: [

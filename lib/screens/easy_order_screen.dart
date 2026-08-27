@@ -1,4 +1,5 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:geliyor_app/data/banner_repository.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
 import 'package:geliyor_app/screens/order_confirm_screen.dart';
@@ -8,6 +9,7 @@ import 'package:geliyor_app/state/cart_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/utils/product_price.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
+import 'package:geliyor_app/widgets/app_banner_slider.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
 import 'package:geliyor_app/widgets/app_pressable_button.dart';
@@ -118,27 +120,9 @@ class _EasyOrderScreenState extends State<EasyOrderScreen> {
   }
 
   Widget _buildBanner() {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Image.asset(
-          'assets/images/kolay_siparis_banner.png',
-          width: double.infinity,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            return Container(
-              height: 160,
-              color: AppColors.selected,
-              alignment: Alignment.center,
-              child: const Icon(Icons.pets_rounded, color: AppColors.primary, size: 40),
-            );
-          },
-        ),
-      ),
+    return const AppBannerSlot(
+      placement: BannerPlacement.easyOrder,
+      fallbackAssets: ['assets/images/kolay_siparis_banner.png'],
     );
   }
 
@@ -153,11 +137,7 @@ class _EasyOrderScreenState extends State<EasyOrderScreen> {
             children: [
               const Text(
                 'Son Siparişini Tekrarla',
-                style: TextStyle(
-                  color: AppColors.primary,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w900,
-                ),
+                style: AppTextStyles.sectionHeader,
               ),
               const SizedBox(height: 2),
               Text(

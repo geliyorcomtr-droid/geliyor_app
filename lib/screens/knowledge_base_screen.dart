@@ -1,4 +1,5 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:geliyor_app/data/banner_repository.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/screens/all_topics_screen.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
@@ -8,6 +9,7 @@ import 'package:geliyor_app/screens/featured_questions_screen.dart';
 import 'package:geliyor_app/screens/question_detail_screen.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
+import 'package:geliyor_app/widgets/app_banner_slider.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
 import 'package:geliyor_app/widgets/knowledge_disclaimer.dart';
@@ -55,11 +57,7 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
       iconPath: 'assets/images/app_ikonlar/bagisiklik.png',
       color: Color(0xFF00A859),
     ),
-    _KbCategory(
-      id: 'tumu',
-      title: 'Tümü',
-      color: AppColors.subText,
-    ),
+    _KbCategory(id: 'tumu', title: 'Tümü', color: AppColors.subText),
   ];
 
   static const _featuredQuestions = <_KbQuestion>[
@@ -256,9 +254,9 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
 
   void _onCategoryTap(String id) {
     if (id == 'tumu') {
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const AllTopicsScreen()),
-      );
+      Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => const AllTopicsScreen()));
       return;
     }
     setState(() {
@@ -380,32 +378,9 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
   }
 
   Widget _buildHeroBanner() {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.border, width: 1.3),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Image.asset(
-        'assets/images/bilgi_bankasi_banner.png',
-        width: double.infinity,
-        fit: BoxFit.fitWidth,
-        alignment: Alignment.center,
-        errorBuilder: (context, error, stackTrace) {
-          return Container(
-            height: 110,
-            color: AppColors.selected,
-            alignment: Alignment.center,
-            child: const Icon(
-              Icons.menu_book_rounded,
-              color: AppColors.primary,
-              size: 36,
-            ),
-          );
-        },
-      ),
+    return const AppBannerSlot(
+      placement: BannerPlacement.knowledge,
+      fallbackAssets: ['assets/images/bilgi_bankasi_banner.png'],
     );
   }
 
@@ -494,11 +469,7 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
                 _questionsTitle,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: AppColors.text,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w900,
-                ),
+                style: AppTextStyles.sectionHeader,
               ),
             ),
             GestureDetector(
@@ -513,16 +484,12 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
                 children: [
                   Text(
                     'Tümünü Gör',
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: AppTextStyles.seeAllAction,
                   ),
                   Icon(
                     Icons.chevron_right_rounded,
                     color: AppColors.primary,
-                    size: 16,
+                    size: 20,
                   ),
                 ],
               ),
@@ -649,11 +616,7 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
             const Expanded(
               child: Text(
                 'Makaleler',
-                style: TextStyle(
-                  color: AppColors.text,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w900,
-                ),
+                style: AppTextStyles.sectionHeader,
               ),
             ),
             GestureDetector(
@@ -662,16 +625,12 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
                 children: [
                   Text(
                     'Tüm Makaleler',
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: AppTextStyles.seeAllAction,
                   ),
                   Icon(
                     Icons.chevron_right_rounded,
                     color: AppColors.primary,
-                    size: 16,
+                    size: 20,
                   ),
                 ],
               ),
@@ -709,107 +668,107 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
         );
       },
       child: Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.border),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: Image.asset(
-                    article.imagePath,
-                    fit: BoxFit.cover,
-                    // Görselin içindeki hazır etiket kırpılsın, pill kod ile çizilir
-                    alignment: Alignment.bottomCenter,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        color: AppColors.selected,
-                        alignment: Alignment.center,
-                        child: const Icon(
-                          Icons.image_outlined,
-                          color: AppColors.subText,
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppColors.border),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: Image.asset(
+                      article.imagePath,
+                      fit: BoxFit.cover,
+                      // Görselin içindeki hazır etiket kırpılsın, pill kod ile çizilir
+                      alignment: Alignment.bottomCenter,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color: AppColors.selected,
+                          alignment: Alignment.center,
+                          child: const Icon(
+                            Icons.image_outlined,
+                            color: AppColors.subText,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  Positioned(
+                    left: 5,
+                    top: 5,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: article.tagColor.withValues(alpha: 0.35),
                         ),
-                      );
-                    },
-                  ),
-                ),
-                Positioned(
-                  left: 5,
-                  top: 5,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 5,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(
-                        color: article.tagColor.withValues(alpha: 0.35),
+                      ),
+                      child: Text(
+                        article.tag,
+                        style: TextStyle(
+                          color: article.tagColor,
+                          fontSize: 7,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(6, 5, 6, 6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    height: 31,
                     child: Text(
-                      article.tag,
-                      style: TextStyle(
-                        color: article.tagColor,
-                        fontSize: 7,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(6, 5, 6, 6),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(
-                  height: 31,
-                  child: Text(
-                    article.title,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.text,
-                      fontSize: 8.5,
-                      fontWeight: FontWeight.w800,
-                      height: 1.2,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.schedule_rounded,
-                      size: 9,
-                      color: AppColors.subText,
-                    ),
-                    const SizedBox(width: 2),
-                    Text(
-                      '${article.minutes} dk',
+                      article.title,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: AppColors.subText,
-                        fontSize: 8,
-                        fontWeight: FontWeight.w600,
+                        color: AppColors.text,
+                        fontSize: 8.5,
+                        fontWeight: FontWeight.w800,
+                        height: 1.2,
                       ),
                     ),
-                  ],
-                ),
-              ],
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.schedule_rounded,
+                        size: 9,
+                        color: AppColors.subText,
+                      ),
+                      const SizedBox(width: 2),
+                      Text(
+                        '${article.minutes} dk',
+                        style: const TextStyle(
+                          color: AppColors.subText,
+                          fontSize: 8,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }

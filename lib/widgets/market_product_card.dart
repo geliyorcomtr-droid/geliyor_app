@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:geliyor_app/state/favorite_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:geliyor_app/utils/product_image.dart';
 import 'package:geliyor_app/utils/product_price.dart';
+import 'package:geliyor_app/utils/product_skt.dart';
+import 'package:geliyor_app/widgets/product_favorite_corner.dart';
 
 class MarketProductFeature {
   const MarketProductFeature({
@@ -35,8 +38,15 @@ class MarketProductData {
     required this.oldPrices,
     required this.features,
     this.brand = 'Pro Plan',
-    this.expiryLabel = 'SKT: 12.2027',
+    this.skt = '',
+    this.expiryLabel = 'SKT: —',
     this.deliveryLabel = '3 saatte kapında',
+    this.trustBadgeIds = const [],
+    this.productAdvantageIds = const [],
+    this.productAdvantageValues = const {},
+    this.proteinValue = '',
+    this.preferredRank = '',
+    this.repurchaseRate = '',
   });
 
   final String id;
@@ -53,8 +63,15 @@ class MarketProductData {
   final List<double> oldPrices;
   final List<MarketProductFeature> features;
   final String brand;
+  final String skt;
   final String expiryLabel;
   final String deliveryLabel;
+  final List<String> trustBadgeIds;
+  final List<String> productAdvantageIds;
+  final Map<String, String> productAdvantageValues;
+  final String proteinValue;
+  final String preferredRank;
+  final String repurchaseRate;
 }
 
 /// Pet Market ürün kartı — 393×852 tuvale sığacak kompakt mockup kartı.
@@ -75,8 +92,13 @@ class MarketProductCard extends StatefulWidget {
 
   final MarketProductData product;
   final VoidCallback? onTap;
-  final void Function(String weight, double price, double oldPrice, int quantity)?
-      onAddToCart;
+  final void Function(
+    String weight,
+    double price,
+    double oldPrice,
+    int quantity,
+  )?
+  onAddToCart;
   final int initialQuantity;
   final ValueChanged<int>? onQuantityChanged;
   final bool showAddToCart;
@@ -98,8 +120,7 @@ class _MarketProductCardState extends State<MarketProductCard> {
 
   MarketProductData get p => widget.product;
 
-  bool get _compactControls =>
-      !widget.showAddToCart || p.weights.length == 1;
+  bool get _compactControls => !widget.showAddToCart || p.weights.length == 1;
 
   @override
   void initState() {
@@ -180,61 +201,16 @@ class _MarketProductCardState extends State<MarketProductCard> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  p.title,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: AppColors.text,
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w900,
-                                    height: 1.15,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              ListenableBuilder(
-                                listenable: FavoriteStore.instance,
-                                builder: (context, _) {
-                                  final isFavorite =
-                                      FavoriteStore.instance.isFavorite(p.id);
-                                  return GestureDetector(
-                                    onTap: _toggleFavorite,
-                                    behavior: HitTestBehavior.opaque,
-                                    child: Container(
-                                      width: 24,
-                                      height: 24,
-                                      decoration: BoxDecoration(
-                                        color: isFavorite
-                                            ? AppColors.error
-                                                .withValues(alpha: 0.12)
-                                            : AppColors.selected,
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                          color: isFavorite
-                                              ? AppColors.error
-                                              : AppColors.primary,
-                                          width: 1.2,
-                                        ),
-                                      ),
-                                      child: Icon(
-                                        isFavorite
-                                            ? Icons.favorite_rounded
-                                            : Icons.favorite_border_rounded,
-                                        color: isFavorite
-                                            ? AppColors.error
-                                            : AppColors.primary,
-                                        size: 14,
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ],
+                          Text(
+                            p.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: AppColors.text,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w900,
+                              height: 1.15,
+                            ),
                           ),
                           if (p.subtitle.trim().isNotEmpty) ...[
                             const SizedBox(height: 1),
@@ -294,10 +270,10 @@ class _MarketProductCardState extends State<MarketProductCard> {
           Positioned.fill(
             child: Padding(
               padding: const EdgeInsets.all(4),
-              child: Image.asset(
+              child: buildProductImage(
                 p.imagePath,
                 fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) => const Icon(
+                errorWidget: const Icon(
                   Icons.inventory_2_outlined,
                   color: AppColors.subText,
                   size: 28,
@@ -308,6 +284,14 @@ class _MarketProductCardState extends State<MarketProductCard> {
           Positioned(
             top: 4,
             left: 4,
+            child: ProductFavoriteCorner(
+              productId: p.id,
+              onToggle: _toggleFavorite,
+            ),
+          ),
+          Positioned(
+            top: 4,
+            right: 4,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
               decoration: BoxDecoration(
@@ -374,8 +358,9 @@ class _MarketProductCardState extends State<MarketProductCard> {
                           fontSize: 11,
                           fontWeight: FontWeight.w800,
                           decoration: TextDecoration.lineThrough,
-                          decorationColor:
-                              AppColors.subText.withValues(alpha: 0.7),
+                          decorationColor: AppColors.subText.withValues(
+                            alpha: 0.7,
+                          ),
                         ),
                       ),
                     ),
@@ -471,7 +456,7 @@ class _MarketProductCardState extends State<MarketProductCard> {
         ),
         const SizedBox(height: 2),
         Text(
-          p.expiryLabel,
+          ProductSkt.label(p.skt),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: infoStyle,
@@ -507,15 +492,18 @@ class _MarketProductCardState extends State<MarketProductCard> {
               ),
             ),
             const SizedBox(width: 6),
-            Text(
-              p.expiryLabel,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: AppColors.text,
-                fontSize: 12,
-                fontWeight: FontWeight.w900,
-                height: 1.1,
+            Flexible(
+              child: Text(
+                ProductSkt.label(p.skt),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.right,
+                style: const TextStyle(
+                  color: AppColors.text,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                  height: 1.1,
+                ),
               ),
             ),
           ],
@@ -535,10 +523,7 @@ class _MarketProductCardState extends State<MarketProductCard> {
           children: [
             for (int i = 0; i < p.weights.length; i++) ...[
               if (i > 0) const SizedBox(width: 4),
-              if (_compactControls && p.weights.length == 1)
-                _weightChip(i)
-              else
-                Expanded(child: _weightChip(i)),
+              Expanded(child: _weightChip(i)),
             ],
           ],
         ),
@@ -554,8 +539,8 @@ class _MarketProductCardState extends State<MarketProductCard> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 140),
         height: compact ? 22 : 24,
-        width: compact && p.weights.length == 1 ? 68 : null,
         alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 4),
         decoration: BoxDecoration(
           color: selected
               ? AppColors.primary.withValues(alpha: 0.06)
@@ -566,12 +551,16 @@ class _MarketProductCardState extends State<MarketProductCard> {
             width: 0.8,
           ),
         ),
-        child: Text(
-          p.weights[index],
-          style: TextStyle(
-            color: selected ? AppColors.primaryLight : AppColors.text,
-            fontSize: compact ? 9 : 9.5,
-            fontWeight: FontWeight.w900,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            p.weights[index],
+            maxLines: 1,
+            style: TextStyle(
+              color: selected ? AppColors.primaryLight : AppColors.text,
+              fontSize: compact ? 9 : 9.5,
+              fontWeight: FontWeight.w900,
+            ),
           ),
         ),
       ),
@@ -699,6 +688,29 @@ class MarketCompactProductCard extends StatelessWidget {
   static const double cardHeight = 148;
   static const double cardGap = 8;
 
+  void _toggleFavorite() {
+    final price = product.prices.isNotEmpty ? product.prices.first : 0.0;
+    final oldPrice = product.oldPrices.isNotEmpty
+        ? product.oldPrices.first
+        : price;
+    final weight = product.weights.isNotEmpty
+        ? product.weights.first
+        : '1 adet';
+    FavoriteStore.instance.toggle(
+      FavoriteItem(
+        id: product.id,
+        imagePath: product.imagePath,
+        title: product.title,
+        unitPrice: price,
+        oldPrice: oldPrice,
+        discountPercent: product.discount,
+        weight: weight,
+        brand: product.brand,
+        category: product.petTag,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final price = product.prices.isNotEmpty ? product.prices.first : 0.0;
@@ -718,17 +730,33 @@ class MarketCompactProductCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
-              child: Center(
-                child: Image.asset(
-                  product.imagePath,
-                  fit: BoxFit.contain,
-                  filterQuality: FilterQuality.high,
-                  errorBuilder: (context, error, stackTrace) => const Icon(
-                    Icons.image_outlined,
-                    color: AppColors.subText,
-                    size: 36,
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: Center(
+                      child: buildProductImage(
+                        product.imagePath,
+                        fit: BoxFit.contain,
+                        filterQuality: FilterQuality.high,
+                        errorWidget: const Icon(
+                          Icons.image_outlined,
+                          color: AppColors.subText,
+                          size: 36,
+                        ),
+                      ),
+                    ),
                   ),
-                ),
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    child: ProductFavoriteCorner(
+                      productId: product.id,
+                      onToggle: _toggleFavorite,
+                      size: 22,
+                      iconSize: 12,
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 6),

@@ -1,9 +1,11 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:geliyor_app/data/banner_repository.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/screens/featured_questions_screen.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
+import 'package:geliyor_app/widgets/app_banner_slider.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
 import 'package:geliyor_app/widgets/knowledge_disclaimer.dart';
@@ -217,37 +219,9 @@ class _AllTopicsScreenState extends State<AllTopicsScreen> {
   }
 
   Widget _buildBanner() {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.border, width: 1.2),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Image.asset(
-        'assets/images/tum_konular_banner.png',
-        width: double.infinity,
-        fit: BoxFit.fitWidth,
-        alignment: Alignment.center,
-        errorBuilder: (context, error, stackTrace) {
-          return Container(
-            height: 100,
-            color: AppColors.selected,
-            alignment: Alignment.center,
-            padding: const EdgeInsets.all(12),
-            child: const Text(
-              'Dostunuzun sağlığı bizim önceliğimiz',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: AppColors.primary,
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          );
-        },
-      ),
+    return const AppBannerSlot(
+      placement: BannerPlacement.allTopics,
+      fallbackAssets: ['assets/images/tum_konular_banner.png'],
     );
   }
 

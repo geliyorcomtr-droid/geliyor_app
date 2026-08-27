@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:geliyor_app/data/pet_market_catalog.dart';
+import 'package:geliyor_app/data/brand_repository.dart';
+import 'package:geliyor_app/data/product_repository.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
 import 'package:geliyor_app/screens/cart_screen.dart';
 import 'package:geliyor_app/screens/product_detail_screen.dart';
 import 'package:geliyor_app/state/cart_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
-import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
 import 'package:geliyor_app/widgets/app_pressable_button.dart';
 import 'package:geliyor_app/widgets/market_product_card.dart';
@@ -30,6 +30,7 @@ class PetMarketProductsScreen extends StatefulWidget {
     this.initialMainCategory = 'cat',
     this.initialSubCategory,
     this.initialFeature,
+    this.initialBrand,
     this.initialSearchQuery,
     this.openFeatureSheet = false,
   });
@@ -37,6 +38,7 @@ class PetMarketProductsScreen extends StatefulWidget {
   final String initialMainCategory;
   final String? initialSubCategory;
   final String? initialFeature;
+  final String? initialBrand;
   final String? initialSearchQuery;
   final bool openFeatureSheet;
 
@@ -88,14 +90,15 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
     'Yaşlı (7-+)',
   ];
 
-  static const _brandOptions = [
-    'Pro Plan',
-    'N&D',
-    'Royal Canin',
-    "Hill's",
-    'Reflex Plus',
-    'Brit Care',
-  ];
+  List<String> _brandOptions = const [];
+
+  List<String> get _brandFilterOptions {
+    final selected = _selectedBrand;
+    if (selected == null || _brandOptions.contains(selected)) {
+      return _brandOptions;
+    }
+    return [selected, ..._brandOptions];
+  }
 
   static const _weightOptions = [
     '1.5 kg',
@@ -195,6 +198,8 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
     _subCategory =
         widget.initialSubCategory ?? _defaultSubCategoryFor(_mainCategory);
     _selectedFeature = widget.initialFeature;
+    _selectedBrand = widget.initialBrand;
+    _loadBrandOptions();
     final initialQuery = widget.initialSearchQuery?.trim() ?? '';
     if (initialQuery.isNotEmpty) {
       _searchController.text = initialQuery;
@@ -215,6 +220,18 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
     }
   }
 
+  Future<void> _loadBrandOptions() async {
+    try {
+      final brands = await BrandRepository.instance.fetchAll(activeOnly: true);
+      if (!mounted) return;
+      setState(() {
+        _brandOptions = [for (final brand in brands) brand.name];
+      });
+    } catch (_) {
+      // Filtre boş kalır; seçili marka yine de ürünleri süzebilir.
+    }
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -226,27 +243,8 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
     setState(() => _searchQuery = query.toLowerCase());
   }
 
-  List<MarketProductData> get _products {
-    var items = _searchQuery.isEmpty
-        ? List<MarketProductData>.from(
-            petMarketProductsFor(
-              mainCategory: _mainCategory,
-              subCategory: _subCategory,
-            ),
-          )
-        : List<MarketProductData>.from(
-            petMarketSearchProducts(
-              query: _searchQuery,
-              mainCategory: _mainCategory,
-            ),
-          );
-
-    if (_searchQuery.isNotEmpty && items.isEmpty) {
-      // Geniş arama: tüm kategoriler
-      items = List<MarketProductData>.from(
-        petMarketSearchProducts(query: _searchQuery),
-      );
-    }
+  List<MarketProductData> _filteredProducts(List<MarketProductData> remote) {
+    var items = List<MarketProductData>.from(remote);
 
     if (_selectedBrand != null) {
       items = items
@@ -259,8 +257,7 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
     }
 
     if (_selectedWeight != null) {
-      items =
-          items.where((p) => p.weights.contains(_selectedWeight)).toList();
+      items = items.where((p) => p.weights.contains(_selectedWeight)).toList();
     }
 
     if (_selectedAgeGroup != null) {
@@ -330,26 +327,29 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: AppPageFrame(
-        backgroundColor: AppColors.background,
-        child: Column(
-          children: [
-            const SizedBox(height: AppPageFrame.safeAreaTop),
-            _buildHeader(),
-            Expanded(child: _buildScrollBody()),
-            const AppBottomNavbar(),
-            const SizedBox(height: AppPageFrame.safeAreaBottom),
-          ],
-        ),
+    return StreamBuilder<List<MarketProductData>>(
+      stream: ProductRepository.instance.watchMarketProducts(
+        mainCategory: _searchQuery.isEmpty ? _mainCategory : null,
+        subCategory: _searchQuery.isEmpty ? _subCategory : null,
+        searchQuery: _searchQuery.isEmpty ? null : _searchQuery,
       ),
+      builder: (context, snapshot) {
+        final products = _filteredProducts(snapshot.data ?? const []);
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          body: AppPageFrame.standard(
+            backgroundColor: AppColors.background,
+            header: _buildHeader(),
+            content: _buildScrollBody(products),
+          ),
+        );
+      },
     );
   }
 
   Widget _buildHeader() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 0, 8, 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Row(
         children: [
           IconButton(
@@ -376,13 +376,18 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
     );
   }
 
-  Widget _buildScrollBody() {
+  Widget _buildScrollBody(List<MarketProductData> products) {
     return CustomScrollView(
       physics: const BouncingScrollPhysics(),
       slivers: [
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+            padding: const EdgeInsets.fromLTRB(
+              AppPageFrame.contentHorizontalPadding,
+              0,
+              AppPageFrame.contentHorizontalPadding,
+              8,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -396,8 +401,13 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
           ),
         ),
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-          sliver: _products.isEmpty
+          padding: const EdgeInsets.fromLTRB(
+            AppPageFrame.contentHorizontalPadding,
+            0,
+            AppPageFrame.contentHorizontalPadding,
+            12,
+          ),
+          sliver: products.isEmpty
               ? const SliverToBoxAdapter(
                   child: Padding(
                     padding: EdgeInsets.symmetric(vertical: 24),
@@ -420,32 +430,31 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
                     crossAxisSpacing: MarketCompactProductCard.cardGap,
                     mainAxisExtent: MarketCompactProductCard.cardHeight,
                   ),
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final product = _products[index];
-                      final price =
-                          product.prices.isNotEmpty ? product.prices.first : 0.0;
-                      final oldPrice = product.oldPrices.isNotEmpty
-                          ? product.oldPrices.first
-                          : price;
-                      final weight = product.weights.isNotEmpty
-                          ? product.weights.first
-                          : '';
-                      return MarketCompactProductCard(
-                        product: product,
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const ProductDetailScreen(),
-                            ),
-                          );
-                        },
-                        onAddToCart: () =>
-                            _addToCart(product, weight, price, oldPrice, 1),
-                      );
-                    },
-                    childCount: _products.length,
-                  ),
+                  delegate: SliverChildBuilderDelegate((context, index) {
+                    final product = products[index];
+                    final price = product.prices.isNotEmpty
+                        ? product.prices.first
+                        : 0.0;
+                    final oldPrice = product.oldPrices.isNotEmpty
+                        ? product.oldPrices.first
+                        : price;
+                    final weight = product.weights.isNotEmpty
+                        ? product.weights.first
+                        : '';
+                    return MarketCompactProductCard(
+                      product: product,
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                ProductDetailScreen(product: product),
+                          ),
+                        );
+                      },
+                      onAddToCart: () =>
+                          _addToCart(product, weight, price, oldPrice, 1),
+                    );
+                  }, childCount: products.length),
                 ),
         ),
       ],
@@ -559,8 +568,7 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        for (final category in _categories)
-          _buildCategoryCircle(category),
+        for (final category in _categories) _buildCategoryCircle(category),
       ],
     );
   }
@@ -605,8 +613,8 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
                     category.id == 'smart'
                         ? Icons.auto_awesome_rounded
                         : category.id == 'bird'
-                            ? Icons.flutter_dash_rounded
-                            : Icons.pets_rounded,
+                        ? Icons.flutter_dash_rounded
+                        : Icons.pets_rounded,
                     color: AppColors.primary,
                     size: 22,
                   ),
@@ -686,7 +694,7 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
             showArrow: true,
             onTap: () => _openOptionSheet(
               title: 'Marka',
-              options: _brandOptions,
+              options: _brandFilterOptions,
               selected: _selectedBrand,
               allowClear: true,
               onSelect: (value) => setState(() => _selectedBrand = value),
@@ -933,9 +941,12 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
       CartStore.instance.addItem(
         id: '${product.id}-$weight',
         imagePath: product.imagePath,
-        title: '${product.title} $weight',
+        title: product.title,
         unitPrice: price,
         oldPrice: oldPrice,
+        weight: weight,
+        brand: product.brand,
+        skt: product.skt,
       );
     }
     _showAddedToCartDialog(product.title);

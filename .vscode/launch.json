@@ -2,23 +2,40 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "geliyor_app (Chrome, HTML renderer)",
+      "name": "geliyor_app (Chrome)",
       "request": "launch",
       "type": "dart",
+      "program": "lib/main.dart",
       "args": [
         "-d",
         "chrome",
-        "--web-renderer",
-        "html"
+        "--web-port",
+        "5001",
+        "--no-web-resources-cdn"
       ]
     },
     {
-      "name": "geliyor_app (Chrome, CanvasKit)",
+      "name": "geliyor_app (Chrome, CDN fonts)",
       "request": "launch",
       "type": "dart",
+      "program": "lib/main.dart",
       "args": [
         "-d",
-        "chrome"
+        "chrome",
+        "--web-port",
+        "5001"
+      ]
+    },
+    {
+      "name": "admin panel (Chrome)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/admin/main_admin.dart",
+      "args": [
+        "-d",
+        "chrome",
+        "--web-port",
+        "5000"
       ]
     }
   ]

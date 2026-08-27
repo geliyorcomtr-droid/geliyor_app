@@ -10,16 +10,22 @@ class FoodTrackingStore extends ChangeNotifier {
   String _foodName = '';
   double _bagKg = 0;
   DateTime _purchaseDate = DateTime.now();
+  String? _petName;
+  String? _petSpecies;
 
   bool get isActive => _isActive;
   String get foodName => _foodName;
   double get bagKg => _bagKg;
   DateTime get purchaseDate => _purchaseDate;
+  String? get petName => _petName;
+  String? get petSpecies => _petSpecies;
 
   void start({
     required String foodName,
     required double bagKg,
     required DateTime purchaseDate,
+    String? petName,
+    String? petSpecies,
   }) {
     if (bagKg <= 0) return;
     _isActive = true;
@@ -30,6 +36,8 @@ class FoodTrackingStore extends ChangeNotifier {
       purchaseDate.month,
       purchaseDate.day,
     );
+    _petName = petName;
+    _petSpecies = petSpecies;
     notifyListeners();
   }
 
@@ -37,6 +45,8 @@ class FoodTrackingStore extends ChangeNotifier {
     _isActive = false;
     _foodName = '';
     _bagKg = 0;
+    _petName = null;
+    _petSpecies = null;
     notifyListeners();
   }
 }

@@ -1,4 +1,6 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:geliyor_app/screens/cart_screen.dart';
+import 'package:geliyor_app/state/cart_store.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
@@ -19,73 +21,11 @@ class OrdersScreen extends StatefulWidget {
 class _OrdersScreenState extends State<OrdersScreen> {
   final TextEditingController _searchController = TextEditingController();
   _OrderStatus? _activeFilter;
+  String? _expandedOrderId;
   int _currentPage = 1;
   static const int _pageSize = 4;
 
-  static const List<_OrderItem> _allOrders = [
-    _OrderItem(
-      id: '12345',
-      dateLabel: '10 Mayıs 2024 • 14:30',
-      total: '1.249,90 TL',
-      status: _OrderStatus.delivered,
-      statusMessage: 'Siparişiniz 12 Mayıs 2024 tarihinde teslim edildi.',
-      actionLabel: 'Tekrarla',
-      images: [
-        'assets/images/nd_kuzu_kisir.jpg',
-        'assets/images/nd_kuzu_kisir.jpg',
-        'assets/images/nd_kuzu_kisir.jpg',
-      ],
-    ),
-    _OrderItem(
-      id: '12344',
-      dateLabel: '08 Mayıs 2024 • 09:15',
-      total: '899,00 TL',
-      status: _OrderStatus.shipping,
-      statusMessage: 'Siparişiniz kargoya verildi.',
-      actionLabel: 'Sipariş Takibi',
-      images: [
-        'assets/images/nd_kuzu_kisir.jpg',
-        'assets/images/nd_kuzu_kisir.jpg',
-      ],
-    ),
-    _OrderItem(
-      id: '12343',
-      dateLabel: '05 Mayıs 2024 • 18:45',
-      total: '2.150,00 TL',
-      status: _OrderStatus.preparing,
-      statusMessage: 'Siparişiniz hazırlanıyor.',
-      actionLabel: 'Detayları Gör',
-      images: [
-        'assets/images/nd_kuzu_kisir.jpg',
-        'assets/images/nd_kuzu_kisir.jpg',
-        'assets/images/nd_kuzu_kisir.jpg',
-        'assets/images/nd_kuzu_kisir.jpg',
-      ],
-    ),
-    _OrderItem(
-      id: '12342',
-      dateLabel: '01 Mayıs 2024 • 11:20',
-      total: '450,00 TL',
-      status: _OrderStatus.cancelled,
-      statusMessage: 'Siparişiniz iptal edildi.',
-      actionLabel: 'Detayları Gör',
-      images: [
-        'assets/images/nd_kuzu_kisir.jpg',
-      ],
-    ),
-    _OrderItem(
-      id: '12341',
-      dateLabel: '28 Nisan 2024 • 16:05',
-      total: '3.420,00 TL',
-      status: _OrderStatus.delivered,
-      statusMessage: 'Siparişiniz 30 Nisan 2024 tarihinde teslim edildi.',
-      actionLabel: 'Tekrarla',
-      images: [
-        'assets/images/nd_kuzu_kisir.jpg',
-        'assets/images/nd_kuzu_kisir.jpg',
-      ],
-    ),
-  ];
+  static const List<_OrderItem> _allOrders = [];
 
   @override
   void dispose() {
@@ -98,7 +38,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
     return _allOrders.where((order) {
       final matchesFilter =
           _activeFilter == null || order.status == _activeFilter;
-      final matchesSearch = query.isEmpty ||
+      final matchesSearch =
+          query.isEmpty ||
           order.id.contains(query) ||
           order.dateLabel.toLowerCase().contains(query) ||
           order.total.toLowerCase().contains(query);
@@ -132,6 +73,12 @@ class _OrdersScreenState extends State<OrdersScreen> {
     setState(() => _currentPage = page.clamp(1, _totalPages));
   }
 
+  void _toggleOrderDetails(_OrderItem order) {
+    setState(() {
+      _expandedOrderId = _expandedOrderId == order.id ? null : order.id;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final pageOrders = _pageOrders;
@@ -145,7 +92,12 @@ class _OrdersScreenState extends State<OrdersScreen> {
         content: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+              padding: const EdgeInsets.fromLTRB(
+                AppPageFrame.contentHorizontalPadding,
+                0,
+                AppPageFrame.contentHorizontalPadding,
+                8,
+              ),
               child: _buildSearchBar(),
             ),
             _buildTabs(),
@@ -155,7 +107,12 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   ? _buildEmptyState()
                   : ListView.separated(
                       physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+                      padding: const EdgeInsets.fromLTRB(
+                        AppPageFrame.contentHorizontalPadding,
+                        0,
+                        AppPageFrame.contentHorizontalPadding,
+                        8,
+                      ),
                       itemCount: pageOrders.length,
                       separatorBuilder: (_, _) => const SizedBox(height: 10),
                       itemBuilder: (context, index) =>
@@ -180,7 +137,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
           Expanded(
             child: IgnorePointer(
               child: Text(
-                'Siparişlerim',
+                'SipariÅŸlerim',
                 textAlign: TextAlign.center,
                 style: AppTextStyles.pageHeader,
               ),
@@ -217,7 +174,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
               decoration: const InputDecoration(
                 isDense: true,
                 border: InputBorder.none,
-                hintText: 'Sipariş, ürün veya teslimat numarası ile ara',
+                hintText: 'SipariÅŸ, Ã¼rÃ¼n veya teslimat numarasÄ± ile ara',
                 hintStyle: TextStyle(
                   color: AppColors.subText,
                   fontSize: 11,
@@ -245,18 +202,20 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   Widget _buildTabs() {
     const tabs = <(String, _OrderStatus?)>[
-      ('Tümü', null),
-      ('Hazırlanıyor', _OrderStatus.preparing),
+      ('TÃ¼mÃ¼', null),
+      ('HazÄ±rlanÄ±yor', _OrderStatus.preparing),
       ('Kargoda', _OrderStatus.shipping),
       ('Teslim Edildi', _OrderStatus.delivered),
-      ('İptal Edildi', _OrderStatus.cancelled),
+      ('Ä°ptal Edildi', _OrderStatus.cancelled),
     ];
 
     return SizedBox(
       height: 34,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppPageFrame.contentHorizontalPadding,
+        ),
         itemCount: tabs.length,
         separatorBuilder: (_, _) => const SizedBox(width: 14),
         itemBuilder: (context, index) {
@@ -316,7 +275,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
             ),
             const SizedBox(height: 12),
             const Text(
-              'Bu filtrede sipariş bulunamadı',
+              'Bu filtrede sipariÅŸ bulunamadÄ±',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: AppColors.text,
@@ -326,7 +285,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
             ),
             const SizedBox(height: 6),
             const Text(
-              'Farklı bir durum seçebilir veya aramayı temizleyebilirsin.',
+              'FarklÄ± bir durum seÃ§ebilir veya aramayÄ± temizleyebilirsin.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: AppColors.subText,
@@ -343,157 +302,379 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   Widget _buildOrderCard(_OrderItem order) {
     final style = _statusStyle(order.status);
-    final visibleImages = order.images.take(3).toList();
-    final extraCount = order.images.length - visibleImages.length;
+    final images = order.images;
+    final visibleImages = images.take(3).toList();
+    final extraCount = images.length - visibleImages.length;
+    final isExpanded = _expandedOrderId == order.id;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _toggleOrderDetails(order),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: isExpanded ? AppColors.primary : AppColors.border,
+            width: isExpanded ? 1.5 : 1,
           ),
-        ],
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 30,
-                      height: 30,
-                      decoration: BoxDecoration(
-                        color: AppColors.selected,
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: const Icon(
-                        Icons.inventory_2_outlined,
-                        color: AppColors.primary,
-                        size: 16,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Sipariş No #${order.id}',
-                            style: const TextStyle(
-                              color: AppColors.text,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          Text(
-                            order.dateLabel,
-                            style: const TextStyle(
-                              color: AppColors.subText,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    _buildStatusBadge(order.status, style),
-                    const SizedBox(width: 4),
-                    const Icon(
-                      Icons.chevron_right_rounded,
-                      color: AppColors.subText,
-                      size: 18,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                SizedBox(
-                  height: 58,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.text.withValues(alpha: 0.03),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
+              child: Column(
+                children: [
+                  Row(
                     children: [
-                      Expanded(
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            for (final image in visibleImages) ...[
-                              _buildProductThumb(image),
-                              const SizedBox(width: 6),
-                            ],
-                            if (extraCount > 0) _buildMoreThumb(extraCount),
-                          ],
+                      Container(
+                        width: 30,
+                        height: 30,
+                        decoration: BoxDecoration(
+                          color: AppColors.selected,
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: const Icon(
+                          Icons.inventory_2_outlined,
+                          color: AppColors.primary,
+                          size: 16,
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              const Text(
-                                'Toplam Tutar',
-                                style: TextStyle(
-                                  color: AppColors.subText,
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'SipariÅŸ No #${order.id}',
+                              style: const TextStyle(
+                                color: AppColors.text,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w900,
                               ),
-                              Text(
-                                order.total,
-                                style: const TextStyle(
-                                  color: AppColors.primary,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                            ],
-                          ),
-                          AppPressableButton.outline(
-                            onTap: () {},
-                            height: 24,
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            child: Text(
-                              order.actionLabel,
-                              style: const TextStyle(fontSize: 9),
                             ),
-                          ),
-                        ],
+                            Text(
+                              order.dateLabel,
+                              style: const TextStyle(
+                                color: AppColors.subText,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      _buildStatusBadge(order.status, style),
+                      const SizedBox(width: 4),
+                      AnimatedRotation(
+                        turns: isExpanded ? 0.25 : 0,
+                        duration: const Duration(milliseconds: 200),
+                        child: const Icon(
+                          Icons.chevron_right_rounded,
+                          color: AppColors.subText,
+                          size: 18,
+                        ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 58,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              for (final image in visibleImages) ...[
+                                _buildProductThumb(image),
+                                const SizedBox(width: 6),
+                              ],
+                              if (extraCount > 0) _buildMoreThumb(extraCount),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                const Text(
+                                  'Toplam Tutar',
+                                  style: TextStyle(
+                                    color: AppColors.subText,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                Text(
+                                  order.total,
+                                  style: const TextStyle(
+                                    color: AppColors.primary,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            AppPressableButton.outline(
+                              onTap: () => _onOrderAction(order),
+                              height: 24,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                              ),
+                              child: Text(
+                                order.actionLabel,
+                                style: const TextStyle(fontSize: 9),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              color: style.bannerColor,
+              child: Row(
+                children: [
+                  Icon(style.bannerIcon, size: 14, color: style.color),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      order.statusMessage,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: style.color,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            AnimatedCrossFade(
+              duration: const Duration(milliseconds: 220),
+              sizeCurve: Curves.easeOut,
+              firstChild: const SizedBox(width: double.infinity),
+              secondChild: _buildOrderDetails(order, style),
+              crossFadeState: isExpanded
+                  ? CrossFadeState.showSecond
+                  : CrossFadeState.showFirst,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOrderDetails(_OrderItem order, _StatusStyle style) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
+      decoration: const BoxDecoration(
+        color: AppColors.background,
+        border: Border(top: BorderSide(color: AppColors.border)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text('SipariÅŸ DetayÄ±', style: AppTextStyles.sectionHeader),
+              const Spacer(),
+              Text(
+                '${order.lines.length} Ã¼rÃ¼n',
+                style: const TextStyle(
+                  color: AppColors.subText,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ...order.lines.map(_buildOrderLineDetail),
+          const SizedBox(height: 10),
+          _buildDetailInfoTile(
+            icon: Icons.location_on_outlined,
+            title: 'Teslimat Adresi',
+            value: 'Ev Adresim â€¢ Ä°stanbul',
+          ),
+          const SizedBox(height: 8),
+          _buildDetailInfoTile(
+            icon: Icons.credit_card_rounded,
+            title: 'Ã–deme',
+            value: 'Banka / Kredi KartÄ± â€¢â€¢â€¢â€¢ 4242',
+          ),
+          const SizedBox(height: 8),
+          _buildDetailInfoTile(
+            icon: style.badgeIcon,
+            iconColor: style.color,
+            title: 'SipariÅŸ Durumu',
+            value: order.statusMessage,
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Row(
+              children: [
+                const Text(
+                  'Ã–denen Toplam',
+                  style: TextStyle(
+                    color: AppColors.text,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  order.total,
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
               ],
             ),
           ),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-            color: style.bannerColor,
-            child: Row(
-              children: [
-                Icon(style.bannerIcon, size: 14, color: style.color),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    order.statusMessage,
-                    maxLines: 1,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOrderLineDetail(_OrderLine line) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Image.asset(
+                line.imagePath,
+                fit: BoxFit.contain,
+                errorBuilder: (_, _, _) =>
+                    const Icon(Icons.pets_rounded, color: AppColors.primary),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    line.title,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: style.color,
+                    style: const TextStyle(
+                      color: AppColors.text,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      height: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${line.weight} â€¢ ${line.quantity} adet',
+                    style: const TextStyle(
+                      color: AppColors.subText,
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
                     ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailInfoTile({
+    required IconData icon,
+    required String title,
+    required String value,
+    Color iconColor = AppColors.primary,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: const BoxDecoration(
+              color: AppColors.selected,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: iconColor, size: 17),
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: AppColors.subText,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    color: AppColors.text,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
               ],
@@ -543,11 +724,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
       child: Image.asset(
         imagePath,
         fit: BoxFit.contain,
-        errorBuilder: (context, error, stackTrace) => const Icon(
-          Icons.pets_rounded,
-          color: AppColors.primary,
-          size: 20,
-        ),
+        errorBuilder: (context, error, stackTrace) =>
+            const Icon(Icons.pets_rounded, color: AppColors.primary, size: 20),
       ),
     );
   }
@@ -575,7 +753,12 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   Widget _buildPagination() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
+      padding: const EdgeInsets.fromLTRB(
+        AppPageFrame.contentHorizontalPadding,
+        0,
+        AppPageFrame.contentHorizontalPadding,
+        4,
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -628,40 +811,174 @@ class _OrdersScreenState extends State<OrdersScreen> {
     );
   }
 
+  void _onOrderAction(_OrderItem order) {
+    if (order.actionLabel == 'Tekrarla') {
+      _repeatOrder(order);
+      return;
+    }
+    _toggleOrderDetails(order);
+  }
+
+  void _repeatOrder(_OrderItem order) {
+    if (order.lines.isEmpty) return;
+
+    for (final line in order.lines) {
+      for (var i = 0; i < line.quantity; i++) {
+        CartStore.instance.addItem(
+          id: line.id,
+          imagePath: line.imagePath,
+          title: line.title,
+          unitPrice: line.unitPrice,
+          oldPrice: line.oldPrice,
+          weight: line.weight,
+        );
+      }
+    }
+
+    final subtitle = order.lines.length == 1
+        ? order.lines.first.title
+        : 'SipariÅŸ #${order.id} â€¢ ${order.lines.length} Ã¼rÃ¼n';
+    _showAddedToCartDialog(subtitle);
+  }
+
+  void _showAddedToCartDialog(String productTitle) {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withValues(alpha: 0.35),
+      builder: (dialogContext) {
+        return Center(
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              width: AppPageFrame.width - 48,
+              constraints: const BoxConstraints(maxHeight: 280),
+              margin: const EdgeInsets.symmetric(horizontal: 24),
+              padding: const EdgeInsets.fromLTRB(16, 18, 16, 14),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: AppColors.border),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: AppColors.success.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.check_rounded,
+                      color: AppColors.success,
+                      size: 26,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'ÃœrÃ¼n sepete eklenmiÅŸtir',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: AppColors.text,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    productTitle,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.subText,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  AppPressableButton.primary(
+                    onTap: () {
+                      Navigator.of(dialogContext).pop();
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const CartScreen()),
+                      );
+                    },
+                    width: double.infinity,
+                    height: 40,
+                    child: const Text(
+                      'Sepete Git',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  AppPressableButton.outline(
+                    onTap: () => Navigator.of(dialogContext).pop(),
+                    width: double.infinity,
+                    height: 40,
+                    child: const Text(
+                      'AlÄ±ÅŸveriÅŸe Devam Et',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   _StatusStyle _statusStyle(_OrderStatus status) {
     return switch (status) {
       _OrderStatus.delivered => const _StatusStyle(
-          label: 'Teslim Edildi',
-          color: AppColors.success,
-          badgeBackground: Color(0xFFEAF9EF),
-          bannerColor: Color(0xFFF0FBF4),
-          badgeIcon: Icons.check_circle_rounded,
-          bannerIcon: Icons.check_circle_outline_rounded,
-        ),
+        label: 'Teslim Edildi',
+        color: AppColors.success,
+        badgeBackground: Color(0xFFEAF9EF),
+        bannerColor: Color(0xFFF0FBF4),
+        badgeIcon: Icons.check_circle_rounded,
+        bannerIcon: Icons.check_circle_outline_rounded,
+      ),
       _OrderStatus.shipping => const _StatusStyle(
-          label: 'Kargoda',
-          color: AppColors.primary,
-          badgeBackground: AppColors.selected,
-          bannerColor: Color(0xFFF2F8FF),
-          badgeIcon: Icons.local_shipping_outlined,
-          bannerIcon: Icons.info_outline_rounded,
-        ),
+        label: 'Kargoda',
+        color: AppColors.primary,
+        badgeBackground: AppColors.selected,
+        bannerColor: Color(0xFFF2F8FF),
+        badgeIcon: Icons.local_shipping_outlined,
+        bannerIcon: Icons.info_outline_rounded,
+      ),
       _OrderStatus.preparing => const _StatusStyle(
-          label: 'Hazırlanıyor',
-          color: AppColors.warning,
-          badgeBackground: Color(0xFFFFF7E8),
-          bannerColor: Color(0xFFFFFAF0),
-          badgeIcon: Icons.schedule_rounded,
-          bannerIcon: Icons.schedule_rounded,
-        ),
+        label: 'HazÄ±rlanÄ±yor',
+        color: AppColors.warning,
+        badgeBackground: Color(0xFFFFF7E8),
+        bannerColor: Color(0xFFFFFAF0),
+        badgeIcon: Icons.schedule_rounded,
+        bannerIcon: Icons.schedule_rounded,
+      ),
       _OrderStatus.cancelled => const _StatusStyle(
-          label: 'İptal Edildi',
-          color: AppColors.subText,
-          badgeBackground: Color(0xFFF3F4F6),
-          bannerColor: Color(0xFFF8FAFC),
-          badgeIcon: Icons.cancel_outlined,
-          bannerIcon: Icons.info_outline_rounded,
-        ),
+        label: 'Ä°ptal Edildi',
+        color: AppColors.subText,
+        badgeBackground: Color(0xFFF3F4F6),
+        bannerColor: Color(0xFFF8FAFC),
+        badgeIcon: Icons.cancel_outlined,
+        bannerIcon: Icons.info_outline_rounded,
+      ),
     };
   }
 }
@@ -674,7 +991,7 @@ class _OrderItem {
     required this.status,
     required this.statusMessage,
     required this.actionLabel,
-    required this.images,
+    required this.lines,
   });
 
   final String id;
@@ -683,7 +1000,29 @@ class _OrderItem {
   final _OrderStatus status;
   final String statusMessage;
   final String actionLabel;
-  final List<String> images;
+  final List<_OrderLine> lines;
+
+  List<String> get images => lines.map((line) => line.imagePath).toList();
+}
+
+class _OrderLine {
+  const _OrderLine({
+    required this.id,
+    required this.title,
+    required this.weight,
+    required this.unitPrice,
+    required this.oldPrice,
+    required this.imagePath,
+    this.quantity = 1,
+  });
+
+  final String id;
+  final String title;
+  final String weight;
+  final double unitPrice;
+  final double oldPrice;
+  final String imagePath;
+  final int quantity;
 }
 
 class _StatusStyle {

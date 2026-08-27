@@ -1,10 +1,12 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:geliyor_app/data/banner_repository.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/screens/cart_screen.dart';
 import 'package:geliyor_app/screens/product_detail_screen.dart';
 import 'package:geliyor_app/state/cart_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
+import 'package:geliyor_app/widgets/app_banner_slider.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
 import 'package:geliyor_app/widgets/cart_product_card.dart';
@@ -249,32 +251,9 @@ class _MedicineTreatmentScreenState extends State<MedicineTreatmentScreen> {
   }
 
   Widget _buildBanner() {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.border, width: 1.3),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Image.asset(
-        'assets/images/ilac_tedavi_banner.png',
-        width: double.infinity,
-        fit: BoxFit.fitWidth,
-        alignment: Alignment.center,
-        errorBuilder: (context, error, stackTrace) {
-          return Container(
-            height: 100,
-            color: AppColors.selected,
-            alignment: Alignment.center,
-            child: const Icon(
-              Icons.medical_services_outlined,
-              color: AppColors.primary,
-              size: 36,
-            ),
-          );
-        },
-      ),
+    return const AppBannerSlot(
+      placement: BannerPlacement.medicine,
+      fallbackAssets: ['assets/images/ilac_tedavi_banner.png'],
     );
   }
 
@@ -425,43 +404,18 @@ class _MedicineTreatmentScreenState extends State<MedicineTreatmentScreen> {
   }
 
   Widget _buildSectionHeader() {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              _sectionTitle,
-              style: const TextStyle(
-                color: AppColors.text,
-                fontSize: 14,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Container(
-              width: 28,
-              height: 2.5,
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-          ],
-        ),
-        const Spacer(),
-        const Text(
-          'Tümünü Gör',
-          style: TextStyle(
+        Text(_sectionTitle, style: AppTextStyles.sectionHeader),
+        const SizedBox(height: 2),
+        Container(
+          width: 28,
+          height: 2.5,
+          decoration: BoxDecoration(
             color: AppColors.primary,
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
+            borderRadius: BorderRadius.circular(999),
           ),
-        ),
-        const Icon(
-          Icons.chevron_right_rounded,
-          color: AppColors.primary,
-          size: 16,
         ),
       ],
     );
@@ -483,7 +437,7 @@ class _MedicineTreatmentScreenState extends State<MedicineTreatmentScreen> {
     final discount = product.oldPrice <= 0
         ? 0
         : (((product.oldPrice - product.price) / product.oldPrice) * 100)
-            .round();
+              .round();
 
     return CartProductCard(
       item: CartItem(
@@ -498,9 +452,9 @@ class _MedicineTreatmentScreenState extends State<MedicineTreatmentScreen> {
         quantity: qty,
       ),
       onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const ProductDetailScreen()),
-        );
+        Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (_) => const ProductDetailScreen()));
       },
       onQuantityChanged: (next) {
         setState(() => _quantities[product.id] = next);
@@ -511,15 +465,16 @@ class _MedicineTreatmentScreenState extends State<MedicineTreatmentScreen> {
           CartStore.instance.addItem(
             id: product.id,
             imagePath: product.imagePath,
-            title: '${product.brand} ${product.name} ${product.weight}',
+            title: product.name,
             unitPrice: product.price,
             oldPrice: product.oldPrice,
             weight: product.weight,
+            brand: product.brand,
           );
         }
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const CartScreen()),
-        );
+        Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (_) => const CartScreen()));
       },
     );
   }

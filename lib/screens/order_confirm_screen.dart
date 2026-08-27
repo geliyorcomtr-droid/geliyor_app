@@ -1,8 +1,12 @@
-﻿import 'package:flutter/material.dart';
+import 'dart:async';
+
+import 'package:flutter/material.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
+import 'package:geliyor_app/data/order_repository.dart';
 import 'package:geliyor_app/screens/addresses_screen.dart';
 import 'package:geliyor_app/screens/order_success_screen.dart';
 import 'package:geliyor_app/state/address_store.dart';
+import 'package:geliyor_app/state/cart_store.dart';
 import 'package:geliyor_app/state/order_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
@@ -44,6 +48,20 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
 
   void _onAddressChanged() {
     if (mounted) setState(() {});
+  }
+
+  Future<void> _submitOrder(String deliveryTime) async {
+    try {
+      final id = await OrderRepository.instance.placeCurrentCart(
+        paymentMethod: selectedPayment,
+        deliverySlot: deliveryTime,
+      );
+      if (id != null) {
+        CartStore.instance.clear();
+      }
+    } catch (_) {
+      // Yerel başarı ekranı açılsın; admin paneline yazılamazsa sessiz geç.
+    }
   }
 
   String _formatPrice(double price) {
@@ -116,7 +134,11 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
             child: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.verified_user_outlined, color: AppColors.primary, size: 13),
+                Icon(
+                  Icons.verified_user_outlined,
+                  color: AppColors.primary,
+                  size: 13,
+                ),
                 SizedBox(width: 4),
                 Text(
                   'Güvenli',
@@ -205,9 +227,9 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
           'Teslimat Adresi',
           showChange: true,
           onChange: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const AddressesScreen()),
-            );
+            Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const AddressesScreen()));
           },
         ),
         const SizedBox(height: 8),
@@ -325,7 +347,11 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
             ),
             const SizedBox(width: 8),
             Expanded(
-              child: _timeCard('Öğle', '12:00-18:00', Icons.wb_twilight_outlined),
+              child: _timeCard(
+                'Öğle',
+                '12:00-18:00',
+                Icons.wb_twilight_outlined,
+              ),
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -383,7 +409,9 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
             Align(
               alignment: Alignment.topRight,
               child: Icon(
-                selected ? Icons.check_circle_rounded : Icons.radio_button_unchecked,
+                selected
+                    ? Icons.check_circle_rounded
+                    : Icons.radio_button_unchecked,
                 color: selected ? AppColors.primary : AppColors.border,
                 size: 14,
               ),
@@ -535,7 +563,9 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
               ),
             ),
             Icon(
-              selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+              selected
+                  ? Icons.radio_button_checked
+                  : Icons.radio_button_unchecked,
               color: selected ? AppColors.primary : AppColors.border,
               size: 20,
             ),
@@ -558,7 +588,11 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
             children: [
               _summaryRow('${widget.itemCount} ürün', totalText),
               const SizedBox(height: 6),
-              _summaryRow('Teslimat Ücreti', 'Ücretsiz', valueColor: AppColors.primary),
+              _summaryRow(
+                'Teslimat Ücreti',
+                'Ücretsiz',
+                valueColor: AppColors.primary,
+              ),
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 8),
                 child: Divider(height: 1, color: AppColors.border),
@@ -619,14 +653,15 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
     final deliveryTime = selectedDeliveryTime == 'Sabah'
         ? '09:00 - 12:00'
         : selectedDeliveryTime == 'Öğle'
-            ? '12:00 - 18:00'
-            : '19:00 - 22:00';
+        ? '12:00 - 18:00'
+        : '19:00 - 22:00';
 
     return AppPressableButton.primary(
       onTap: () {
         if (widget.saveCartAsLastOrder) {
           OrderStore.instance.saveLastOrderFromCart();
         }
+        unawaited(_submitOrder(deliveryTime));
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => OrderSuccessScreen(
@@ -684,7 +719,10 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
       child: const Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _TrustBadge(icon: Icons.delivery_dining_rounded, label: 'Ücretsiz Kurye'),
+          _TrustBadge(
+            icon: Icons.delivery_dining_rounded,
+            label: 'Ücretsiz Kurye',
+          ),
           _TrustBadge(icon: Icons.shield_outlined, label: 'Güvenli Teslimat'),
           _TrustBadge(icon: Icons.support_agent_rounded, label: '7/24 Destek'),
         ],
@@ -719,15 +757,7 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
           ),
         ),
         const SizedBox(width: 8),
-        Text(
-          title,
-          style: const TextStyle(
-            color: AppColors.text,
-            fontSize: 14,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        const Spacer(),
+        Expanded(child: Text(title, style: AppTextStyles.sectionHeader)),
         if (showChange)
           GestureDetector(
             behavior: HitTestBehavior.opaque,

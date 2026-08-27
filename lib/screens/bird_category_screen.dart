@@ -14,7 +14,6 @@ class BirdCategoryScreen extends StatelessWidget {
           title: 'Kuş Ürünleri',
           subtitle: 'Yem, aksesuar ve bakım ürünleri',
           imagePath: 'assets/images/urunler_kus.png',
-          emoji: '🐦',
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(

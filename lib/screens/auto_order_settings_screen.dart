@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/state/notification_settings_store.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
@@ -21,6 +21,19 @@ class _AutoOrderSettingsScreenState extends State<AutoOrderSettingsScreen> {
   int _confirmMode = 0; // 0: otomatik, 1: sor
   int _deliverySlot = 0; // 0: sabah, 1: öğle, 2: akşam
 
+
+  /// Akıllı Plan → Otomatik Sipariş / Kolay Sipariş rengi.
+  static const Color _accent = Color(0xFF22C55E);
+
+  Color get _soft => _accent.withValues(alpha: 0.12);
+  Color get _lineSoft => _accent.withValues(alpha: 0.28);
+  Color get _track => Color.lerp(_accent, Colors.white, 0.35) ?? _accent;
+
+  TextStyle get _titleStyle =>
+      AppTextStyles.pageHeaderWith(color: _accent);
+
+  TextStyle get _sectionStyle =>
+      AppTextStyles.sectionHeaderWith(color: _accent);
   bool get _advancedEnabled => !_smartMode && _advancedMode;
 
   @override
@@ -87,11 +100,11 @@ class _AutoOrderSettingsScreenState extends State<AutoOrderSettingsScreen> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
-                    style: AppTextStyles.pageHeader,
+                    style: _titleStyle,
                   ),
                 ),
                 const SizedBox(width: 4),
-                const Icon(Icons.pets_rounded, color: AppColors.primary, size: 16),
+                const Icon(Icons.pets_rounded, color: _accent, size: 16),
               ],
             ),
           ),
@@ -107,7 +120,7 @@ class _AutoOrderSettingsScreenState extends State<AutoOrderSettingsScreen> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: _lineSoft),
       ),
       child: Column(
         children: [
@@ -118,7 +131,7 @@ class _AutoOrderSettingsScreenState extends State<AutoOrderSettingsScreen> {
                 width: 36,
                 height: 36,
                 decoration: const BoxDecoration(
-                  color: AppColors.primary,
+                  color: _accent,
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -149,13 +162,13 @@ class _AutoOrderSettingsScreenState extends State<AutoOrderSettingsScreen> {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: AppColors.selected,
+                            color: _soft,
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: const Text(
                             'Önerilen',
                             style: TextStyle(
-                              color: AppColors.primary,
+                              color: _accent,
                               fontSize: 9,
                               fontWeight: FontWeight.w800,
                             ),
@@ -173,7 +186,7 @@ class _AutoOrderSettingsScreenState extends State<AutoOrderSettingsScreen> {
                               });
                             },
                             activeThumbColor: AppColors.surface,
-                            activeTrackColor: AppColors.primaryLight,
+                            activeTrackColor: _track,
                             materialTapTargetSize:
                                 MaterialTapTargetSize.shrinkWrap,
                           ),
@@ -204,7 +217,7 @@ class _AutoOrderSettingsScreenState extends State<AutoOrderSettingsScreen> {
                           errorBuilder: (context, error, stackTrace) {
                             return const Icon(
                               Icons.pets_rounded,
-                              color: AppColors.primary,
+                              color: _accent,
                               size: 40,
                             );
                           },
@@ -233,20 +246,20 @@ class _AutoOrderSettingsScreenState extends State<AutoOrderSettingsScreen> {
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: _lineSoft),
         ),
         child: Row(
           children: [
             Container(
               width: 36,
               height: 36,
-              decoration: const BoxDecoration(
-                color: AppColors.selected,
+              decoration: BoxDecoration(
+                color: _soft,
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.settings_rounded,
-                color: AppColors.primary,
+                color: _accent,
                 size: 18,
               ),
             ),
@@ -284,7 +297,7 @@ class _AutoOrderSettingsScreenState extends State<AutoOrderSettingsScreen> {
                     ? null
                     : (v) => setState(() => _advancedMode = v),
                 activeThumbColor: AppColors.surface,
-                activeTrackColor: AppColors.primaryLight,
+                activeTrackColor: _track,
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
             ),
@@ -305,27 +318,23 @@ class _AutoOrderSettingsScreenState extends State<AutoOrderSettingsScreen> {
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: _lineSoft),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Row(
+              Row(
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.calendar_month_rounded,
-                    color: AppColors.primary,
+                    color: _accent,
                     size: 16,
                   ),
-                  SizedBox(width: 6),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       '1. Sipariş Ne Zaman Oluşturulsun?',
-                      style: TextStyle(
-                        color: AppColors.text,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w900,
-                      ),
+                      style: _sectionStyle,
                     ),
                   ),
                 ],
@@ -365,10 +374,10 @@ class _AutoOrderSettingsScreenState extends State<AutoOrderSettingsScreen> {
       child: Container(
         padding: const EdgeInsets.fromLTRB(4, 8, 4, 6),
         decoration: BoxDecoration(
-          color: selected ? AppColors.selected : AppColors.surface,
+          color: selected ? _soft : AppColors.surface,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: selected ? AppColors.primary : AppColors.border,
+            color: selected ? _accent : _lineSoft,
             width: selected ? 1.6 : 1,
           ),
         ),
@@ -380,20 +389,20 @@ class _AutoOrderSettingsScreenState extends State<AutoOrderSettingsScreen> {
                 selected
                     ? Icons.check_circle_rounded
                     : Icons.radio_button_unchecked,
-                color: selected ? AppColors.primary : AppColors.border,
+                color: selected ? _accent : _lineSoft,
                 size: 14,
               ),
             ),
             Icon(
               Icons.calendar_today_rounded,
-              color: selected ? AppColors.primary : AppColors.subText,
+              color: selected ? _accent : AppColors.subText,
               size: 16,
             ),
             const SizedBox(height: 4),
             Text(
               '$days Gün',
               style: TextStyle(
-                color: selected ? AppColors.primary : AppColors.text,
+                color: selected ? _accent : AppColors.text,
                 fontSize: 11,
                 fontWeight: FontWeight.w800,
               ),
@@ -401,7 +410,7 @@ class _AutoOrderSettingsScreenState extends State<AutoOrderSettingsScreen> {
             Text(
               'Önce',
               style: TextStyle(
-                color: selected ? AppColors.primary : AppColors.subText,
+                color: selected ? _accent : AppColors.subText,
                 fontSize: 9,
                 fontWeight: FontWeight.w600,
               ),
@@ -411,7 +420,7 @@ class _AutoOrderSettingsScreenState extends State<AutoOrderSettingsScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                 decoration: BoxDecoration(
-                  color: AppColors.primary,
+                  color: _accent,
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: const Text(
@@ -441,26 +450,22 @@ class _AutoOrderSettingsScreenState extends State<AutoOrderSettingsScreen> {
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: _lineSoft),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Row(
+              Row(
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.verified_user_outlined,
-                    color: AppColors.primary,
+                    color: _accent,
                     size: 16,
                   ),
-                  SizedBox(width: 6),
+                  const SizedBox(width: 6),
                   Text(
                     '2. Sipariş Onayı',
-                    style: TextStyle(
-                      color: AppColors.text,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w900,
-                    ),
+                    style: _sectionStyle,
                   ),
                 ],
               ),
@@ -506,10 +511,10 @@ class _AutoOrderSettingsScreenState extends State<AutoOrderSettingsScreen> {
       child: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: selected ? AppColors.selected : AppColors.surface,
+          color: selected ? _soft : AppColors.surface,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: selected ? AppColors.primary : AppColors.border,
+            color: selected ? _accent : _lineSoft,
             width: selected ? 1.5 : 1,
           ),
         ),
@@ -519,7 +524,7 @@ class _AutoOrderSettingsScreenState extends State<AutoOrderSettingsScreen> {
               selected
                   ? Icons.check_circle_rounded
                   : Icons.radio_button_unchecked,
-              color: selected ? AppColors.primary : AppColors.border,
+              color: selected ? _accent : _lineSoft,
               size: 18,
             ),
             const SizedBox(width: 8),
@@ -530,7 +535,7 @@ class _AutoOrderSettingsScreenState extends State<AutoOrderSettingsScreen> {
                   Text(
                     title,
                     style: TextStyle(
-                      color: selected ? AppColors.primary : AppColors.text,
+                      color: selected ? _accent : AppColors.text,
                       fontSize: 12.5,
                       fontWeight: FontWeight.w800,
                     ),
@@ -547,7 +552,7 @@ class _AutoOrderSettingsScreenState extends State<AutoOrderSettingsScreen> {
                 ],
               ),
             ),
-            Icon(icon, color: AppColors.primary, size: 22),
+            Icon(icon, color: _accent, size: 22),
           ],
         ),
       ),
@@ -564,27 +569,23 @@ class _AutoOrderSettingsScreenState extends State<AutoOrderSettingsScreen> {
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: _lineSoft),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Row(
+              Row(
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.access_time_rounded,
-                    color: AppColors.primary,
+                    color: _accent,
                     size: 16,
                   ),
-                  SizedBox(width: 6),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       '3. Tahmini Teslimat Saat Aralığı',
-                      style: TextStyle(
-                        color: AppColors.text,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w900,
-                      ),
+                      style: _sectionStyle,
                     ),
                   ),
                 ],
@@ -647,10 +648,10 @@ class _AutoOrderSettingsScreenState extends State<AutoOrderSettingsScreen> {
       child: Container(
         padding: const EdgeInsets.fromLTRB(6, 8, 6, 8),
         decoration: BoxDecoration(
-          color: selected ? AppColors.selected : AppColors.surface,
+          color: selected ? _soft : AppColors.surface,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: selected ? AppColors.primary : AppColors.border,
+            color: selected ? _accent : _lineSoft,
             width: selected ? 1.6 : 1,
           ),
         ),
@@ -662,20 +663,20 @@ class _AutoOrderSettingsScreenState extends State<AutoOrderSettingsScreen> {
                 selected
                     ? Icons.check_circle_rounded
                     : Icons.radio_button_unchecked,
-                color: selected ? AppColors.primary : AppColors.border,
+                color: selected ? _accent : _lineSoft,
                 size: 14,
               ),
             ),
             Icon(
               icon,
-              color: selected ? AppColors.primary : AppColors.subText,
+              color: selected ? _accent : AppColors.subText,
               size: 18,
             ),
             const SizedBox(height: 4),
             Text(
               title,
               style: TextStyle(
-                color: selected ? AppColors.primary : AppColors.text,
+                color: selected ? _accent : AppColors.text,
                 fontSize: 12,
                 fontWeight: FontWeight.w800,
               ),
@@ -685,7 +686,7 @@ class _AutoOrderSettingsScreenState extends State<AutoOrderSettingsScreen> {
               time,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: selected ? AppColors.primary : AppColors.subText,
+                color: selected ? _accent : AppColors.subText,
                 fontSize: 9,
                 fontWeight: FontWeight.w600,
               ),
@@ -707,13 +708,13 @@ class _AutoOrderSettingsScreenState extends State<AutoOrderSettingsScreen> {
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: _lineSoft),
           ),
           child: Row(
             children: [
               const Icon(
                 Icons.notifications_active_outlined,
-                color: AppColors.primary,
+                color: _accent,
                 size: 18,
               ),
               const SizedBox(width: 8),
@@ -721,13 +722,9 @@ class _AutoOrderSettingsScreenState extends State<AutoOrderSettingsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       '4. Bildirimler',
-                      style: TextStyle(
-                        color: AppColors.text,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w900,
-                      ),
+                      style: _sectionStyle,
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -747,7 +744,7 @@ class _AutoOrderSettingsScreenState extends State<AutoOrderSettingsScreen> {
                   value: store.autoOrderNotifications,
                   onChanged: store.setAutoOrderNotifications,
                   activeThumbColor: AppColors.surface,
-                  activeTrackColor: AppColors.primaryLight,
+                  activeTrackColor: _track,
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
               ),
@@ -763,14 +760,14 @@ class _AutoOrderSettingsScreenState extends State<AutoOrderSettingsScreen> {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: AppColors.selected,
+        color: _soft,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
         children: [
           const Icon(
             Icons.info_outline_rounded,
-            color: AppColors.primary,
+            color: _accent,
             size: 15,
           ),
           const SizedBox(width: 8),
@@ -778,7 +775,7 @@ class _AutoOrderSettingsScreenState extends State<AutoOrderSettingsScreen> {
             child: Text(
               text,
               style: const TextStyle(
-                color: AppColors.primary,
+                color: _accent,
                 fontSize: 10.5,
                 fontWeight: FontWeight.w600,
                 height: 1.25,

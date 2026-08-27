@@ -19,7 +19,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _phoneController = TextEditingController();
   final _codeController = TextEditingController();
   bool _codeSent = false;
-  bool _obscureCode = true;
+  bool _busy = false;
 
   @override
   void dispose() {
@@ -28,17 +28,27 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _sendCode() {
+  Future<void> _sendCode() async {
     final phone = _phoneController.text.trim();
     if (phone.length < 10) {
       _showMessage('Geçerli bir telefon numarası girin.');
       return;
     }
-    setState(() => _codeSent = true);
-    _showMessage('Giriş kodu telefonunuza gönderildi.');
+    setState(() => _busy = true);
+    try {
+      await AuthStore.instance.sendCode(phone);
+      if (!mounted) return;
+      setState(() => _codeSent = true);
+      _showMessage('Giriş kodu telefonunuza gönderildi.');
+    } catch (e) {
+      if (!mounted) return;
+      _showMessage(AuthStore.friendlyError(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
-  void _login() {
+  Future<void> _login() async {
     final phone = _phoneController.text.trim();
     final code = _codeController.text.trim();
 
@@ -47,7 +57,7 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
     if (!_codeSent) {
-      _sendCode();
+      await _sendCode();
       return;
     }
     if (code.length < 4) {
@@ -55,14 +65,26 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    AuthStore.instance.login(phone: phone);
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(
-        settings: const RouteSettings(name: 'profile'),
-        builder: (_) => const AccountScreen(),
-      ),
-      (route) => false,
-    );
+    setState(() => _busy = true);
+    try {
+      await AuthStore.instance.verifyCode(
+        smsCode: code,
+        requireExistingUser: true,
+      );
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          settings: const RouteSettings(name: 'profile'),
+          builder: (_) => const AccountScreen(),
+        ),
+        (route) => false,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _showMessage(AuthStore.friendlyError(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   void _showMessage(String message) {
@@ -86,7 +108,12 @@ class _LoginScreenState extends State<LoginScreen> {
         header: _buildHeader(context),
         content: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+          padding: const EdgeInsets.fromLTRB(
+            AppPageFrame.contentHorizontalPadding,
+            0,
+            AppPageFrame.contentHorizontalPadding,
+            10,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -120,69 +147,58 @@ class _LoginScreenState extends State<LoginScreen> {
                 hint: '05XX XXX XX XX',
                 icon: Icons.phone_outlined,
                 keyboardType: TextInputType.phone,
+                onChanged: (_) {
+                  if (_codeSent) {
+                    setState(() {
+                      _codeSent = false;
+                      _codeController.clear();
+                    });
+                  }
+                },
                 inputFormatters: [
                   FilteringTextInputFormatter.digitsOnly,
                   LengthLimitingTextInputFormatter(11),
                 ],
               ),
               const SizedBox(height: 14),
-              _fieldLabel('Giriş Kodu'),
+              _fieldLabel('SMS Doğrulama Kodu'),
               const SizedBox(height: 6),
               _inputField(
                 controller: _codeController,
                 hint: _codeSent
-                    ? 'Telefonunuza gelen kodu girin'
+                    ? 'SMS ile gelen 6 haneli kod'
                     : 'Önce kod gönderin',
-                icon: Icons.lock_outline_rounded,
-                obscureText: _obscureCode,
+                icon: Icons.sms_outlined,
+                enabled: _codeSent && !_busy,
+                obscureText: false,
                 keyboardType: TextInputType.number,
                 inputFormatters: [
                   FilteringTextInputFormatter.digitsOnly,
                   LengthLimitingTextInputFormatter(6),
                 ],
-                suffix: IconButton(
-                  onPressed: () => setState(() => _obscureCode = !_obscureCode),
-                  icon: Icon(
-                    _obscureCode
-                        ? Icons.visibility_outlined
-                        : Icons.visibility_off_outlined,
-                    color: AppColors.subText,
-                    size: 20,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: _sendCode,
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.primary,
-                    padding: EdgeInsets.zero,
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: Text(
-                    _codeSent ? 'Kodu Tekrar Gönder' : 'Kod Gönder',
-                    style: const TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
               ),
               const SizedBox(height: 16),
               AppPressableButton.primary(
-                onTap: _login,
+                onTap: _busy ? null : (_codeSent ? _login : _sendCode),
+                enabled: !_busy,
                 width: double.infinity,
                 height: 48,
-                child: const Text(
-                  'Giriş Yap',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
+                child: _busy
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.4,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Text(
+                        _codeSent ? 'Giriş Yap' : 'Kod Gönder',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
               ),
               const SizedBox(height: 18),
               _orDivider(),
@@ -196,7 +212,8 @@ class _LoginScreenState extends State<LoginScreen> {
               _socialButton(
                 label: 'Google ile Giriş Yap',
                 icon: Icons.g_mobiledata_rounded,
-                onTap: () => _showMessage('Google ile giriş yakında eklenecek.'),
+                onTap: () =>
+                    _showMessage('Google ile giriş yakında eklenecek.'),
               ),
               const SizedBox(height: 22),
               Row(
@@ -262,15 +279,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildBrand() {
     return Image.asset(
-      'assets/images/geliyor_auth_logo.png',
-      height: 138,
+      'assets/images/geliyor_splash_logo.png',
+      height: 240,
       fit: BoxFit.contain,
       filterQuality: FilterQuality.high,
-      errorBuilder: (context, error, stackTrace) => const Icon(
-        Icons.pets_rounded,
-        color: AppColors.primary,
-        size: 48,
-      ),
+      errorBuilder: (context, error, stackTrace) =>
+          const Icon(Icons.pets_rounded, color: AppColors.primary, size: 48),
     );
   }
 
@@ -290,17 +304,21 @@ class _LoginScreenState extends State<LoginScreen> {
     required String hint,
     required IconData icon,
     bool obscureText = false,
+    bool enabled = true,
     TextInputType? keyboardType,
     List<TextInputFormatter>? inputFormatters,
     Widget? suffix,
+    ValueChanged<String>? onChanged,
   }) {
     return TextField(
       controller: controller,
+      enabled: enabled,
+      onChanged: onChanged,
       obscureText: obscureText,
       keyboardType: keyboardType,
       inputFormatters: inputFormatters,
-      style: const TextStyle(
-        color: AppColors.text,
+      style: TextStyle(
+        color: enabled ? AppColors.text : AppColors.subText,
         fontSize: 14,
         fontWeight: FontWeight.w600,
       ),
@@ -314,8 +332,15 @@ class _LoginScreenState extends State<LoginScreen> {
         prefixIcon: Icon(icon, color: AppColors.subText, size: 20),
         suffixIcon: suffix,
         filled: true,
-        fillColor: AppColors.surface,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        fillColor: enabled ? AppColors.surface : AppColors.selected,
+        disabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(color: AppColors.border),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 14,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
           borderSide: const BorderSide(color: AppColors.border),
@@ -368,10 +393,7 @@ class _LoginScreenState extends State<LoginScreen> {
           const SizedBox(width: 8),
           Text(
             label,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-            ),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
           ),
         ],
       ),

@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:geliyor_app/state/cart_store.dart';
 import 'package:geliyor_app/state/favorite_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:geliyor_app/utils/product_image.dart';
 import 'package:geliyor_app/utils/product_price.dart';
+import 'package:geliyor_app/utils/product_skt.dart';
 import 'package:geliyor_app/widgets/market_product_card.dart';
+import 'package:geliyor_app/widgets/product_favorite_corner.dart';
 
-/// Sepet ürün kartı — ekteki mockup düzeni (üstte Somonlu rozeti yok).
+/// Sepet ürün kartı.
 class CartProductCard extends StatefulWidget {
   const CartProductCard({
     super.key,
@@ -43,6 +46,30 @@ class _CartProductCardState extends State<CartProductCard> {
     return 'Pro Plan';
   }
 
+  String get _sktDisplay {
+    final value = ProductSkt.display(item.skt);
+    return value.isEmpty ? '—' : value;
+  }
+
+  String get _displayTitle {
+    var title = item.title.trim();
+    final weight = item.weight.trim();
+    if (weight.isNotEmpty) {
+      final lower = title.toLowerCase();
+      final weightLower = weight.toLowerCase();
+      if (lower.endsWith(weightLower)) {
+        title = title.substring(0, title.length - weight.length).trim();
+      }
+    }
+    title = title
+        .replaceFirst(
+          RegExp(r'\s+\d+([.,]\d+)?\s*(kg|g)\s*$', caseSensitive: false),
+          '',
+        )
+        .trim();
+    return title.isEmpty ? item.title : title;
+  }
+
   void _setQuantity(int next) {
     if (next < 1) return;
     widget.onQuantityChanged?.call(next);
@@ -69,19 +96,42 @@ class _CartProductCardState extends State<CartProductCard> {
             ),
           ],
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        child: Column(
           children: [
-            _buildImage(),
-            const SizedBox(width: 8),
-            Expanded(child: _buildMiddle()),
-            Container(
-              width: 1,
-              margin: const EdgeInsets.symmetric(vertical: 4),
-              color: AppColors.border.withValues(alpha: 0.8),
+            const Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.local_shipping_outlined,
+                    color: AppColors.success,
+                    size: 12,
+                  ),
+                  SizedBox(width: 4),
+                  Text(
+                    '3 saatte kapında',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: AppColors.success,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(width: 6),
-            SizedBox(width: 62, child: _buildRight()),
+            const SizedBox(height: 4),
+            Expanded(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildImage(),
+                  const SizedBox(width: 8),
+                  Expanded(child: _buildContent()),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -102,10 +152,10 @@ class _CartProductCardState extends State<CartProductCard> {
             Positioned.fill(
               child: Padding(
                 padding: const EdgeInsets.all(4),
-                child: Image.asset(
+                child: buildProductImage(
                   item.imagePath,
                   fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) => const Icon(
+                  errorWidget: const Icon(
                     Icons.inventory_2_outlined,
                     color: AppColors.subText,
                     size: 28,
@@ -116,31 +166,15 @@ class _CartProductCardState extends State<CartProductCard> {
             Positioned(
               top: 4,
               left: 4,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.inventory_2_outlined,
-                      color: AppColors.surface,
-                      size: 9,
-                    ),
-                    const SizedBox(width: 2),
-                    Text(
-                      'x${item.quantity}',
-                      style: const TextStyle(
-                        color: AppColors.surface,
-                        fontSize: 8,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
-                ),
+              child: ProductFavoriteCorner(
+                productId: item.id,
+                onToggle: () {
+                  FavoriteStore.instance.toggle(
+                    FavoriteItem.fromCartItem(item),
+                  );
+                },
+                size: 22,
+                iconSize: 12,
               ),
             ),
           ],
@@ -149,13 +183,12 @@ class _CartProductCardState extends State<CartProductCard> {
     );
   }
 
-  Widget _buildMiddle() {
+  Widget _buildContent() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
         Text(
-          item.title,
+          _displayTitle,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(
@@ -165,81 +198,193 @@ class _CartProductCardState extends State<CartProductCard> {
             height: 1.1,
           ),
         ),
+        const Spacer(),
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            _metaCell(
-              label: 'Marka',
-              value: _brand,
-              align: TextAlign.left,
-            ),
+            _metaCell(label: 'Marka', value: _brand),
             const SizedBox(width: 14),
-            _metaCell(
-              label: 'SKT',
-              value: '12.2027',
-              align: TextAlign.left,
-            ),
+            _metaCell(label: 'SKT', value: _sktDisplay),
             const SizedBox(width: 14),
             _metaCell(
               label: 'Ağırlık',
-              value: item.weight,
-              align: TextAlign.left,
+              value: item.weight.trim().isEmpty ? '—' : item.weight,
             ),
             const Spacer(),
           ],
         ),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: const Color(0xFFE8F9EE),
-            borderRadius: BorderRadius.circular(999),
+        const Spacer(),
+        _buildActionsRow(),
+      ],
+    );
+  }
+
+  Widget _buildActionsRow() {
+    return Row(
+      children: [
+        Expanded(
+          child: Align(
+            alignment: const Alignment(-0.2, 0),
+            child: _buildPriceBlock(),
           ),
-          child: const Row(
-            children: [
-              Icon(
-                Icons.local_shipping_outlined,
-                color: AppColors.success,
-                size: 12,
-              ),
-              SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  '3 saatte kapında',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: AppColors.success,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ],
+        ),
+        _buildQuantityControls(),
+        Expanded(
+          child: Align(
+            alignment: const Alignment(0.35, 0),
+            child: _buildDeleteButton(),
           ),
         ),
       ],
     );
   }
 
-  Widget _metaCell({
-    required String label,
-    required String value,
-    TextAlign align = TextAlign.center,
-  }) {
-    final cross = align == TextAlign.left
-        ? CrossAxisAlignment.start
-        : CrossAxisAlignment.center;
+  Widget _buildPriceBlock() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              formatProductPrice(item.oldPrice, withDecimals: true),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: AppColors.subText.withValues(alpha: 0.9),
+                fontSize: 8,
+                fontWeight: FontWeight.w700,
+                height: 1,
+                decoration: TextDecoration.lineThrough,
+                decorationColor: AppColors.subText.withValues(alpha: 0.7),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+              decoration: BoxDecoration(
+                color: AppColors.error.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                '%${item.discountPercent}',
+                style: const TextStyle(
+                  color: AppColors.error,
+                  fontSize: 8,
+                  fontWeight: FontWeight.w900,
+                  height: 1,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(
+          formatProductPrice(item.unitPrice, withDecimals: true),
+          maxLines: 1,
+          style: const TextStyle(
+            color: AppColors.primary,
+            fontSize: 13,
+            fontWeight: FontWeight.w900,
+            height: 1,
+            letterSpacing: -0.4,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuantityControls() {
+    return Container(
+      height: 30,
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _qtyButton(
+            icon: Icons.remove_rounded,
+            onTap: () => _setQuantity(item.quantity - 1),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: Text(
+              '${item.quantity}',
+              style: const TextStyle(
+                color: AppColors.primary,
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+                height: 1,
+              ),
+            ),
+          ),
+          _qtyButton(
+            icon: Icons.add_rounded,
+            onTap: () => _setQuantity(item.quantity + 1),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _qtyButton({required IconData icon, required VoidCallback onTap}) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: SizedBox(
+        width: 26,
+        height: 28,
+        child: Icon(icon, color: AppColors.primary, size: 16),
+      ),
+    );
+  }
+
+  Widget _buildDeleteButton() {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        if (widget.onRemove != null) {
+          widget.onRemove!();
+        } else {
+          widget.onAddToCart?.call();
+        }
+      },
+      child: Container(
+        width: 30,
+        height: 30,
+        decoration: BoxDecoration(
+          color: widget.onRemove != null
+              ? AppColors.error.withValues(alpha: 0.12)
+              : AppColors.primary,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Icon(
+          widget.onRemove != null
+              ? Icons.delete_outline_rounded
+              : Icons.add_shopping_cart_rounded,
+          color: widget.onRemove != null
+              ? AppColors.error
+              : AppColors.surface,
+          size: 16,
+        ),
+      ),
+    );
+  }
+
+  Widget _metaCell({required String label, required String value}) {
     return Column(
       mainAxisSize: MainAxisSize.min,
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: cross,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          textAlign: align,
           style: const TextStyle(
             color: AppColors.text,
             fontSize: 10,
@@ -252,194 +397,11 @@ class _CartProductCardState extends State<CartProductCard> {
           value,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          textAlign: align,
           style: const TextStyle(
             color: AppColors.primary,
             fontSize: 11.5,
             fontWeight: FontWeight.w900,
             height: 1.2,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildRight() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Align(
-          alignment: Alignment.center,
-          child: ListenableBuilder(
-            listenable: FavoriteStore.instance,
-            builder: (context, _) {
-              final isFavorite = FavoriteStore.instance.isFavorite(item.id);
-              return GestureDetector(
-                onTap: () {
-                  FavoriteStore.instance.toggle(FavoriteItem.fromCartItem(item));
-                },
-                child: Container(
-                  width: 24,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isFavorite ? AppColors.error : AppColors.primary,
-                      width: 1.2,
-                    ),
-                  ),
-                  child: Icon(
-                    isFavorite
-                        ? Icons.favorite_rounded
-                        : Icons.favorite_border_rounded,
-                    color: isFavorite ? AppColors.error : AppColors.primary,
-                    size: 14,
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    formatProductPrice(item.oldPrice, withDecimals: true),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.right,
-                    style: TextStyle(
-                      color: AppColors.subText.withValues(alpha: 0.9),
-                      fontSize: 7,
-                      fontWeight: FontWeight.w700,
-                      height: 1,
-                      decoration: TextDecoration.lineThrough,
-                      decorationColor: AppColors.subText.withValues(alpha: 0.7),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 2),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: AppColors.error.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    '%${item.discountPercent}',
-                    style: const TextStyle(
-                      color: AppColors.error,
-                      fontSize: 7,
-                      fontWeight: FontWeight.w900,
-                      height: 1,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 1),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerRight,
-              child: Text(
-                formatProductPrice(item.unitPrice, withDecimals: true),
-                maxLines: 1,
-                style: const TextStyle(
-                  color: AppColors.primary,
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w900,
-                  height: 1,
-                  letterSpacing: -0.4,
-                ),
-              ),
-            ),
-          ],
-        ),
-        SizedBox(
-          height: 16,
-          width: double.infinity,
-          child: Container(
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => _setQuantity(item.quantity - 1),
-                    child: const Center(
-                      child: Icon(
-                        Icons.remove_rounded,
-                        color: AppColors.primary,
-                        size: 11,
-                      ),
-                    ),
-                  ),
-                ),
-                Text(
-                  '${item.quantity}',
-                  style: const TextStyle(
-                    color: AppColors.primary,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w900,
-                    height: 1,
-                  ),
-                ),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => _setQuantity(item.quantity + 1),
-                    child: const Center(
-                      child: Icon(
-                        Icons.add_rounded,
-                        color: AppColors.primary,
-                        size: 11,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        Align(
-          alignment: Alignment.center,
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () {
-              if (widget.onRemove != null) {
-                widget.onRemove!();
-              } else {
-                widget.onAddToCart?.call();
-              }
-            },
-            child: Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(
-                color: widget.onRemove != null
-                    ? AppColors.error.withValues(alpha: 0.12)
-                    : AppColors.primary,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                widget.onRemove != null
-                    ? Icons.delete_outline_rounded
-                    : Icons.add_shopping_cart_rounded,
-                color: widget.onRemove != null
-                    ? AppColors.error
-                    : AppColors.surface,
-                size: 15,
-              ),
-            ),
           ),
         ),
       ],

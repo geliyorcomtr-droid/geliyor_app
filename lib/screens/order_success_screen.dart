@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:flutter/services.dart';
 import 'package:geliyor_app/screens/gift_select_screen.dart';
@@ -140,7 +140,11 @@ class OrderSuccessScreen extends StatelessWidget {
             child: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.check_circle_outline_rounded, color: AppColors.primary, size: 13),
+                Icon(
+                  Icons.check_circle_outline_rounded,
+                  color: AppColors.primary,
+                  size: 13,
+                ),
                 SizedBox(width: 4),
                 Text(
                   'Onaylandı',
@@ -424,7 +428,10 @@ class OrderSuccessScreen extends StatelessWidget {
             children: [
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.selected,
                   borderRadius: BorderRadius.circular(18),
@@ -453,10 +460,7 @@ class OrderSuccessScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              _ibanInfoRow(
-                label: 'Alıcı',
-                value: ibanHolder,
-              ),
+              _ibanInfoRow(label: 'Alıcı', value: ibanHolder),
               const SizedBox(height: 10),
               _ibanInfoRow(
                 label: 'IBAN',
@@ -525,9 +529,7 @@ class OrderSuccessScreen extends StatelessWidget {
   }
 
   void _copyIban(BuildContext context) {
-    Clipboard.setData(
-      ClipboardData(text: ibanNumber.replaceAll(' ', '')),
-    );
+    Clipboard.setData(ClipboardData(text: ibanNumber.replaceAll(' ', '')));
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('IBAN kopyalandı'),
@@ -664,14 +666,7 @@ class OrderSuccessScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
-        Text(
-          title,
-          style: const TextStyle(
-            color: AppColors.text,
-            fontSize: 14,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
+        Expanded(child: Text(title, style: AppTextStyles.sectionHeader)),
       ],
     );
   }

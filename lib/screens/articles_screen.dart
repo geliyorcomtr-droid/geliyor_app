@@ -1,9 +1,11 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:geliyor_app/data/banner_repository.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/screens/article_detail_screen.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
+import 'package:geliyor_app/widgets/app_banner_slider.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
 import 'package:geliyor_app/widgets/knowledge_disclaimer.dart';
@@ -222,35 +224,9 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
   }
 
   Widget _buildBanner() {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.border, width: 1.2),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Image.asset(
-        'assets/images/bilgi_bankasi_banner.png',
-        width: double.infinity,
-        fit: BoxFit.fitWidth,
-        errorBuilder: (context, error, stackTrace) {
-          return Container(
-            height: 96,
-            color: AppColors.selected,
-            alignment: Alignment.center,
-            padding: const EdgeInsets.all(12),
-            child: const Text(
-              'Güvenilir bilgiye tek tıkla ulaşın',
-              style: TextStyle(
-                color: AppColors.primary,
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          );
-        },
-      ),
+    return const AppBannerSlot(
+      placement: BannerPlacement.articles,
+      fallbackAssets: ['assets/images/bilgi_bankasi_banner.png'],
     );
   }
 
@@ -384,11 +360,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
             '${_selectedCategory.title} Makaleleri',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: AppColors.text,
-              fontSize: 14,
-              fontWeight: FontWeight.w900,
-            ),
+            style: AppTextStyles.sectionHeader,
           ),
         ),
         Text(

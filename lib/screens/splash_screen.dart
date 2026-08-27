@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:geliyor_app/screens/home_screen.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
+import 'package:geliyor_app/widgets/paw_print_background.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -58,42 +59,24 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.surface,
+      backgroundColor: AppColors.background,
       body: AppPageFrame(
-        backgroundColor: AppColors.surface,
+        backgroundColor: AppColors.background,
+        pawPrintStyle: PawPrintStyle.splash,
         child: GestureDetector(
           onTap: _onTapAnywhere,
           behavior: HitTestBehavior.opaque,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            child: Container(
-              width: double.infinity,
-              height: double.infinity,
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: AppColors.primary, width: 1),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.12),
-                    blurRadius: 14,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 40),
-                  child: Image.asset(
-                    _logoPath,
-                    fit: BoxFit.contain,
-                    filterQuality: FilterQuality.high,
-                    errorBuilder: (context, error, stackTrace) => const Icon(
-                      Icons.pets_rounded,
-                      color: AppColors.primary,
-                      size: 88,
-                    ),
-                  ),
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 40),
+              child: Image.asset(
+                _logoPath,
+                fit: BoxFit.contain,
+                filterQuality: FilterQuality.high,
+                errorBuilder: (context, error, stackTrace) => const Icon(
+                  Icons.pets_rounded,
+                  color: AppColors.primary,
+                  size: 88,
                 ),
               ),
             ),

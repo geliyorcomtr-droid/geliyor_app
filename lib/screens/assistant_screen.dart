@@ -1,4 +1,5 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
+import 'package:geliyor_app/data/banner_repository.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/screens/filter_screen.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
@@ -7,6 +8,7 @@ import 'package:geliyor_app/services/assistant_service.dart';
 import 'package:geliyor_app/state/cart_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/utils/market_product_helpers.dart';
+import 'package:geliyor_app/widgets/app_banner_slider.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
 
@@ -91,7 +93,8 @@ class _AssistantScreenState extends State<AssistantScreen> {
         _messages.removeLast();
         _messages.add(
           _ChatMessage.assistant(
-            text: 'Şu anda yanıt veremiyorum. Lütfen biraz sonra tekrar deneyin.',
+            text:
+                'Şu anda yanıt veremiyorum. Lütfen biraz sonra tekrar deneyin.',
           ),
         );
         _isSending = false;
@@ -138,11 +141,15 @@ class _AssistantScreenState extends State<AssistantScreen> {
         children: [
           IconButton(
             onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const FilterScreen()),
-              );
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const FilterScreen()));
             },
-            icon: const Icon(Icons.menu_rounded, color: AppColors.primary, size: 28),
+            icon: const Icon(
+              Icons.menu_rounded,
+              color: AppColors.primary,
+              size: 28,
+            ),
           ),
           Expanded(
             child: Column(
@@ -151,10 +158,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text(
-                      'Asistan',
-                      style: AppTextStyles.pageHeader,
-                    ),
+                    const Text('Asistan', style: AppTextStyles.pageHeader),
                     const SizedBox(width: 4),
                     Icon(
                       Icons.pets_rounded,
@@ -184,7 +188,12 @@ class _AssistantScreenState extends State<AssistantScreen> {
     return ListView.builder(
       controller: _scrollController,
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      padding: const EdgeInsets.fromLTRB(
+        AppPageFrame.contentHorizontalPadding,
+        0,
+        AppPageFrame.contentHorizontalPadding,
+        8,
+      ),
       itemCount: _messages.length + 1,
       itemBuilder: (context, index) {
         if (index == 0) {
@@ -199,72 +208,39 @@ class _AssistantScreenState extends State<AssistantScreen> {
   }
 
   Widget _buildBanner() {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: Stack(
-        children: [
-          Image.asset(
-            'assets/images/asistan_banner.png',
-            width: double.infinity,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) {
-              return Container(
-                height: 148,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24),
-                  gradient: const LinearGradient(
-                    colors: [AppColors.primaryLight, AppColors.primary],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
-                padding: const EdgeInsets.all(14),
-                child: const Text(
-                  'Merhaba! Ben Geliyor.tr Asistanı.\nDostunuz için her zaman buradayım.',
-                  style: TextStyle(
-                    color: AppColors.surface,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    height: 1.35,
-                  ),
-                ),
-              );
-            },
-          ),
-          Positioned(
-            left: 10,
-            right: 10,
-            bottom: 8,
-            child: Row(
-              children: [
-                Expanded(
-                  child: _BannerQuickAction(
-                    onTap: () => _sendMessage(
-                      'Kedim için mama önerisi isterim.',
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: _BannerQuickAction(
-                    onTap: () => _sendMessage(
-                      'Aşı takvimi hakkında bilgi verir misin?',
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: _BannerQuickAction(
-                    onTap: () => _sendMessage(
-                      'Kısır kedim için nelere dikkat etmeliyim?',
-                    ),
-                  ),
-                ),
-              ],
+    return Column(
+      children: [
+        const AppBannerSlot(
+          placement: BannerPlacement.assistant,
+          fallbackAssets: ['assets/images/asistan_banner.png'],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: _BannerQuickAction(
+                onTap: () =>
+                    _sendMessage('Kedim için mama önerisi isterim.'),
+              ),
             ),
-          ),
-        ],
-      ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: _BannerQuickAction(
+                onTap: () =>
+                    _sendMessage('Aşı takvimi hakkında bilgi verir misin?'),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: _BannerQuickAction(
+                onTap: () => _sendMessage(
+                  'Kısır kedim için nelere dikkat etmeliyim?',
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -448,9 +424,9 @@ class _AssistantScreenState extends State<AssistantScreen> {
         price: 1249,
         oldPrice: 1470,
       ),
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const ProductDetailScreen()),
-      ),
+      onTap: () => Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => const ProductDetailScreen())),
       onAddToCart: (_, price, oldPrice, qty) {
         for (var i = 0; i < qty; i++) {
           CartStore.instance.addItem(
@@ -467,7 +443,12 @@ class _AssistantScreenState extends State<AssistantScreen> {
 
   Widget _buildInputBar() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      padding: const EdgeInsets.fromLTRB(
+        AppPageFrame.contentHorizontalPadding,
+        0,
+        AppPageFrame.contentHorizontalPadding,
+        8,
+      ),
       child: Row(
         children: [
           Expanded(
@@ -519,7 +500,9 @@ class _AssistantScreenState extends State<AssistantScreen> {
           ),
           const SizedBox(width: 8),
           GestureDetector(
-            onTap: _isSending ? null : () => _sendMessage(_inputController.text),
+            onTap: _isSending
+                ? null
+                : () => _sendMessage(_inputController.text),
             child: Container(
               width: 42,
               height: 42,

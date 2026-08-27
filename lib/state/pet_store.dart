@@ -10,6 +10,7 @@ class PetData {
     this.neutered,
     this.activityLevel,
     this.extraFood,
+    this.dailyFoodGrams,
     this.allergies = const [],
   });
 
@@ -21,6 +22,7 @@ class PetData {
   final String? neutered;
   final String? activityLevel;
   final String? extraFood;
+  final int? dailyFoodGrams;
   final List<String> allergies;
 
   String get imagePath => species == 'Köpek'
@@ -54,35 +56,49 @@ class PetStore extends ChangeNotifier {
       weight: '2-3 kg',
       neutered: 'Evet',
       activityLevel: 'Orta',
+      dailyFoodGrams: 40,
       allergies: ['Besin'],
     ),
     const PetData(
       name: 'Luna',
       species: 'Köpek',
-      ageRange: 'Yetişkin',
+      ageRange: 'Medium (11-25 kg)',
       weight: '20-30 kg',
       neutered: 'Hayır',
       activityLevel: 'Yüksek',
+      dailyFoodGrams: 260,
       allergies: ['Çevre'],
     ),
   ];
+  int _activePetIndex = 0;
 
   List<PetData> get pets => List.unmodifiable(_pets);
+  PetData? get activePet =>
+      _pets.isEmpty ? null : _pets[_activePetIndex.clamp(0, _pets.length - 1)];
 
   void addPet(PetData pet) {
     _pets.add(pet);
+    _activePetIndex = _pets.length - 1;
     notifyListeners();
   }
 
   void updatePet(int index, PetData pet) {
     if (index < 0 || index >= _pets.length) return;
     _pets[index] = pet;
+    _activePetIndex = index;
     notifyListeners();
   }
 
   void removePet(int index) {
     if (index < 0 || index >= _pets.length) return;
     _pets.removeAt(index);
+    if (_pets.isEmpty) {
+      _activePetIndex = 0;
+    } else if (_activePetIndex >= _pets.length) {
+      _activePetIndex = _pets.length - 1;
+    } else if (index < _activePetIndex) {
+      _activePetIndex--;
+    }
     notifyListeners();
   }
 }

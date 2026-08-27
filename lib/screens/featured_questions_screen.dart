@@ -1,10 +1,12 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
+import 'package:geliyor_app/data/banner_repository.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
 import 'package:geliyor_app/screens/question_detail_screen.dart';
 import 'package:geliyor_app/screens/topic_search_screen.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
+import 'package:geliyor_app/widgets/app_banner_slider.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
 import 'package:geliyor_app/widgets/knowledge_disclaimer.dart';
@@ -43,28 +45,43 @@ class _FeaturedQuestionsScreenState extends State<FeaturedQuestionsScreen> {
       _FqQuestion('Kedimin bağırsak parazit belirtileri nelerdir?', '5,3B'),
     ],
     'idrar': [
-      _FqQuestion('Kedilerde idrar yolu enfeksiyonu belirtileri nelerdir?', '9,8B'),
+      _FqQuestion(
+        'Kedilerde idrar yolu enfeksiyonu belirtileri nelerdir?',
+        '9,8B',
+      ),
       _FqQuestion('Kum kabı dışında idrar yapıyorsa ne anlama gelir?', '7,6B'),
       _FqQuestion('Kedimin idrarı kanlıysa ne yapmalıyım?', '6,4B'),
       _FqQuestion('Su tüketimini nasıl artırabilirim?', '5,9B'),
       _FqQuestion('İdrar yolu sağlığı için mama seçimi nasıl olmalı?', '5,2B'),
-      _FqQuestion('Kedilerde böbrek yetmezliği erken belirtileri neler?', '4,8B'),
+      _FqQuestion(
+        'Kedilerde böbrek yetmezliği erken belirtileri neler?',
+        '4,8B',
+      ),
       _FqQuestion('Erkek kedilerde idrar tıkanıklığı acil midir?', '4,5B'),
       _FqQuestion('Kum tipi idrar sağlığını etkiler mi?', '3,9B'),
     ],
     'alerji': [
       _FqQuestion('Kedimin tüyleri çok dökülüyor, normal mi?', '8,1B'),
       _FqQuestion('Kaşıntı ve kızarıklık alerji belirtisi midir?', '7,0B'),
-      _FqQuestion('Alerjik deri sorunlarında mama değişimi gerekir mi?', '5,6B'),
+      _FqQuestion(
+        'Alerjik deri sorunlarında mama değişimi gerekir mi?',
+        '5,6B',
+      ),
       _FqQuestion('Tüy bakımı alerjiyi nasıl etkiler?', '4,9B'),
       _FqQuestion('Kedilerde yiyecek alerjisi nasıl anlaşılır?', '4,4B'),
-      _FqQuestion('Pire alerjisi ile gıda alerjisi nasıl ayırt edilir?', '4,1B'),
+      _FqQuestion(
+        'Pire alerjisi ile gıda alerjisi nasıl ayırt edilir?',
+        '4,1B',
+      ),
       _FqQuestion('Deri yaraları için evde ne yapabilirim?', '3,7B'),
       _FqQuestion('Hiperalerjenik mama ne zaman tercih edilmeli?', '3,3B'),
     ],
     'kilo': [
       _FqQuestion('Kedimin iştahı azaldı, ne yapmalıyım?', '12,4B'),
-      _FqQuestion('Fazla kilolu kediler için porsiyon nasıl ayarlanır?', '6,8B'),
+      _FqQuestion(
+        'Fazla kilolu kediler için porsiyon nasıl ayarlanır?',
+        '6,8B',
+      ),
       _FqQuestion('Günlük kalori ihtiyacı nasıl hesaplanır?', '5,1B'),
       _FqQuestion('Ödül mamaları kilo alımına yol açar mı?', '4,0B'),
       _FqQuestion('Kedi ideal kilosu nasıl ölçülür?', '3,8B'),
@@ -134,9 +151,8 @@ class _FeaturedQuestionsScreenState extends State<FeaturedQuestionsScreen> {
     ],
   };
 
-  TopicSearchItem get _selectedTopic => TopicSearchScreen.topics.firstWhere(
-    (t) => t.id == _selectedTopicId,
-  );
+  TopicSearchItem get _selectedTopic =>
+      TopicSearchScreen.topics.firstWhere((t) => t.id == _selectedTopicId);
 
   List<_FqQuestion> get _questions =>
       _questionsByTopic[_selectedTopicId] ?? const [];
@@ -204,35 +220,9 @@ class _FeaturedQuestionsScreenState extends State<FeaturedQuestionsScreen> {
   }
 
   Widget _buildBanner() {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.border, width: 1.2),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Image.asset(
-        'assets/images/one_cikan_sorular_banner.png',
-        width: double.infinity,
-        fit: BoxFit.fitWidth,
-        errorBuilder: (context, error, stackTrace) {
-          return Container(
-            height: 96,
-            color: AppColors.selected,
-            alignment: Alignment.center,
-            padding: const EdgeInsets.all(12),
-            child: const Text(
-              'Merak ettikleriniz burada!',
-              style: TextStyle(
-                color: AppColors.primary,
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          );
-        },
-      ),
+    return const AppBannerSlot(
+      placement: BannerPlacement.featuredQuestions,
+      fallbackAssets: ['assets/images/one_cikan_sorular_banner.png'],
     );
   }
 
@@ -300,11 +290,7 @@ class _FeaturedQuestionsScreenState extends State<FeaturedQuestionsScreen> {
             '${_selectedTopic.title} ile ilgili sorular',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: AppColors.primary,
-              fontSize: 13,
-              fontWeight: FontWeight.w900,
-            ),
+            style: AppTextStyles.sectionHeader,
           ),
         ),
         GestureDetector(

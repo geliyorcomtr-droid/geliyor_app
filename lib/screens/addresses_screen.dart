@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/state/address_store.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
@@ -286,7 +286,12 @@ class _AddressesScreenState extends State<AddressesScreen> {
           header: _buildHeader(),
           content: _showForm
               ? Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+                  padding: const EdgeInsets.fromLTRB(
+                    AppPageFrame.contentHorizontalPadding,
+                    0,
+                    AppPageFrame.contentHorizontalPadding,
+                    8,
+                  ),
                   child: Column(
                     children: [
                       Expanded(
@@ -304,7 +309,12 @@ class _AddressesScreenState extends State<AddressesScreen> {
                 )
               : SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+                  padding: const EdgeInsets.fromLTRB(
+                    AppPageFrame.contentHorizontalPadding,
+                    0,
+                    AppPageFrame.contentHorizontalPadding,
+                    8,
+                  ),
                   child: _buildList(),
                 ),
           navbar: const AppBottomNavbar(activeTab: AppNavTab.profile),
@@ -533,10 +543,7 @@ class _AddressesScreenState extends State<AddressesScreen> {
             padding: EdgeInsets.zero,
             child: Text(
               _isEditing ? 'Kaydet' : 'Adres Ekle',
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w900,
-              ),
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
             ),
           ),
         ),
@@ -644,14 +651,7 @@ class _AddressesScreenState extends State<AddressesScreen> {
     return Row(
       children: [
         const Expanded(
-          child: Text(
-            'Kayıtlı Adreslerim',
-            style: TextStyle(
-              color: AppColors.text,
-              fontSize: 14,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
+          child: Text('Kayıtlı Adreslerim', style: AppTextStyles.sectionHeader),
         ),
         AppPressableButton.primary(
           onTap: _openAddForm,
@@ -663,10 +663,7 @@ class _AddressesScreenState extends State<AddressesScreen> {
             children: [
               Icon(Icons.add_rounded, size: 16),
               SizedBox(width: 4),
-              Text(
-                'Yeni Adres Ekle',
-                style: TextStyle(fontSize: 10),
-              ),
+              Text('Yeni Adres Ekle', style: TextStyle(fontSize: 10)),
             ],
           ),
         ),
@@ -759,10 +756,7 @@ class _AddressesScreenState extends State<AddressesScreen> {
                         address.contactName,
                       ),
                       const SizedBox(height: 3),
-                      _buildInfoLine(
-                        Icons.phone_outlined,
-                        address.phone,
-                      ),
+                      _buildInfoLine(Icons.phone_outlined, address.phone),
                       const SizedBox(height: 3),
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -811,11 +805,7 @@ class _AddressesScreenState extends State<AddressesScreen> {
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: AppColors.border),
       ),
-      child: Icon(
-        address.icon,
-        color: AppColors.primary,
-        size: 20,
-      ),
+      child: Icon(address.icon, color: AppColors.primary, size: 20),
     );
   }
 

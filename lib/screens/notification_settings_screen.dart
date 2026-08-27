@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/state/notification_settings_store.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
@@ -25,7 +25,12 @@ class NotificationSettingsScreen extends StatelessWidget {
           builder: (context, _) {
             return SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+              padding: const EdgeInsets.fromLTRB(
+                AppPageFrame.contentHorizontalPadding,
+                0,
+                AppPageFrame.contentHorizontalPadding,
+                8,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -210,7 +215,8 @@ class NotificationSettingsScreen extends StatelessWidget {
         id: 'reminders',
         icon: Icons.notifications_none_rounded,
         title: 'Hatırlatıcılar',
-        subtitle: 'Sepet hatırlatıcıları, alışveriş hatırlatıcıları ve diğer uyarılar.',
+        subtitle:
+            'Sepet hatırlatıcıları, alışveriş hatırlatıcıları ve diğer uyarılar.',
       ),
     ];
 
@@ -378,7 +384,11 @@ class NotificationSettingsScreen extends StatelessWidget {
           const Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.info_outline_rounded, color: AppColors.primary, size: 18),
+              Icon(
+                Icons.info_outline_rounded,
+                color: AppColors.primary,
+                size: 18,
+              ),
               SizedBox(width: 8),
               Expanded(
                 child: Column(

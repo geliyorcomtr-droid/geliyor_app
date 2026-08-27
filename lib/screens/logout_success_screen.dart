@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/screens/filter_screen.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
@@ -28,7 +28,12 @@ class LogoutSuccessScreen extends StatelessWidget {
         header: _buildHeader(context),
         content: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+          padding: const EdgeInsets.fromLTRB(
+            AppPageFrame.contentHorizontalPadding,
+            0,
+            AppPageFrame.contentHorizontalPadding,
+            8,
+          ),
           child: Container(
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
@@ -99,10 +104,7 @@ class LogoutSuccessScreen extends StatelessWidget {
                   height: 46,
                   child: const Text(
                     'Ana Sayfaya Dön',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w900,
-                    ),
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
                   ),
                 ),
               ],
@@ -121,9 +123,9 @@ class LogoutSuccessScreen extends StatelessWidget {
         children: [
           IconButton(
             onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const FilterScreen()),
-              );
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const FilterScreen()));
             },
             icon: const Icon(
               Icons.menu_rounded,
@@ -135,10 +137,7 @@ class LogoutSuccessScreen extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text(
-                  'Çıkış Sayfası',
-                  style: AppTextStyles.pageHeader,
-                ),
+                const Text('Çıkış Sayfası', style: AppTextStyles.pageHeader),
                 const SizedBox(width: 6),
                 Container(
                   width: 20,
@@ -294,10 +293,7 @@ class _InfoCard extends StatelessWidget {
               ],
             ),
           ),
-          if (trailing != null) ...[
-            const SizedBox(width: 6),
-            trailing!,
-          ],
+          if (trailing != null) ...[const SizedBox(width: 6), trailing!],
         ],
       ),
     );

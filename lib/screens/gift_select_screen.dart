@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
@@ -7,10 +7,7 @@ import 'package:geliyor_app/widgets/app_page_frame.dart';
 import 'package:geliyor_app/widgets/app_pressable_button.dart';
 
 class GiftSelectScreen extends StatefulWidget {
-  const GiftSelectScreen({
-    super.key,
-    this.orderTotal = 4250,
-  });
+  const GiftSelectScreen({super.key, this.orderTotal = 4250});
 
   final double orderTotal;
 
@@ -29,21 +26,81 @@ class _GiftSelectScreenState extends State<GiftSelectScreen> {
   ];
 
   final List<_GiftItem> normalGifts = const [
-    _GiftItem(id: 'n1', title: 'Mama & Su Kabı', points: '900 Puan', imagePath: 'assets/images/mama_kabi.png'),
-    _GiftItem(id: 'n2', title: 'Somonlu Ödül', points: '850 Puan', imagePath: 'assets/images/app_ikonlar/somon.png'),
-    _GiftItem(id: 'n3', title: 'Doğal Bakım', points: '950 Puan', imagePath: 'assets/images/app_ikonlar/dogal_icerik.png'),
-    _GiftItem(id: 'n4', title: 'Yavru Kedi Seti', points: '1.100 Puan', imagePath: 'assets/images/icons/yavru_kedi.png'),
-    _GiftItem(id: 'n5', title: 'Tavuklu Mama', points: '1.000 Puan', imagePath: 'assets/images/app_ikonlar/tavuk.png'),
-    _GiftItem(id: 'n6', title: 'Kuzu Etli Mama', points: '1.050 Puan', imagePath: 'assets/images/app_ikonlar/kuzu.png'),
+    _GiftItem(
+      id: 'n1',
+      title: 'Mama & Su Kabı',
+      points: '900 Puan',
+      imagePath: 'assets/images/mama_kabi.png',
+    ),
+    _GiftItem(
+      id: 'n2',
+      title: 'Somonlu Ödül',
+      points: '850 Puan',
+      imagePath: 'assets/images/app_ikonlar/somon.png',
+    ),
+    _GiftItem(
+      id: 'n3',
+      title: 'Doğal Bakım',
+      points: '950 Puan',
+      imagePath: 'assets/images/app_ikonlar/dogal_icerik.png',
+    ),
+    _GiftItem(
+      id: 'n4',
+      title: 'Yavru Kedi Seti',
+      points: '1.100 Puan',
+      imagePath: 'assets/images/icons/yavru_kedi.png',
+    ),
+    _GiftItem(
+      id: 'n5',
+      title: 'Tavuklu Mama',
+      points: '1.000 Puan',
+      imagePath: 'assets/images/app_ikonlar/tavuk.png',
+    ),
+    _GiftItem(
+      id: 'n6',
+      title: 'Kuzu Etli Mama',
+      points: '1.050 Puan',
+      imagePath: 'assets/images/app_ikonlar/kuzu.png',
+    ),
   ];
 
   final List<_GiftItem> premiumGifts = const [
-    _GiftItem(id: 'p1', title: 'Akıllı Mama Kabı', points: '1.800 Puan', imagePath: 'assets/images/market_akilli_pet.png'),
-    _GiftItem(id: 'p2', title: 'Premium Mama 2kg', points: '1.500 Puan', imagePath: 'assets/images/nd_kuzu_kisir.jpg'),
-    _GiftItem(id: 'p3', title: 'Taşıma Çantası', points: '1.600 Puan', imagePath: 'assets/images/market_kedi.png'),
-    _GiftItem(id: 'p4', title: 'Tüy Bakım Seti', points: '1.400 Puan', imagePath: 'assets/images/app_ikonlar/tuy_deri.png'),
-    _GiftItem(id: 'p5', title: 'Omega Destek', points: '1.350 Puan', imagePath: 'assets/images/icons/omega.png'),
-    _GiftItem(id: 'p6', title: 'Sokaktakiler Paket', points: '1.700 Puan', imagePath: 'assets/images/app_ikonlar/sokak.png'),
+    _GiftItem(
+      id: 'p1',
+      title: 'Akıllı Mama Kabı',
+      points: '1.800 Puan',
+      imagePath: 'assets/images/market_akilli_pet.png',
+    ),
+    _GiftItem(
+      id: 'p2',
+      title: 'Premium Mama 2kg',
+      points: '1.500 Puan',
+      imagePath: 'assets/images/app_ikonlar/mama_kabi.png',
+    ),
+    _GiftItem(
+      id: 'p3',
+      title: 'Taşıma Çantası',
+      points: '1.600 Puan',
+      imagePath: 'assets/images/market_kedi.png',
+    ),
+    _GiftItem(
+      id: 'p4',
+      title: 'Tüy Bakım Seti',
+      points: '1.400 Puan',
+      imagePath: 'assets/images/app_ikonlar/tuy_deri.png',
+    ),
+    _GiftItem(
+      id: 'p5',
+      title: 'Omega Destek',
+      points: '1.350 Puan',
+      imagePath: 'assets/images/icons/omega.png',
+    ),
+    _GiftItem(
+      id: 'p6',
+      title: 'Sokaktakiler Paket',
+      points: '1.700 Puan',
+      imagePath: 'assets/images/app_ikonlar/sokak.png',
+    ),
   ];
 
   @override
@@ -171,7 +228,11 @@ class _GiftSelectScreenState extends State<GiftSelectScreen> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.card_giftcard_rounded, color: AppColors.primary, size: 13),
+                const Icon(
+                  Icons.card_giftcard_rounded,
+                  color: AppColors.primary,
+                  size: 13,
+                ),
                 const SizedBox(width: 4),
                 Text(
                   '${selectedGiftIds.length}/$maxSelect',
@@ -267,7 +328,11 @@ class _GiftSelectScreenState extends State<GiftSelectScreen> {
                       shape: BoxShape.circle,
                       border: Border.all(color: AppColors.border),
                     ),
-                    child: const Icon(Icons.pets_rounded, color: AppColors.primary, size: 18),
+                    child: const Icon(
+                      Icons.pets_rounded,
+                      color: AppColors.primary,
+                      size: 18,
+                    ),
                   ),
                   const SizedBox(width: 10),
                   const Expanded(
@@ -304,9 +369,30 @@ class _GiftSelectScreenState extends State<GiftSelectScreen> {
               const Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('₺1.000', style: TextStyle(color: AppColors.subText, fontSize: 10, fontWeight: FontWeight.w600)),
-                  Text('₺2.000', style: TextStyle(color: AppColors.subText, fontSize: 10, fontWeight: FontWeight.w600)),
-                  Text('₺4.000+', style: TextStyle(color: AppColors.subText, fontSize: 10, fontWeight: FontWeight.w600)),
+                  Text(
+                    '₺1.000',
+                    style: TextStyle(
+                      color: AppColors.subText,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    '₺2.000',
+                    style: TextStyle(
+                      color: AppColors.subText,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    '₺4.000+',
+                    style: TextStyle(
+                      color: AppColors.subText,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -417,7 +503,8 @@ class _GiftSelectScreenState extends State<GiftSelectScreen> {
                   scrollDirection: Axis.horizontal,
                   physics: const BouncingScrollPhysics(),
                   itemCount: items.length,
-                  separatorBuilder: (context, index) => const SizedBox(width: gap),
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(width: gap),
                   itemBuilder: (context, index) => _buildGiftCard(
                     items[index],
                     enabled: enabled,
@@ -438,7 +525,8 @@ class _GiftSelectScreenState extends State<GiftSelectScreen> {
     required double width,
   }) {
     final isSelected = selectedGiftIds.contains(gift.id);
-    final canSelect = enabled && (isSelected || selectedGiftIds.length < maxSelect);
+    final canSelect =
+        enabled && (isSelected || selectedGiftIds.length < maxSelect);
 
     return GestureDetector(
       onTap: canSelect ? () => _toggleGift(gift.id) : null,
@@ -476,7 +564,11 @@ class _GiftSelectScreenState extends State<GiftSelectScreen> {
                     border: Border.all(color: AppColors.primary, width: 1.3),
                   ),
                   child: isSelected
-                      ? const Icon(Icons.check_rounded, color: AppColors.surface, size: 14)
+                      ? const Icon(
+                          Icons.check_rounded,
+                          color: AppColors.surface,
+                          size: 14,
+                        )
                       : null,
                 ),
               ],
@@ -560,7 +652,9 @@ class _GiftSelectScreenState extends State<GiftSelectScreen> {
           ? () {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('${selectedGiftIds.length} hediye seçimin onaylandı.'),
+                  content: Text(
+                    '${selectedGiftIds.length} hediye seçimin onaylandı.',
+                  ),
                   backgroundColor: AppColors.primary,
                 ),
               );
@@ -598,14 +692,7 @@ class _GiftSelectScreenState extends State<GiftSelectScreen> {
           ),
         ),
         const SizedBox(width: 8),
-        Text(
-          title,
-          style: const TextStyle(
-            color: AppColors.text,
-            fontSize: 14,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
+        Expanded(child: Text(title, style: AppTextStyles.sectionHeader)),
       ],
     );
   }

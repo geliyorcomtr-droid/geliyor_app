@@ -1,8 +1,12 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:geliyor_app/data/banner_repository.dart';
+import 'package:geliyor_app/data/cat_feeding_guide.dart';
+import 'package:geliyor_app/data/dog_feeding_guide.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/state/pet_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
+import 'package:geliyor_app/widgets/app_banner_slider.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
 import 'package:geliyor_app/widgets/app_pressable_button.dart';
@@ -24,11 +28,14 @@ class _MeetPetScreenState extends State<MeetPetScreen> {
   String? _activityLevel = 'Orta';
   String? _extraFood;
 
-  static const _ageOptions = [
-    'Yavru',
-    'Genç',
-    'Yetişkin',
-    'Senior',
+  static const _ageOptions = ['Yavru', 'Genç', 'Yetişkin', 'Senior'];
+
+  static const _dogSizeOptions = [
+    'X-Small (0-4 kg)',
+    'Mini (5-10 kg)',
+    'Medium (11-25 kg)',
+    'Maxi (26-44 kg)',
+    'Giant (45 kg+)',
   ];
 
   static const _activityOptions = ['Düşük', 'Orta', 'Yüksek'];
@@ -63,14 +70,20 @@ class _MeetPetScreenState extends State<MeetPetScreen> {
   List<String> get _weightOptions =>
       _species == 'Köpek' ? _dogWeightOptions : _catWeightOptions;
 
+  bool get _isDog => _species == 'Köpek';
+
   void _selectSpecies(String species) {
     setState(() {
       _species = species;
-      final options = species == 'Köpek'
+      final weightOpts = species == 'Köpek'
           ? _dogWeightOptions
           : _catWeightOptions;
-      if (_weight == null || !options.contains(_weight)) {
-        _weight = options.first;
+      if (_weight == null || !weightOpts.contains(_weight)) {
+        _weight = weightOpts.first;
+      }
+      final rangeOpts = species == 'Köpek' ? _dogSizeOptions : _ageOptions;
+      if (_ageRange == null || !rangeOpts.contains(_ageRange)) {
+        _ageRange = rangeOpts.first;
       }
     });
   }
@@ -115,6 +128,16 @@ class _MeetPetScreenState extends State<MeetPetScreen> {
   void _savePet() {
     final species = _species ?? 'Kedi';
     final typedName = _nameController.text.trim();
+    final dailyFoodGrams = species == 'Köpek'
+        ? DogFeedingGuide.dailyGramsFor(
+            sizeLabel: _ageRange,
+            activityLevel: _activityLevel,
+          )
+        : CatFeedingGuide.dailyGramsFor(
+            weightLabel: _weight,
+            bodyType: _bodyType,
+            activityLevel: _activityLevel,
+          );
     setState(() {
       if (_selectedPetIndex != null) {
         final existing = _savedPets[_selectedPetIndex!];
@@ -129,6 +152,7 @@ class _MeetPetScreenState extends State<MeetPetScreen> {
             neutered: _neutered,
             activityLevel: _activityLevel,
             extraFood: _extraFood,
+            dailyFoodGrams: dailyFoodGrams,
             allergies: existing.allergies,
           ),
         );
@@ -144,6 +168,7 @@ class _MeetPetScreenState extends State<MeetPetScreen> {
             neutered: _neutered,
             activityLevel: _activityLevel,
             extraFood: _extraFood,
+            dailyFoodGrams: dailyFoodGrams,
           ),
         );
       }
@@ -175,73 +200,69 @@ class _MeetPetScreenState extends State<MeetPetScreen> {
               const SizedBox(height: 10),
               _buildPetSummaryCard(),
               const SizedBox(height: 10),
+              _buildQuestion(title: 'Dostunun adı?', child: _buildNameField()),
+              const SizedBox(height: 10),
               _buildQuestion(
-                title: 'Dostunun adı?',
-                child: _buildNameField(),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: _buildQuestion(
-                      number: '1',
-                      title: 'Türü nedir?',
-                      child: _buildSpeciesRow(),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _buildQuestion(
-                      number: '2',
-                      title: 'Kısır mı?',
-                      child: _buildNeuteredRow(),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: _buildQuestion(
-                      number: '3',
-                      title: 'Yaş aralığı nedir?',
-                      child: _buildSelectDropdown(
-                        value: _ageRange,
-                        placeholder: 'Yaş seç',
-                        onTap: () => _openSelectSheet(
-                          title: 'Yaş Aralığı',
-                          options: _ageOptions,
-                          selected: _ageRange,
-                          onSelect: (v) => setState(() => _ageRange = v),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _buildQuestion(
-                      number: '4',
-                      title: 'Kilosu nedir?',
-                      child: _buildSelectDropdown(
-                        value: _weight,
-                        placeholder: 'Kilo seç',
-                        onTap: () => _openSelectSheet(
-                          title: 'Kilo',
-                          options: _weightOptions,
-                          selected: _weight,
-                          onSelect: (v) => setState(() => _weight = v),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+                number: '1',
+                title: 'Türü nedir?',
+                child: _buildSpeciesRow(),
               ),
               const SizedBox(height: 10),
               _buildQuestion(
-                number: '5',
+                number: '2',
+                title: 'Kısır mı?',
+                child: _buildNeuteredRow(),
+              ),
+              const SizedBox(height: 10),
+              if (_isDog)
+                _buildQuestion(
+                  number: '3',
+                  title: 'Boyuta Göre',
+                  child: _buildSelectDropdown(
+                    value: _ageRange,
+                    placeholder: 'Boyut seç',
+                    onTap: () => _openSelectSheet(
+                      title: 'Boyuta Göre',
+                      options: _dogSizeOptions,
+                      selected: _ageRange,
+                      onSelect: (v) => setState(() => _ageRange = v),
+                    ),
+                  ),
+                )
+              else ...[
+                _buildQuestion(
+                  number: '3',
+                  title: 'Yaş aralığı nedir?',
+                  child: _buildSelectDropdown(
+                    value: _ageRange,
+                    placeholder: 'Yaş seç',
+                    onTap: () => _openSelectSheet(
+                      title: 'Yaş Aralığı',
+                      options: _ageOptions,
+                      selected: _ageRange,
+                      onSelect: (v) => setState(() => _ageRange = v),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                _buildQuestion(
+                  number: '4',
+                  title: 'Kilosu nedir?',
+                  child: _buildSelectDropdown(
+                    value: _weight,
+                    placeholder: 'Kilo seç',
+                    onTap: () => _openSelectSheet(
+                      title: 'Kilo',
+                      options: _weightOptions,
+                      selected: _weight,
+                      onSelect: (v) => setState(() => _weight = v),
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 10),
+              _buildQuestion(
+                number: _isDog ? '4' : '5',
                 title: 'Vücut yapısı?',
                 child: _buildOptionRow(
                   options: _bodyTypeOptions,
@@ -251,7 +272,7 @@ class _MeetPetScreenState extends State<MeetPetScreen> {
               ),
               const SizedBox(height: 10),
               _buildQuestion(
-                number: '6',
+                number: _isDog ? '5' : '6',
                 title: 'Aktivite seviyesi nedir?',
                 child: _buildOptionRow(
                   options: _activityOptions,
@@ -261,7 +282,7 @@ class _MeetPetScreenState extends State<MeetPetScreen> {
               ),
               const SizedBox(height: 10),
               _buildQuestion(
-                number: '7',
+                number: _isDog ? '6' : '7',
                 title: 'Kuru mama dışında düzenli besin tüketiyor mu?',
                 child: _buildOptionRow(
                   options: _extraFoodOptions,
@@ -307,29 +328,9 @@ class _MeetPetScreenState extends State<MeetPetScreen> {
   }
 
   Widget _buildTopBanner() {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: Image.asset(
-        'assets/images/dostunu_taniyalim_banner.png',
-        width: double.infinity,
-        fit: BoxFit.fitWidth,
-        errorBuilder: (context, error, stackTrace) {
-          return Container(
-            height: 120,
-            decoration: BoxDecoration(
-              color: AppColors.selected,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: AppColors.border),
-            ),
-            alignment: Alignment.center,
-            child: const Icon(
-              Icons.pets_rounded,
-              color: AppColors.primary,
-              size: 36,
-            ),
-          );
-        },
-      ),
+    return const AppBannerSlot(
+      placement: BannerPlacement.meetPet,
+      fallbackAssets: ['assets/images/dostunu_taniyalim_banner.png'],
     );
   }
 
@@ -507,17 +508,7 @@ class _MeetPetScreenState extends State<MeetPetScreen> {
               ),
               const SizedBox(width: 8),
             ],
-            Expanded(
-              child: Text(
-                title,
-                style: const TextStyle(
-                  color: AppColors.text,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
-                  height: 1.2,
-                ),
-              ),
-            ),
+            Expanded(child: Text(title, style: AppTextStyles.questionHeader)),
           ],
         ),
         const SizedBox(height: 8),
@@ -645,86 +636,88 @@ class _MeetPetScreenState extends State<MeetPetScreen> {
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
                   child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Expanded(
-                        child: Text(
-                          title,
-                          style: const TextStyle(
-                            color: AppColors.text,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w900,
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              title,
+                              style: const TextStyle(
+                                color: AppColors.text,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
                           ),
-                        ),
+                          GestureDetector(
+                            onTap: () => Navigator.of(sheetContext).pop(),
+                            child: const Icon(
+                              Icons.close_rounded,
+                              color: AppColors.subText,
+                              size: 18,
+                            ),
+                          ),
+                        ],
                       ),
-                      GestureDetector(
-                        onTap: () => Navigator.of(sheetContext).pop(),
-                        child: const Icon(
-                          Icons.close_rounded,
-                          color: AppColors.subText,
-                          size: 18,
+                      const SizedBox(height: 8),
+                      Flexible(
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          padding: EdgeInsets.zero,
+                          itemCount: options.length,
+                          separatorBuilder: (_, _) => const Divider(
+                            height: 1,
+                            thickness: 1,
+                            color: AppColors.border,
+                          ),
+                          itemBuilder: (context, index) {
+                            final option = options[index];
+                            final isSelected = selected == option;
+                            return Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: () {
+                                  onSelect(option);
+                                  Navigator.of(sheetContext).pop();
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 10,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          option,
+                                          style: TextStyle(
+                                            color: isSelected
+                                                ? AppColors.primary
+                                                : AppColors.text,
+                                            fontSize: 12.5,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                        ),
+                                      ),
+                                      Icon(
+                                        isSelected
+                                            ? Icons.radio_button_checked
+                                            : Icons.radio_button_unchecked,
+                                        color: isSelected
+                                            ? AppColors.primary
+                                            : AppColors.border,
+                                        size: 18,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  Flexible(
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      padding: EdgeInsets.zero,
-                      itemCount: options.length,
-                      separatorBuilder: (_, _) => const Divider(
-                        height: 1,
-                        thickness: 1,
-                        color: AppColors.border,
-                      ),
-                      itemBuilder: (context, index) {
-                        final option = options[index];
-                        final isSelected = selected == option;
-                        return Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            onTap: () {
-                              onSelect(option);
-                              Navigator.of(sheetContext).pop();
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      option,
-                                      style: TextStyle(
-                                        color: isSelected
-                                            ? AppColors.primary
-                                            : AppColors.text,
-                                        fontSize: 12.5,
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                    ),
-                                  ),
-                                  Icon(
-                                    isSelected
-                                        ? Icons.radio_button_checked
-                                        : Icons.radio_button_unchecked,
-                                    color: isSelected
-                                        ? AppColors.primary
-                                        : AppColors.border,
-                                    size: 18,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
                 ),
               ),
             ),

@@ -32,7 +32,12 @@ class AccountScreen extends StatelessWidget {
         header: _buildHeader(context),
         content: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+          padding: const EdgeInsets.fromLTRB(
+            AppPageFrame.contentHorizontalPadding,
+            0,
+            AppPageFrame.contentHorizontalPadding,
+            8,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -130,10 +135,12 @@ class AccountScreen extends StatelessWidget {
     final progress = _points / _nextTierPoints;
     final remaining = _nextTierPoints - _points;
     final auth = AuthStore.instance;
-    final displayName =
-        auth.fullName.trim().isEmpty ? 'Can Dostu' : auth.fullName.trim();
-    final phoneLabel =
-        auth.phone.trim().isEmpty ? 'Üye hesabı' : auth.phone.trim();
+    final displayName = auth.fullName.trim().isEmpty
+        ? 'Can Dostu'
+        : auth.fullName.trim();
+    final phoneLabel = auth.phone.trim().isEmpty
+        ? 'Üye hesabı'
+        : auth.phone.trim();
 
     return Container(
       width: double.infinity,
@@ -169,8 +176,7 @@ class AccountScreen extends StatelessWidget {
                       child: Image.asset(
                         'assets/images/luna_kopek.png',
                         fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) =>
-                            Container(
+                        errorBuilder: (context, error, stackTrace) => Container(
                           color: AppColors.selected,
                           child: const Icon(
                             Icons.pets_rounded,
@@ -363,11 +369,7 @@ class AccountScreen extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
             child: Text(
               title,
-              style: const TextStyle(
-                color: AppColors.text,
-                fontSize: 13,
-                fontWeight: FontWeight.w900,
-              ),
+              style: AppTextStyles.sectionHeader,
             ),
           ),
           for (int i = 0; i < items.length; i++) ...[
@@ -396,82 +398,68 @@ class AccountScreen extends StatelessWidget {
         onTap: item.opensPersonalInfo
             ? () {
                 Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const PersonalInfoScreen(),
-                  ),
+                  MaterialPageRoute(builder: (_) => const PersonalInfoScreen()),
                 );
               }
             : item.opensAddresses
-                ? () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const AddressesScreen(),
-                      ),
-                    );
-                  }
-                : item.opensPaymentMethods
-                    ? () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const PaymentMethodsScreen(),
-                          ),
-                        );
-                      }
-                    : item.opensNotificationSettings
-                        ? () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    const NotificationSettingsScreen(),
-                              ),
-                            );
-                          }
-                        : item.opensOrders
-                            ? () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => const OrdersScreen(),
-                                  ),
-                                );
-                              }
-                            : item.opensFavorites
-                                ? () {
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) => const FavoritesScreen(),
-                                      ),
-                                    );
-                                  }
-                                : item.opensHelpSupport
-                                ? () {
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            const HelpSupportScreen(),
-                                      ),
-                                    );
-                                  }
-                                : item.opensPrivacySecurity
-                                    ? () {
-                                        Navigator.of(context).push(
-                                          MaterialPageRoute(
-                                            builder: (_) =>
-                                                const PrivacySecurityScreen(),
-                                          ),
-                                        );
-                                      }
-                                    : item.opensLogout
-                                        ? () {
-                                            AuthStore.instance.logout();
-                                            Navigator.of(context)
-                                                .pushReplacement(
-                                              MaterialPageRoute(
-                                                builder: (_) =>
-                                                    const LogoutSuccessScreen(),
-                                              ),
-                                            );
-                                          }
-                                        : null,
+            ? () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const AddressesScreen()),
+                );
+              }
+            : item.opensPaymentMethods
+            ? () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const PaymentMethodsScreen(),
+                  ),
+                );
+              }
+            : item.opensNotificationSettings
+            ? () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const NotificationSettingsScreen(),
+                  ),
+                );
+              }
+            : item.opensOrders
+            ? () {
+                Navigator.of(
+                  context,
+                ).push(MaterialPageRoute(builder: (_) => const OrdersScreen()));
+              }
+            : item.opensFavorites
+            ? () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const FavoritesScreen()),
+                );
+              }
+            : item.opensHelpSupport
+            ? () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const HelpSupportScreen()),
+                );
+              }
+            : item.opensPrivacySecurity
+            ? () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const PrivacySecurityScreen(),
+                  ),
+                );
+              }
+            : item.opensLogout
+            ? () async {
+                await AuthStore.instance.logout();
+                if (!context.mounted) return;
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (_) => const LogoutSuccessScreen(),
+                  ),
+                );
+              }
+            : null,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(14, 10, 12, 10),
           child: Row(

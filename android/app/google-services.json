@@ -1,0 +1,67 @@
+{
+  "project_info": {
+    "project_number": "654846208029",
+    "project_id": "geliyortrapp",
+    "storage_bucket": "geliyortrapp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:654846208029:android:e6c2436221cb60b75e7ef4",
+        "android_client_info": {
+          "package_name": "com.geliyor.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBvhbvJHGnCpKNTco8ZiIGjnNy_qGBkGYQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:654846208029:android:0e69844e114cea865e7ef4",
+        "android_client_info": {
+          "package_name": "com.geliyortr.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBvhbvJHGnCpKNTco8ZiIGjnNy_qGBkGYQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:654846208029:android:7e0c9a6fd2791b735e7ef4",
+        "android_client_info": {
+          "package_name": "com.mycompany.geliyortr"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBvhbvJHGnCpKNTco8ZiIGjnNy_qGBkGYQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

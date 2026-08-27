@@ -1,4 +1,7 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'package:geliyor_app/data/firestore_collections.dart';
+import 'package:geliyor_app/state/auth_store.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
@@ -56,7 +59,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
     super.dispose();
   }
 
-  void _sendMessage() {
+  Future<void> _sendMessage() async {
     final name = _nameController.text.trim();
     final email = _emailController.text.trim();
     final message = _messageController.text.trim();
@@ -74,6 +77,32 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
       return;
     }
 
+    try {
+      await FirebaseFirestore.instance
+          .collection(FirestoreCollections.supportTickets)
+          .add({
+            SupportTicketFields.name: name,
+            SupportTicketFields.email: email,
+            SupportTicketFields.subject: _selectedSubject,
+            SupportTicketFields.message: message,
+            SupportTicketFields.userId: AuthStore.instance.uid ?? '',
+            SupportTicketFields.status: SupportTicketStatuses.open,
+            SupportTicketFields.reply: '',
+            SupportTicketFields.createdAt: FieldValue.serverTimestamp(),
+            SupportTicketFields.updatedAt: FieldValue.serverTimestamp(),
+          });
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Mesaj gönderilemedi. Bağlantını kontrol et.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) return;
     setState(() {
       _selectedSubject = null;
       _nameController.clear();
@@ -99,7 +128,12 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
         header: _buildHeader(context),
         content: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+          padding: const EdgeInsets.fromLTRB(
+            AppPageFrame.contentHorizontalPadding,
+            0,
+            AppPageFrame.contentHorizontalPadding,
+            8,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -176,7 +210,11 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
           const Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.headset_mic_outlined, color: AppColors.primary, size: 22),
+              Icon(
+                Icons.headset_mic_outlined,
+                color: AppColors.primary,
+                size: 22,
+              ),
               SizedBox(width: 8),
               Expanded(
                 child: Column(
@@ -326,22 +364,14 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
             const Expanded(
               child: Text(
                 'Sık Sorulan Sorular',
-                style: TextStyle(
-                  color: AppColors.text,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
-                ),
+                style: AppTextStyles.sectionHeader,
               ),
             ),
             GestureDetector(
               onTap: () {},
               child: const Text(
-                'Tümünü Gör >',
-                style: TextStyle(
-                  color: AppColors.primary,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                ),
+                'Tümünü Gör',
+                style: AppTextStyles.seeAllAction,
               ),
             ),
           ],
@@ -477,11 +507,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
               SizedBox(width: 6),
               Text(
                 'Bize Yazın',
-                style: TextStyle(
-                  color: AppColors.primary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
-                ),
+                style: AppTextStyles.sectionHeader,
               ),
             ],
           ),
@@ -701,8 +727,11 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
           const Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.verified_user_outlined,
-                  color: AppColors.primary, size: 18),
+              Icon(
+                Icons.verified_user_outlined,
+                color: AppColors.primary,
+                size: 18,
+              ),
               SizedBox(width: 8),
               Expanded(
                 child: Column(

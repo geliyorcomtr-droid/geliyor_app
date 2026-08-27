@@ -13,7 +13,8 @@ class FilterSubpageItem {
     this.imagePath,
     this.icon,
     this.iconColor = AppColors.primary,
-    this.emoji = '🐾',
+    this.badgeIcon = Icons.pets_rounded,
+    this.badgeIconColor = AppColors.primary,
     this.leadingColor,
     this.leadingLabel,
     this.onTap,
@@ -24,7 +25,8 @@ class FilterSubpageItem {
   final String? imagePath;
   final IconData? icon;
   final Color iconColor;
-  final String emoji;
+  final IconData badgeIcon;
+  final Color badgeIconColor;
   final Color? leadingColor;
   final String? leadingLabel;
   final VoidCallback? onTap;
@@ -214,7 +216,7 @@ class FilterSubpageLayout extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 4),
-                        Text(item.emoji, style: const TextStyle(fontSize: 13)),
+                        Icon(item.badgeIcon, size: 14, color: item.badgeIconColor),
                       ],
                     ),
                     const SizedBox(height: 2),

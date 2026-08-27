@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/utils/product_price.dart';
+import 'package:geliyor_app/widgets/product_favorite_corner.dart';
 
 /// Favorilerim ile aynı yatay ürün kartı — tüm ürün listelerinde kullanılır.
 class AppProductCard extends StatelessWidget {
@@ -116,10 +117,21 @@ class AppProductCard extends StatelessWidget {
                   ),
                 ),
               ),
+              if (showFavorite && trailing == null)
+                Positioned(
+                  top: -2,
+                  left: -2,
+                  child: ProductFavoriteCorner.controlled(
+                    isFavorite: isFavorite,
+                    onToggle: () => onFavoriteTap?.call(),
+                    size: 22,
+                    iconSize: 12,
+                  ),
+                ),
               if (_discountBadge != null)
                 Positioned(
                   top: -4,
-                  left: -4,
+                  right: -4,
                   child: Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
@@ -171,21 +183,7 @@ class AppProductCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                      if (trailing != null)
-                        trailing!
-                      else if (showFavorite)
-                        GestureDetector(
-                          onTap: onFavoriteTap,
-                          child: Icon(
-                            isFavorite
-                                ? Icons.favorite_rounded
-                                : Icons.favorite_border_rounded,
-                            color: isFavorite
-                                ? AppColors.error
-                                : AppColors.primary,
-                            size: 16,
-                          ),
-                        ),
+                      ?trailing,
                     ],
                   ),
                   if (showRating && rating != null) ...[

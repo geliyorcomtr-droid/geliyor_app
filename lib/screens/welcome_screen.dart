@@ -20,10 +20,14 @@ class WelcomeScreen extends StatelessWidget {
         header: _buildHeader(context),
         content: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+          padding: const EdgeInsets.fromLTRB(
+            AppPageFrame.contentHorizontalPadding,
+            0,
+            AppPageFrame.contentHorizontalPadding,
+            10,
+          ),
           child: Column(
             children: [
-              const SizedBox(height: 8),
               _buildLogo(),
               const SizedBox(height: 18),
               const Text(
@@ -104,31 +108,6 @@ class WelcomeScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 18),
-              _benefitRow(
-                icon: Icons.shopping_bag_outlined,
-                text: 'Siparişlerinizi kolayca takip edin',
-              ),
-              const SizedBox(height: 10),
-              _benefitRow(
-                icon: Icons.favorite_border_rounded,
-                text: 'Favori ürünlerinizi kaydedin',
-              ),
-              const SizedBox(height: 10),
-              _benefitRow(
-                icon: Icons.local_offer_outlined,
-                text: 'Kampanya ve puanlardan yararlanın',
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'Gizlilik Politikası  ·  Kullanım Koşulları',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: AppColors.primary,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
             ],
           ),
         ),
@@ -168,43 +147,12 @@ class WelcomeScreen extends StatelessWidget {
 
   Widget _buildLogo() {
     return Image.asset(
-      'assets/images/geliyor_auth_logo.png',
-      height: 148,
+      'assets/images/geliyor_splash_logo.png',
+      height: 240,
       fit: BoxFit.contain,
       filterQuality: FilterQuality.high,
-      errorBuilder: (context, error, stackTrace) => const Icon(
-        Icons.pets_rounded,
-        color: AppColors.primary,
-        size: 56,
-      ),
-    );
-  }
-
-  Widget _benefitRow({required IconData icon, required String text}) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: AppColors.primary, size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(
-                color: AppColors.text,
-                fontSize: 12.5,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
+      errorBuilder: (context, error, stackTrace) =>
+          const Icon(Icons.pets_rounded, color: AppColors.primary, size: 56),
     );
   }
 }

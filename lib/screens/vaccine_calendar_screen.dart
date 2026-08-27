@@ -466,10 +466,11 @@ class _VaccineCalendarScreenState extends State<VaccineCalendarScreen> {
             ),
           ],
           const SizedBox(width: 6),
-          Transform.scale(
-            scale: 0.78,
-            child: SizedBox(
-              height: 24,
+          SizedBox(
+            width: 42,
+            height: 30,
+            child: FittedBox(
+              fit: BoxFit.contain,
               child: Switch(
                 value: _calendarEnabled,
                 onChanged: _setCalendarEnabled,
@@ -740,14 +741,18 @@ class _VaccineCalendarScreenState extends State<VaccineCalendarScreen> {
             onTap: _closeReminder,
             child: Container(color: Colors.black.withValues(alpha: 0.35)),
           ),
-          Align(
-            alignment: Alignment.bottomCenter,
+          Positioned(
+            left: 0,
+            right: 0,
+            top: 8,
+            bottom: 0,
             child: Container(
-              height: AppPageFrame.contentHeight - 8,
               width: double.infinity,
               decoration: const BoxDecoration(
                 color: AppColors.surface,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+                borderRadius: BorderRadius.vertical(
+                  top: Radius.circular(28),
+                ),
               ),
               child: Column(
                 children: [
@@ -810,9 +815,15 @@ class _VaccineCalendarScreenState extends State<VaccineCalendarScreen> {
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Expanded(flex: 42, child: _buildProcedureList()),
+                          Expanded(
+                            flex: 42,
+                            child: _buildProcedureList(),
+                          ),
                           const SizedBox(width: 8),
-                          Expanded(flex: 58, child: _buildDateTimePanel()),
+                          Expanded(
+                            flex: 58,
+                            child: _buildDateTimePanel(),
+                          ),
                         ],
                       ),
                     ),
@@ -830,7 +841,10 @@ class _VaccineCalendarScreenState extends State<VaccineCalendarScreen> {
                           child: const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.notifications_active_rounded, size: 16),
+                              Icon(
+                                Icons.notifications_active_rounded,
+                                size: 16,
+                              ),
                               SizedBox(width: 6),
                               Text(
                                 'Hatırlatıcıyı Kaydet',
@@ -939,93 +953,98 @@ class _VaccineCalendarScreenState extends State<VaccineCalendarScreen> {
           children: [
             Expanded(child: _buildCalendar()),
             const SizedBox(height: 8),
-            const Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Bildirim: Kaç Gün Önce',
-                style: TextStyle(
-                  color: AppColors.text,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                for (final days in [1, 3, 7]) ...[
-                  if (days != 1) const SizedBox(width: 6),
-                  Expanded(
-                    child: _healthDaysChip(
-                      days: days,
-                      selected: store.healthReminderDaysBefore == days,
-                      onTap: () => store.setHealthReminderDaysBefore(days),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            const SizedBox(height: 8),
-            const Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Saat Seçin',
-                style: TextStyle(
-                  color: AppColors.text,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                for (int i = 0; i < _times.length; i++)
-                  GestureDetector(
-                    onTap: () => store.setHealthReminderTimeIndex(i),
-                    child: Container(
-                      width: 72,
-                      padding: const EdgeInsets.symmetric(vertical: 6),
-                      decoration: BoxDecoration(
-                        color: _selectedTime == i
-                            ? AppColors.primary
-                            : AppColors.surface,
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(
-                          color: _selectedTime == i
-                              ? AppColors.primary
-                              : AppColors.border,
-                        ),
+            Flexible(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Bildirim: Kaç Gün Önce',
+                      style: TextStyle(
+                        color: AppColors.text,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
                       ),
-                      child: Column(
-                        children: [
-                          Text(
-                            _times[i],
-                            style: TextStyle(
-                              color: _selectedTime == i
-                                  ? AppColors.surface
-                                  : AppColors.text,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          Text(
-                            _timeLabels[i],
-                            style: TextStyle(
-                              color: _selectedTime == i
-                                  ? AppColors.surface
-                                  : AppColors.subText,
-                              fontSize: 8,
-                              fontWeight: FontWeight.w600,
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        for (final days in [1, 3, 7]) ...[
+                          if (days != 1) const SizedBox(width: 6),
+                          Expanded(
+                            child: _healthDaysChip(
+                              days: days,
+                              selected: store.healthReminderDaysBefore == days,
+                              onTap: () =>
+                                  store.setHealthReminderDaysBefore(days),
                             ),
                           ),
                         ],
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Saat Seçin',
+                      style: TextStyle(
+                        color: AppColors.text,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
-                  ),
-              ],
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        for (int i = 0; i < _times.length; i++)
+                          GestureDetector(
+                            onTap: () => store.setHealthReminderTimeIndex(i),
+                            child: Container(
+                              width: 72,
+                              padding: const EdgeInsets.symmetric(vertical: 6),
+                              decoration: BoxDecoration(
+                                color: _selectedTime == i
+                                    ? AppColors.primary
+                                    : AppColors.surface,
+                                borderRadius: BorderRadius.circular(999),
+                                border: Border.all(
+                                  color: _selectedTime == i
+                                      ? AppColors.primary
+                                      : AppColors.border,
+                                ),
+                              ),
+                              child: Column(
+                                children: [
+                                  Text(
+                                    _times[i],
+                                    style: TextStyle(
+                                      color: _selectedTime == i
+                                          ? AppColors.surface
+                                          : AppColors.text,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  Text(
+                                    _timeLabels[i],
+                                    style: TextStyle(
+                                      color: _selectedTime == i
+                                          ? AppColors.surface
+                                          : AppColors.subText,
+                                      fontSize: 8,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ),
           ],
         );
@@ -1155,6 +1174,7 @@ class _VaccineCalendarScreenState extends State<VaccineCalendarScreen> {
                 crossAxisCount: 7,
                 mainAxisSpacing: 2,
                 crossAxisSpacing: 2,
+                childAspectRatio: 1.1,
               ),
               itemBuilder: (context, index) {
                 if (index < startWeekday - 1) {

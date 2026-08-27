@@ -32,38 +32,7 @@ class OrderStore extends ChangeNotifier {
   DateTime _lastOrderAt = DateTime(2026, 7, 16);
 
   /// Müşterinin en son verdiği sipariş içeriği.
-  List<LastOrderItem> _lastOrderItems = const [
-    LastOrderItem(
-      id: 'hills-8kg',
-      title: "Hill's SCIENCE PLAN Somonlu",
-      subtitle: 'Kısırlaştırılmış Kedi Maması',
-      weight: '8 kg + 2 kg',
-      price: 4799,
-      oldPrice: 6199,
-      imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-      quantity: 1,
-    ),
-    LastOrderItem(
-      id: 'hills-3kg',
-      title: "Hill's SCIENCE PLAN Somonlu",
-      subtitle: 'Kısırlaştırılmış Kedi Maması',
-      weight: '3 kg',
-      price: 2399,
-      oldPrice: 2799,
-      imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-      quantity: 1,
-    ),
-    LastOrderItem(
-      id: 'proplan-14kg',
-      title: 'Pro Plan Hindili',
-      subtitle: 'Kısırlaştırılmış Kedi Maması',
-      weight: '14 kg',
-      price: 6399,
-      oldPrice: 7459,
-      imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-      quantity: 1,
-    ),
-  ];
+  List<LastOrderItem> _lastOrderItems = const [];
 
   String get lastOrderId => _lastOrderId;
   DateTime get lastOrderAt => _lastOrderAt;
@@ -71,8 +40,15 @@ class OrderStore extends ChangeNotifier {
       '${_lastOrderAt.day.toString().padLeft(2, '0')}.'
       '${_lastOrderAt.month.toString().padLeft(2, '0')}.'
       '${_lastOrderAt.year}';
-  List<LastOrderItem> get lastOrderItems =>
-      List.unmodifiable(_lastOrderItems);
+  List<LastOrderItem> get lastOrderItems {
+    _lastOrderItems = _lastOrderItems
+        .where((item) {
+          final path = item.imagePath.trim().toLowerCase();
+          return path.startsWith('http://') || path.startsWith('https://');
+        })
+        .toList(growable: false);
+    return List.unmodifiable(_lastOrderItems);
+  }
 
   bool get hasLastOrder => _lastOrderItems.isNotEmpty;
 

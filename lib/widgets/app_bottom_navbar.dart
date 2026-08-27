@@ -22,6 +22,17 @@ class AppBottomNavbar extends StatelessWidget {
   final AppNavTab activeTab;
   final double height;
 
+  static const double _iconSize = 22;
+  static const double _labelGap = 3;
+  static const double _bottomPad = 8;
+  static const double _labelFontSize = 9.5;
+  static const double _labelHeight = 12;
+  static const double _homeButtonSize = 58;
+
+  /// Etiket kutusunun içindeki boş pay — çemberin alt çizgisi yazının
+  /// görünen alt kenarına oturur.
+  static const double _homeButtonLift = 4;
+
   void _goAssistant(BuildContext context) {
     if (activeTab == AppNavTab.assistant) return;
 
@@ -119,53 +130,75 @@ class AppBottomNavbar extends StatelessWidget {
             ],
           ),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              _navItem(
-                icon: Icons.smart_toy_outlined,
-                label: 'Asistan',
-                active: activeTab == AppNavTab.assistant,
-                onTap: () => _goAssistant(context),
-              ),
-              _navItem(
-                icon: Icons.local_offer_outlined,
-                label: 'Kampanya',
-                active: activeTab == AppNavTab.campaigns,
-                onTap: () => _goCampaigns(context),
-              ),
-              Transform.translate(
-                offset: const Offset(0, -22),
-                child: GestureDetector(
-                  onTap: () => _goHome(context),
-                  child: Container(
-                    width: 54,
-                    height: 54,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.35),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(Icons.pets_rounded, color: AppColors.surface, size: 28),
-                  ),
+              Expanded(
+                child: _navItem(
+                  icon: Icons.smart_toy_outlined,
+                  label: 'Asistan',
+                  active: activeTab == AppNavTab.assistant,
+                  onTap: () => _goAssistant(context),
                 ),
               ),
-              _cartItem(context, quantity),
-              _navItem(
-                icon: Icons.person_outline_rounded,
-                label: 'Profil',
-                active: activeTab == AppNavTab.profile,
-                onTap: () => _goProfile(context),
+              Expanded(
+                child: _navItem(
+                  icon: Icons.local_offer_outlined,
+                  label: 'Kampanya',
+                  active: activeTab == AppNavTab.campaigns,
+                  onTap: () => _goCampaigns(context),
+                ),
+              ),
+              Expanded(child: _homeItem(context)),
+              Expanded(child: _cartItem(context, quantity)),
+              Expanded(
+                child: _navItem(
+                  icon: Icons.person_outline_rounded,
+                  label: 'Profil',
+                  active: activeTab == AppNavTab.profile,
+                  onTap: () => _goProfile(context),
+                ),
               ),
             ],
           ),
         );
       },
+    );
+  }
+
+  /// Ortadaki pati butonu, Kampanya/Sepetim alt yazısıyla aynı alt hizada.
+  Widget _homeItem(BuildContext context) {
+    return GestureDetector(
+      onTap: () => _goHome(context),
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        height: height,
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: _bottomPad + _homeButtonLift),
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            child: Container(
+              width: _homeButtonSize,
+              height: _homeButtonSize,
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.35),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.pets_rounded,
+                color: AppColors.surface,
+                size: 32,
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -177,24 +210,27 @@ class AppBottomNavbar extends StatelessWidget {
       onTap: () => _goCart(context),
       behavior: HitTestBehavior.opaque,
       child: SizedBox(
-        width: 64,
+        height: height,
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.end,
           children: [
             SizedBox(
               width: 28,
-              height: 22,
+              height: _iconSize,
               child: Stack(
                 clipBehavior: Clip.none,
                 alignment: Alignment.center,
                 children: [
-                  Icon(Icons.shopping_cart_outlined, color: color, size: 22),
+                  Icon(Icons.shopping_cart_outlined, color: color, size: _iconSize),
                   if (quantity > 0)
                     Positioned(
                       top: -4,
                       right: -6,
                       child: Container(
-                        constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+                        constraints: const BoxConstraints(
+                          minWidth: 14,
+                          minHeight: 14,
+                        ),
                         padding: const EdgeInsets.symmetric(horizontal: 3),
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
@@ -215,17 +251,23 @@ class AppBottomNavbar extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 3),
-            Text(
-              'Sepetim',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: color,
-                fontSize: 9.5,
-                fontWeight: FontWeight.w700,
+            const SizedBox(height: _labelGap),
+            SizedBox(
+              height: _labelHeight,
+              child: Text(
+                'Sepetim',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: color,
+                  fontSize: _labelFontSize,
+                  fontWeight: FontWeight.w700,
+                  height: 1,
+                ),
               ),
             ),
+            const SizedBox(height: _bottomPad),
           ],
         ),
       ),
@@ -244,22 +286,28 @@ class AppBottomNavbar extends StatelessWidget {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: SizedBox(
-        width: 64,
+        height: height,
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            Icon(icon, color: color, size: 22),
-            const SizedBox(height: 3),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: color,
-                fontSize: 9.5,
-                fontWeight: FontWeight.w700,
+            Icon(icon, color: color, size: _iconSize),
+            const SizedBox(height: _labelGap),
+            SizedBox(
+              height: _labelHeight,
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: color,
+                  fontSize: _labelFontSize,
+                  fontWeight: FontWeight.w700,
+                  height: 1,
+                ),
               ),
             ),
+            const SizedBox(height: _bottomPad),
           ],
         ),
       ),

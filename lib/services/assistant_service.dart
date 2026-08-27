@@ -629,49 +629,7 @@ Kayıtlı dost bilgileri: $petContext
   }
 
   List<AssistantProduct> _defaultProducts({bool isDog = false}) {
-    if (isDog) {
-      return const [
-        AssistantProduct(
-          name: 'Pro Plan',
-          subtitle: 'Adult Medium Tavuklu',
-          rating: 4.8,
-          imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-        ),
-        AssistantProduct(
-          name: 'Royal Canin',
-          subtitle: 'Medium Adult',
-          rating: 4.7,
-          imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-        ),
-        AssistantProduct(
-          name: "Hill's",
-          subtitle: 'Science Plan Adult',
-          rating: 4.6,
-          imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-        ),
-      ];
-    }
-
-    return const [
-      AssistantProduct(
-        name: 'Pro Plan',
-        subtitle: 'Sterilised Somonlu',
-        rating: 4.8,
-        imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-      ),
-      AssistantProduct(
-        name: 'Royal Canin',
-        subtitle: 'Indoor 27',
-        rating: 4.7,
-        imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-      ),
-      AssistantProduct(
-        name: "Hill's",
-        subtitle: 'Science Plan',
-        rating: 4.6,
-        imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-      ),
-    ];
+    return const [];
   }
 
   String _normalize(String text) {

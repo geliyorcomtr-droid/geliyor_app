@@ -1,9 +1,11 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:geliyor_app/data/banner_repository.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:flutter/services.dart';
 import 'package:geliyor_app/screens/smart_plan_screen.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
+import 'package:geliyor_app/widgets/app_banner_slider.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
@@ -17,7 +19,6 @@ class CampaignsPointsScreen extends StatefulWidget {
 }
 
 class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
-  static const int _points = 1250;
   static const String _referralCode = 'GELIYOR100';
 
   bool _inviteOpen = false;
@@ -85,9 +86,9 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
   }
 
   void _openSmartPlan() {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const SmartPlanScreen()),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const SmartPlanScreen()));
   }
 
   void _openInviteForm() {
@@ -150,7 +151,12 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
         header: _buildHeader(context),
         content: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+          padding: const EdgeInsets.fromLTRB(
+            AppPageFrame.contentHorizontalPadding,
+            0,
+            AppPageFrame.contentHorizontalPadding,
+            10,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -213,54 +219,9 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
   }
 
   Widget _buildBanner() {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: Image.asset(
-        'assets/images/kampanya_puan_banner.png',
-        width: double.infinity,
-        height: 150,
-        fit: BoxFit.cover,
-        cacheWidth: 800,
-        filterQuality: FilterQuality.medium,
-        errorBuilder: (context, error, stackTrace) => Container(
-          height: 150,
-          decoration: BoxDecoration(
-            color: AppColors.primary,
-            borderRadius: BorderRadius.circular(24),
-          ),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Merhaba, Can Dostu! 👋',
-                style: TextStyle(
-                  color: AppColors.surface,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Toplam Dost Puanın',
-                style: TextStyle(
-                  color: AppColors.surface,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              Text(
-                '$_points',
-                style: const TextStyle(
-                  color: AppColors.surface,
-                  fontSize: 34,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    return const AppBannerSlot(
+      placement: BannerPlacement.campaignsPoints,
+      fallbackAssets: ['assets/images/kampanya_puan_banner.png'],
     );
   }
 
@@ -268,13 +229,16 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Dost Hediyeni Sen Seç 🎁',
-          style: TextStyle(
-            color: AppColors.text,
-            fontSize: 14,
-            fontWeight: FontWeight.w900,
-          ),
+        const Row(
+          children: [
+            Text('Dost Hediyeni Sen Seç', style: AppTextStyles.sectionHeader),
+            SizedBox(width: 4),
+            Icon(
+              Icons.card_giftcard_rounded,
+              size: 15,
+              color: AppColors.primary,
+            ),
+          ],
         ),
         const SizedBox(height: 3),
         Text(
@@ -299,7 +263,8 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
             const SizedBox(width: 8),
             Expanded(
               child: _GiftOptionCard(
-                imagePath: 'assets/images/son_ikonlar/kampanya_indirim_kupon.png',
+                imagePath:
+                    'assets/images/son_ikonlar/kampanya_indirim_kupon.png',
                 title: 'İndirim Kuponu',
                 subtitle: 'Sana özel indirim kuponu kazan!',
                 onTap: () {},
@@ -308,7 +273,8 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
             const SizedBox(width: 8),
             Expanded(
               child: _GiftOptionCard(
-                imagePath: 'assets/images/son_ikonlar/kampanya_sokaktaki_dost.png',
+                imagePath:
+                    'assets/images/son_ikonlar/kampanya_sokaktaki_dost.png',
                 title: 'Sokaktaki Dostlar',
                 subtitle: 'Puanlarını sokaktaki dostlar için bağışla!',
                 onTap: () {},
@@ -355,7 +321,10 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
                     'Daha Sonra Hatırlat',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w800),
+                    style: TextStyle(
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
               ],
@@ -369,7 +338,7 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
   Widget _buildReferralCard(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(24),
@@ -508,14 +477,18 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
         children: [
           Row(
             children: [
-              const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 22),
-              const SizedBox(width: 8),
+              const Icon(
+                Icons.check_circle_rounded,
+                color: AppColors.success,
+                size: 28,
+              ),
+              const SizedBox(width: 10),
               const Expanded(
                 child: Text(
                   'İşlem başarıyla tamamlanmıştır',
                   style: TextStyle(
                     color: AppColors.text,
-                    fontSize: 11,
+                    fontSize: 14,
                     fontWeight: FontWeight.w900,
                     height: 1.2,
                   ),
@@ -523,7 +496,7 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
               ),
               AppPressableButton(
                 onTap: _closeInviteForm,
-                padding: const EdgeInsets.all(4),
+                padding: const EdgeInsets.all(6),
                 backgroundColor: Colors.transparent,
                 pressedBackgroundColor: AppColors.selected,
                 foregroundColor: AppColors.subText,
@@ -531,11 +504,11 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
                 borderColor: Colors.transparent,
                 pressedBorderColor: Colors.transparent,
                 borderWidth: 0,
-                child: const Icon(Icons.close_rounded, size: 16),
+                child: const Icon(Icons.close_rounded, size: 20),
               ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 10),
           Align(
             alignment: Alignment.centerLeft,
             child: Text(
@@ -544,20 +517,20 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
                   : 'Davet kodu e-postaya gönderildi.',
               style: TextStyle(
                 color: AppColors.subText.withValues(alpha: 0.95),
-                fontSize: 9,
+                fontSize: 12,
                 fontWeight: FontWeight.w600,
               ),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           AppPressableButton.primary(
             onTap: _closeInviteForm,
             width: double.infinity,
-            height: 32,
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            height: 44,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: const Text(
               'Tamam',
-              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800),
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
             ),
           ),
         ],
@@ -573,7 +546,7 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
                 'Arkadaşını Davet Et',
                 style: TextStyle(
                   color: AppColors.text,
-                  fontSize: 11,
+                  fontSize: 15,
                   fontWeight: FontWeight.w900,
                 ),
               ),
@@ -582,14 +555,14 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
               'Kod: $_referralCode',
               style: TextStyle(
                 color: AppColors.subText.withValues(alpha: 0.95),
-                fontSize: 9,
+                fontSize: 12,
                 fontWeight: FontWeight.w700,
               ),
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: 6),
             AppPressableButton(
               onTap: _closeInviteForm,
-              padding: const EdgeInsets.all(4),
+              padding: const EdgeInsets.all(6),
               backgroundColor: Colors.transparent,
               pressedBackgroundColor: AppColors.selected,
               foregroundColor: AppColors.subText,
@@ -597,11 +570,11 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
               borderColor: Colors.transparent,
               pressedBorderColor: Colors.transparent,
               borderWidth: 0,
-              child: const Icon(Icons.close_rounded, size: 16),
+              child: const Icon(Icons.close_rounded, size: 20),
             ),
           ],
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 12),
         Row(
           children: [
             Expanded(
@@ -618,7 +591,7 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
                 },
               ),
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 10),
             Expanded(
               child: _InviteChannelChip(
                 label: 'E-posta',
@@ -635,9 +608,9 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
             ),
           ],
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 12),
         SizedBox(
-          height: 32,
+          height: 44,
           child: TextField(
             controller: _inviteController,
             keyboardType: _inviteChannel == _InviteChannel.phone
@@ -645,7 +618,7 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
                 : TextInputType.emailAddress,
             style: const TextStyle(
               color: AppColors.text,
-              fontSize: 11,
+              fontSize: 14,
               fontWeight: FontWeight.w600,
               height: 1.1,
             ),
@@ -656,14 +629,14 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
                   : 'E-posta adresi',
               hintStyle: TextStyle(
                 color: AppColors.subText.withValues(alpha: 0.8),
-                fontSize: 10,
+                fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
               filled: true,
               fillColor: AppColors.background,
               contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 8,
+                horizontal: 16,
+                vertical: 12,
               ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(999),
@@ -684,28 +657,28 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
           ),
         ),
         if (_inviteError != null) ...[
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Align(
             alignment: Alignment.centerLeft,
             child: Text(
               _inviteError!,
               style: const TextStyle(
                 color: AppColors.error,
-                fontSize: 9,
+                fontSize: 11,
                 fontWeight: FontWeight.w700,
               ),
             ),
           ),
         ],
-        const SizedBox(height: 6),
+        const SizedBox(height: 12),
         AppPressableButton.primary(
           onTap: _submitInvite,
           width: double.infinity,
-          height: 32,
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          height: 44,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: const Text(
             'Tamam',
-            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800),
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
           ),
         ),
       ],
@@ -720,11 +693,7 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
             const Expanded(
               child: Text(
                 'Puanlarını Ödüllere Dönüştür',
-                style: TextStyle(
-                  color: AppColors.text,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
-                ),
+                style: AppTextStyles.sectionHeader,
               ),
             ),
             AppPressableButton(
@@ -764,11 +733,7 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
       children: [
         const Text(
           'Dost Seviyeleri',
-          style: TextStyle(
-            color: AppColors.text,
-            fontSize: 13,
-            fontWeight: FontWeight.w900,
-          ),
+          style: AppTextStyles.sectionHeader,
         ),
         const SizedBox(height: 10),
         Row(
@@ -957,7 +922,10 @@ class _RewardCard extends StatelessWidget {
                   SizedBox(width: 3),
                   Text(
                     'Puanla Al',
-                    style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w800),
+                    style: TextStyle(
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ],
               ),
@@ -1041,20 +1009,20 @@ class _TierCard extends StatelessWidget {
                         ),
                       )
                     : tier.isLocked
-                        ? Container(
-                            width: 14,
-                            height: 14,
-                            decoration: BoxDecoration(
-                              color: AppColors.subText.withValues(alpha: 0.15),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              Icons.lock_rounded,
-                              color: AppColors.subText.withValues(alpha: 0.8),
-                              size: 9,
-                            ),
-                          )
-                        : const SizedBox.shrink(),
+                    ? Container(
+                        width: 14,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: AppColors.subText.withValues(alpha: 0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.lock_rounded,
+                          color: AppColors.subText.withValues(alpha: 0.8),
+                          size: 9,
+                        ),
+                      )
+                    : const SizedBox.shrink(),
               ),
             ],
           ),
@@ -1102,7 +1070,7 @@ class _InviteChannelChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppPressableButton(
       onTap: onTap,
-      height: 30,
+      height: 42,
       padding: EdgeInsets.zero,
       backgroundColor: selected ? AppColors.selected : AppColors.background,
       pressedBackgroundColor: AppColors.selected,
@@ -1114,11 +1082,11 @@ class _InviteChannelChip extends StatelessWidget {
       builder: (pressed) => Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 13),
-          const SizedBox(width: 4),
+          Icon(icon, size: 18),
+          const SizedBox(width: 6),
           Text(
             label,
-            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
           ),
         ],
       ),

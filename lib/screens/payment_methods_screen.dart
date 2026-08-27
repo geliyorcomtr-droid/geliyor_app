@@ -74,7 +74,12 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
         header: _buildHeader(context),
         content: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+          padding: const EdgeInsets.fromLTRB(
+            AppPageFrame.contentHorizontalPadding,
+            0,
+            AppPageFrame.contentHorizontalPadding,
+            8,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -82,11 +87,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
               const SizedBox(height: 12),
               const Text(
                 'Kullanılabilir Ödeme Yöntemleri',
-                style: TextStyle(
-                  color: AppColors.text,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w900,
-                ),
+                style: AppTextStyles.sectionHeader,
               ),
               const SizedBox(height: 10),
               for (int i = 0; i < _methods.length; i++) ...[
@@ -249,7 +250,9 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                       child: Text(
                         enabled ? 'Aktif' : 'Pasif',
                         style: TextStyle(
-                          color: enabled ? AppColors.primary : AppColors.subText,
+                          color: enabled
+                              ? AppColors.primary
+                              : AppColors.subText,
                           fontSize: 8,
                           fontWeight: FontWeight.w800,
                         ),

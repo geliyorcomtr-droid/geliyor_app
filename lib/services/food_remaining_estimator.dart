@@ -1,4 +1,5 @@
 import 'package:geliyor_app/data/cat_feeding_guide.dart';
+import 'package:geliyor_app/data/dog_feeding_guide.dart';
 import 'package:geliyor_app/state/food_tracking_store.dart';
 import 'package:geliyor_app/state/order_store.dart';
 import 'package:geliyor_app/state/pet_store.dart';
@@ -51,14 +52,12 @@ enum FoodStockLevel { safe, watch, low, critical }
 /// Mama takibi açıksa manuel kg; değilse son siparişteki mama kg.
 abstract final class FoodRemainingEstimator {
   static FoodRemainingEstimate? compute() {
-    final pet = _guidePet();
-    if (pet == null) return null;
-
-    final dailyGrams = _dailyGramsFor(pet);
-    if (dailyGrams <= 0) return null;
-
     final tracking = FoodTrackingStore.instance;
     if (tracking.isActive && tracking.bagKg > 0) {
+      final pet = _manualPet(tracking);
+      if (pet == null) return null;
+      final dailyGrams = _dailyGramsFor(pet);
+      if (dailyGrams <= 0) return null;
       return _build(
         pet: pet,
         bagKg: tracking.bagKg,
@@ -71,8 +70,12 @@ abstract final class FoodRemainingEstimator {
       );
     }
 
-    final food = _lastDryFood();
-    if (food == null) return null;
+    final orderMatch = _lastDryFoodWithPet();
+    if (orderMatch == null) return null;
+    final food = orderMatch.$1;
+    final pet = orderMatch.$2;
+    final dailyGrams = _dailyGramsFor(pet);
+    if (dailyGrams <= 0) return null;
 
     final bagKg = kgFromLabel(food.weight) * food.quantity;
     if (bagKg <= 0) return null;
@@ -132,29 +135,111 @@ abstract final class FoodRemainingEstimator {
     return sum;
   }
 
-  static PetData? _guidePet() {
+  static PetData? _manualPet(FoodTrackingStore tracking) {
     final pets = PetStore.instance.pets;
     if (pets.isEmpty) return null;
+    final petName = tracking.petName;
+    if (petName != null) {
+      for (final pet in pets) {
+        if (pet.name == petName) return pet;
+      }
+    }
+    final species = tracking.petSpecies?.toLowerCase();
+    if (species != null) {
+      for (final pet in pets) {
+        if (pet.species.toLowerCase() == species) return pet;
+      }
+    }
+    return _petForText(tracking.foodName, pets) ??
+        PetStore.instance.activePet ??
+        pets.first;
+  }
+
+  static (LastOrderItem, PetData)? _lastDryFoodWithPet() {
+    final pets = PetStore.instance.pets;
+    if (pets.isEmpty) return null;
+    final activePet = PetStore.instance.activePet ?? pets.first;
+    LastOrderItem? fallback;
+
+    // Dost Ekle'de en son kaydedilen dost için uygun mamayı önce bul.
+    for (final item in OrderStore.instance.lastOrderItems) {
+      final blob = '${item.title} ${item.subtitle} ${item.weight}';
+      if (!_isDryFood(blob)) continue;
+      fallback ??= item;
+      if (_textMatchesPetSpecies(blob, activePet)) {
+        return (item, activePet);
+      }
+    }
+
+    // Türü yazmayan bir mama varsa aktif dost için kullanılabilir.
+    if (fallback != null && _petForText(
+          '${fallback.title} ${fallback.subtitle} ${fallback.weight}',
+          pets,
+        ) ==
+        null) {
+      return (fallback, activePet);
+    }
+
+    // Aktif dosta ait ürün yoksa siparişte türü belirli ilk mama kullanılır.
+    for (final item in OrderStore.instance.lastOrderItems) {
+      final blob = '${item.title} ${item.subtitle} ${item.weight}';
+      if (!_isDryFood(blob)) continue;
+      final pet = _petForText(blob, pets);
+      if (pet != null) return (item, pet);
+    }
+    if (fallback == null) return null;
+    return (fallback, activePet);
+  }
+
+  static bool _textMatchesPetSpecies(String text, PetData pet) {
+    final blob = text.toLowerCase();
+    final species = pet.species.toLowerCase();
+    final isDog = species.contains('köpek') || species.contains('kopek');
+    if (isDog) {
+      return blob.contains('köpek') ||
+          blob.contains('kopek') ||
+          blob.contains('dog');
+    }
+    return blob.contains('kedi') || blob.contains('cat');
+  }
+
+  static PetData? _petForText(String text, List<PetData> pets) {
+    final blob = text.toLowerCase();
+    final wantsDog = blob.contains('köpek') || blob.contains('kopek') ||
+        blob.contains('dog');
+    final wantsCat = blob.contains('kedi') || blob.contains('cat');
+    if (!wantsDog && !wantsCat) return null;
     for (final pet in pets) {
-      if (pet.species.toLowerCase().contains('kedi')) return pet;
+      final species = pet.species.toLowerCase();
+      if (wantsDog &&
+          (species.contains('köpek') || species.contains('kopek'))) {
+        return pet;
+      }
+      if (wantsCat && species.contains('kedi')) return pet;
     }
     return null;
   }
 
-  static LastOrderItem? _lastDryFood() {
-    final items = OrderStore.instance.lastOrderItems;
-    for (final item in items) {
-      final blob = '${item.title} ${item.subtitle} ${item.weight}'.toLowerCase();
-      final hasKg = RegExp(r'\d+(?:[.,]\d+)?\s*kg').hasMatch(blob);
-      if (!hasKg) continue;
-      if (blob.contains('mama') || blob.contains('food') || hasKg) {
-        return item;
-      }
-    }
-    return null;
+  static bool _isDryFood(String text) {
+    final blob = text.toLowerCase();
+    final hasKg = RegExp(r'\d+(?:[.,]\d+)?\s*kg').hasMatch(blob);
+    return hasKg &&
+        (blob.contains('mama') || blob.contains('food') || hasKg);
   }
 
   static int _dailyGramsFor(PetData pet) {
+    if (pet.dailyFoodGrams != null && pet.dailyFoodGrams! > 0) {
+      return pet.dailyFoodGrams!;
+    }
+    final isDog = pet.species.toLowerCase().contains('köpek') ||
+        pet.species.toLowerCase().contains('kopek');
+    if (isDog) {
+      return DogFeedingGuide.dailyGramsFor(
+            sizeLabel: pet.ageRange,
+            activityLevel: pet.activityLevel,
+          ) ??
+          0;
+    }
     return CatFeedingGuide.dailyGramsFor(
           weightLabel: pet.weight,
           bodyType: pet.bodyType,

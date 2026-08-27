@@ -1,4 +1,5 @@
 /// Uygulama ikon yolları — `assets/images/app_ikonlar/`
+/// Kaynak dosyalar 256×256; ekranda ~34–64 px gösterilir (3x için yeterli).
 class AppIcons {
   AppIcons._();
 
@@ -35,6 +36,7 @@ class AppIcons {
   static const String tavsan = '$_base/tavsan.png';
   static const String tavuk = '$_base/tavuk.png';
   static const String tl = '$_base/tl.png';
+  static const String uygunFiyat = '$_base/uygun_fiyat.png';
   static const String tonBaligi = '$_base/ton_baligi.png';
   static const String tuyDeri = '$_base/tuy_deri.png';
   static const String tuyYumusak = '$_base/tuy_yumusak.png';
@@ -45,4 +47,6 @@ class AppIcons {
   static const String asiTakvimi = '$_base/asi_takvimi.png';
   static const String acilDurum = '$_base/acil_durum.png';
   static const String akilliOneri = '$_base/akilli_oneri.png';
+  static const String tercihUrun = '$_base/tercih_urun.png';
+  static const String tekrarAlim = '$_base/tekrar_alim.png';
 }

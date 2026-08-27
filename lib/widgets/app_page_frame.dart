@@ -3,13 +3,20 @@ import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
-/// Sabit sayfa tuvali ve dikey standart:
-/// 59 Safe Area + 64 Header + 16 Boşluk + 560 İçerik + 84 Navbar + 69 Alt = 852
+import 'package:geliyor_app/widgets/paw_print_background.dart';
+
+/// Sayfa çerçevesi.
+///
+/// Tasarım referansı (Figma): 393×852.
+/// Gerçek telefonda ekranı doldurur; safe area cihazdan alınır.
+/// Sabit tuval + Center kullanma — üst/alt boşluk ve gereksiz kaydırmaya yol açar.
 class AppPageFrame extends StatelessWidget {
   const AppPageFrame({
     super.key,
     required this.child,
     this.backgroundColor = AppColors.background,
+    this.showPawPrints = true,
+    this.pawPrintStyle = PawPrintStyle.page,
   });
 
   /// Standart dikey yerleşimli sayfa.
@@ -21,65 +28,85 @@ class AppPageFrame extends StatelessWidget {
     AppNavTab activeTab = AppNavTab.home,
     bool showNavbar = true,
     Widget? navbar,
+    bool showPawPrints = true,
+    PawPrintStyle pawPrintStyle = PawPrintStyle.page,
   }) {
     return AppPageFrame(
       key: key,
       backgroundColor: backgroundColor,
-      child: Column(
-        children: [
-          const SizedBox(height: safeAreaTop),
-          SizedBox(height: headerHeight, child: header),
-          const SizedBox(height: headerGap),
-          SizedBox(height: contentHeight, child: content),
-          SizedBox(
-            height: bottomNavHeight,
-            child: showNavbar
-                ? OverflowBox(
-                    maxHeight: bottomNavHeight + 22,
-                    alignment: Alignment.bottomCenter,
-                    child: navbar ?? AppBottomNavbar(activeTab: activeTab),
-                  )
-                : const SizedBox.shrink(),
-          ),
-          const SizedBox(height: safeAreaBottom),
-        ],
+      showPawPrints: showPawPrints,
+      pawPrintStyle: pawPrintStyle,
+      child: Builder(
+        builder: (context) {
+          final padding = MediaQuery.paddingOf(context);
+          return Padding(
+            // Üst: durum çubuğu. Alt boşluk navbar içine alınır —
+            // aksi halde navbar altında ekstra beyaz şerit oluşur.
+            padding: EdgeInsets.only(top: padding.top),
+            child: Column(
+              children: [
+                SizedBox(
+                  height: headerHeight,
+                  child: Padding(
+                    // Başlık metninin üstündeki ve içerikle arasındaki
+                    // görünen boşluğu eşitler.
+                    padding: const EdgeInsets.only(top: headerGap),
+                    child: header,
+                  ),
+                ),
+                const SizedBox(height: headerGap),
+                Expanded(child: content),
+                SizedBox(
+                  height: bottomNavHeight + padding.bottom,
+                  child: showNavbar
+                      ? Padding(
+                          padding: EdgeInsets.only(bottom: padding.bottom),
+                          child: OverflowBox(
+                            maxHeight: bottomNavHeight + 22,
+                            alignment: Alignment.bottomCenter,
+                            child: navbar ??
+                                AppBottomNavbar(activeTab: activeTab),
+                          ),
+                        )
+                      : SizedBox(height: padding.bottom),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
 
+  /// Tasarım referans genişliği (dialog / maxWidth için).
   static const double width = 393;
+
+  /// Tasarım referans yüksekliği.
   static const double height = 852;
 
+  /// Sayfa içeriğinin standart yatay boşluğu.
+  static const double contentHorizontalPadding = 16;
+
   static const double safeAreaTop = 59;
-  static const double headerHeight = 64;
-  static const double headerGap = 16;
+  static const double headerHeight = 56;
+  /// Başlık metninin üstü ve altı (içerikle arası) için ortak boşluk.
+  static const double headerGap = 8;
   static const double contentHeight = 560;
-  static const double bottomNavHeight = 84;
+  static const double bottomNavHeight = 62;
   static const double safeAreaBottom = 69;
 
   final Widget child;
   final Color backgroundColor;
+  final bool showPawPrints;
+  final PawPrintStyle pawPrintStyle;
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
-      color: backgroundColor,
-      child: Center(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: Center(
-            child: SizedBox(
-              width: width,
-              height: height,
-              child: ColoredBox(
-                color: backgroundColor,
-                child: child,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+    Widget body = SizedBox.expand(child: child);
+    if (showPawPrints) {
+      body = PawPrintBackground(style: pawPrintStyle, child: body);
+    }
+    return ColoredBox(color: backgroundColor, child: body);
   }
 }
 
@@ -108,7 +135,8 @@ class AppPageHeader extends StatelessWidget {
         children: [
           SizedBox(
             width: 40,
-            child: leading ??
+            child:
+                leading ??
                 (onBack != null || Navigator.of(context).canPop()
                     ? AppBackButton(onPressed: onBack)
                     : const SizedBox.shrink()),

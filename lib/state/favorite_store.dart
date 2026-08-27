@@ -43,62 +43,7 @@ class FavoriteStore extends ChangeNotifier {
 
   static final FavoriteStore instance = FavoriteStore._();
 
-  final List<FavoriteItem> _items = [
-    const FavoriteItem(
-      id: 'p1',
-      category: 'Kuru Mama',
-      title: 'Royal Canin Labrador Adult',
-      imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-      unitPrice: 2349,
-      oldPrice: 2599,
-      discountPercent: 10,
-    ),
-    const FavoriteItem(
-      id: 'p2',
-      category: 'Kuru Mama',
-      title: "Hill's Science Plan Somonlu",
-      imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-      unitPrice: 1899,
-      oldPrice: 2199,
-      discountPercent: 14,
-    ),
-    const FavoriteItem(
-      id: 'p3',
-      category: 'Takviye',
-      title: 'GimCat Malt Soft Extra',
-      imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-      unitPrice: 249,
-      oldPrice: 287,
-      discountPercent: 13,
-    ),
-    const FavoriteItem(
-      id: 'p4',
-      category: 'Kuru Mama',
-      title: 'Pro Plan Sterilised Somonlu',
-      imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-      unitPrice: 1649,
-      oldPrice: 1849,
-      discountPercent: 11,
-    ),
-    const FavoriteItem(
-      id: 'p5',
-      category: 'Kuru Mama',
-      title: 'N&D Kuzu Kısır Kedi Maması',
-      imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-      unitPrice: 1249,
-      oldPrice: 1436,
-      discountPercent: 13,
-    ),
-    const FavoriteItem(
-      id: 'p6',
-      category: 'Ödül',
-      title: 'Felix Party Mix Ödül Maması',
-      imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-      unitPrice: 189,
-      oldPrice: 217,
-      discountPercent: 13,
-    ),
-  ];
+  final List<FavoriteItem> _items = [];
 
   List<FavoriteItem> get items => List.unmodifiable(_items);
 

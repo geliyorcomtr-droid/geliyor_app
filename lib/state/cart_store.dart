@@ -8,8 +8,9 @@ class CartItem {
     required this.unitPrice,
     required this.oldPrice,
     required this.discountPercent,
-    this.weight = '5 Kg',
+    this.weight = '',
     this.brand,
+    this.skt = '',
     this.quantity = 1,
   });
 
@@ -21,6 +22,7 @@ class CartItem {
   final int discountPercent;
   final String weight;
   final String? brand;
+  final String skt;
   int quantity;
 
   double get lineTotal => unitPrice * quantity;
@@ -28,52 +30,47 @@ class CartItem {
 
 class CartStore extends ChangeNotifier {
   CartStore._() {
-    _items = [
-      CartItem(
-        id: 'hills-8kg',
-        imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-        title:
-            "Hill's SCIENCE PLAN Somonlu Kısırlaştırılmış Kedi Maması 8kg + 2kg HEDİYE",
-        unitPrice: 4799,
-        oldPrice: 6199,
-        discountPercent: 22,
-        weight: '8 Kg',
-      ),
-      CartItem(
-        id: 'hills-3kg',
-        imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-        title: "Hill's SCIENCE PLAN Somonlu Kısırlaştırılmış Kedi Maması 3kg",
-        unitPrice: 2399,
-        oldPrice: 2799,
-        discountPercent: 14,
-        weight: '3 Kg',
-      ),
-      CartItem(
-        id: 'proplan-14kg',
-        imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-        title: 'Pro Plan Hindili Kısırlaştırılmış Kedi Maması 14kg',
-        unitPrice: 6399,
-        oldPrice: 7459,
-        discountPercent: 14,
-        weight: '14 Kg',
-      ),
-    ];
+    _items = [];
   }
 
   static final CartStore instance = CartStore._();
 
   late final List<CartItem> _items;
 
-  List<CartItem> get items => List.unmodifiable(_items);
+  bool _isUploadedProduct(CartItem item) {
+    final path = item.imagePath.trim().toLowerCase();
+    return path.startsWith('http://') || path.startsWith('https://');
+  }
 
-  int get totalQuantity =>
-      _items.fold(0, (sum, item) => sum + item.quantity);
+  void _dropUnuploadedItems() {
+    _items.removeWhere((item) => !_isUploadedProduct(item));
+  }
 
-  double get cartTotal =>
-      _items.fold(0.0, (sum, item) => sum + item.lineTotal);
+  void clear() {
+    if (_items.isEmpty) return;
+    _items.clear();
+    notifyListeners();
+  }
 
-  double get cartOldTotal =>
-      _items.fold(0.0, (sum, item) => sum + (item.oldPrice * item.quantity));
+  List<CartItem> get items {
+    _dropUnuploadedItems();
+    return List.unmodifiable(_items);
+  }
+
+  int get totalQuantity {
+    _dropUnuploadedItems();
+    return _items.fold(0, (sum, item) => sum + item.quantity);
+  }
+
+  double get cartTotal {
+    _dropUnuploadedItems();
+    return _items.fold(0.0, (sum, item) => sum + item.lineTotal);
+  }
+
+  double get cartOldTotal {
+    _dropUnuploadedItems();
+    return _items.fold(0.0, (sum, item) => sum + (item.oldPrice * item.quantity));
+  }
 
   double get cartDiscount => cartOldTotal - cartTotal;
 
@@ -84,7 +81,9 @@ class CartStore extends ChangeNotifier {
     required double unitPrice,
     required double oldPrice,
     int discountPercent = 0,
-    String weight = '5 Kg',
+    String weight = '',
+    String? brand,
+    String skt = '',
   }) {
     final existing = _items.where((e) => e.id == id);
     if (existing.isNotEmpty) {
@@ -104,6 +103,8 @@ class CartStore extends ChangeNotifier {
           oldPrice: oldPrice,
           discountPercent: discount,
           weight: weight,
+          brand: brand,
+          skt: skt,
         ),
       );
     }
@@ -125,7 +126,6 @@ class CartStore extends ChangeNotifier {
 
   void removeItem(int index) {
     if (index < 0 || index >= _items.length) return;
-    if (_items.length <= 1) return;
     _items.removeAt(index);
     notifyListeners();
   }

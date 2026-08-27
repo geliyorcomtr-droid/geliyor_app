@@ -1,6 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
-import 'package:geliyor_app/data/pet_market_catalog.dart';
+import 'package:geliyor_app/data/product_repository.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
 import 'package:geliyor_app/screens/cart_screen.dart';
 import 'package:geliyor_app/screens/pet_market_products_screen.dart';
@@ -91,7 +91,8 @@ class _PetMarketScreenState extends State<PetMarketScreen> {
     super.initState();
     selectedMainCategory = widget.initialMainCategory;
     selectedSubCategory =
-        widget.initialSubCategory ?? _defaultSubCategoryFor(selectedMainCategory);
+        widget.initialSubCategory ??
+        _defaultSubCategoryFor(selectedMainCategory);
   }
 
   @override
@@ -140,10 +141,9 @@ class _PetMarketScreenState extends State<PetMarketScreen> {
     );
   }
 
-  List<MarketProductData> get _products => petMarketProductsFor(
-        mainCategory: selectedMainCategory,
-        subCategory: selectedSubCategory,
-      ).take(6).toList();
+  List<MarketProductData> _mergedProducts(List<MarketProductData> remote) {
+    return remote.take(6).toList();
+  }
 
   String get _sectionTitle {
     if (selectedMainCategory == 'dog') return 'Köpek Ürünleri';
@@ -153,42 +153,67 @@ class _PetMarketScreenState extends State<PetMarketScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final products = _products;
-
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: AppPageFrame.standard(
-        backgroundColor: AppColors.background,
-        header: _buildHeader(),
-        content: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildSearchBar(),
-              const SizedBox(height: 10),
-              _buildMainMenus(),
-              const SizedBox(height: 12),
-              const Text(
-                'Kategoriler',
-                style: TextStyle(
-                  color: AppColors.text,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 8),
-              _buildCategories(),
-              const SizedBox(height: 12),
-              _buildProductSectionHeader(),
-              const SizedBox(height: 8),
-              _buildProductGrid(products),
-            ],
-          ),
-        ),
-        navbar: const AppBottomNavbar(),
+    return StreamBuilder<List<MarketProductData>>(
+      stream: ProductRepository.instance.watchMarketProducts(
+        mainCategory: selectedMainCategory,
+        subCategory: selectedSubCategory,
       ),
+      builder: (context, snapshot) {
+        final products = _mergedProducts(snapshot.data ?? const []);
+
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          body: AppPageFrame.standard(
+            backgroundColor: AppColors.background,
+            header: _buildHeader(),
+            content: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(
+                AppPageFrame.contentHorizontalPadding,
+                0,
+                AppPageFrame.contentHorizontalPadding,
+                8,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSearchBar(),
+                  const SizedBox(height: 10),
+                  _buildMainMenus(),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Kategoriler',
+                    style: TextStyle(
+                      color: AppColors.text,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildCategories(),
+                  const SizedBox(height: 12),
+                  _buildProductSectionHeader(),
+                  const SizedBox(height: 8),
+                  if (snapshot.hasError)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        'Ürünler yüklenemedi: ${snapshot.error}',
+                        style: const TextStyle(
+                          color: AppColors.error,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  _buildProductGrid(products),
+                ],
+              ),
+            ),
+            navbar: const AppBottomNavbar(),
+          ),
+        );
+      },
     );
   }
 
@@ -205,12 +230,13 @@ class _PetMarketScreenState extends State<PetMarketScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.pets_rounded, color: AppColors.primary, size: 16),
-                    const SizedBox(width: 4),
-                    const Text(
-                      'Pet Market',
-                      style: AppTextStyles.pageHeader,
+                    const Icon(
+                      Icons.pets_rounded,
+                      color: AppColors.primary,
+                      size: 16,
                     ),
+                    const SizedBox(width: 4),
+                    const Text('Pet Market', style: AppTextStyles.pageHeader),
                   ],
                 ),
                 const SizedBox(height: 1),
@@ -385,10 +411,10 @@ class _PetMarketScreenState extends State<PetMarketScreen> {
                         fit: BoxFit.contain,
                         errorBuilder: (context, error, stackTrace) =>
                             const Icon(
-                          Icons.pets_rounded,
-                          color: AppColors.primary,
-                          size: 28,
-                        ),
+                              Icons.pets_rounded,
+                              color: AppColors.primary,
+                              size: 28,
+                            ),
                       ),
                     ),
                   ),
@@ -435,7 +461,8 @@ class _PetMarketScreenState extends State<PetMarketScreen> {
     const gap = 6.0;
     const visibleCount = 6;
     final icons = _categoryIcons;
-    final contentWidth = AppPageFrame.width - 24;
+    final contentWidth =
+        AppPageFrame.width - (AppPageFrame.contentHorizontalPadding * 2);
     final itemWidth = (contentWidth - gap * (visibleCount - 1)) / visibleCount;
 
     return SingleChildScrollView(
@@ -447,10 +474,7 @@ class _PetMarketScreenState extends State<PetMarketScreen> {
         children: [
           for (int i = 0; i < icons.length; i++) ...[
             if (i > 0) const SizedBox(width: gap),
-            SizedBox(
-              width: itemWidth,
-              child: _buildCategoryItem(icons[i]),
-            ),
+            SizedBox(width: itemWidth, child: _buildCategoryItem(icons[i])),
           ],
         ],
       ),
@@ -511,8 +535,8 @@ class _PetMarketScreenState extends State<PetMarketScreen> {
           selectedMainCategory == 'dog'
               ? Icons.pets_rounded
               : selectedMainCategory == 'smart'
-                  ? Icons.auto_awesome_rounded
-                  : Icons.pets_rounded,
+              ? Icons.auto_awesome_rounded
+              : Icons.pets_rounded,
           color: AppColors.primary,
           size: 15,
         ),
@@ -520,11 +544,7 @@ class _PetMarketScreenState extends State<PetMarketScreen> {
         Expanded(
           child: Text(
             _sectionTitle,
-            style: const TextStyle(
-              color: AppColors.text,
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-            ),
+            style: AppTextStyles.sectionHeader,
           ),
         ),
         GestureDetector(
@@ -542,16 +562,12 @@ class _PetMarketScreenState extends State<PetMarketScreen> {
             children: [
               Text(
                 'Tümünü Gör',
-                style: TextStyle(
-                  color: AppColors.primary,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: AppTextStyles.seeAllAction,
               ),
               Icon(
                 Icons.chevron_right_rounded,
                 color: AppColors.primary,
-                size: 16,
+                size: 20,
               ),
             ],
           ),
@@ -594,7 +610,7 @@ class _PetMarketScreenState extends State<PetMarketScreen> {
                   child: start + i < products.length
                       ? MarketCompactProductCard(
                           product: products[start + i],
-                          onTap: _openDetail,
+                          onTap: () => _openDetail(products[start + i]),
                           onAddToCart: () {
                             final product = products[start + i];
                             final price = product.prices.isNotEmpty
@@ -621,9 +637,9 @@ class _PetMarketScreenState extends State<PetMarketScreen> {
     return Column(children: rows);
   }
 
-  void _openDetail() {
+  void _openDetail(MarketProductData product) {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const ProductDetailScreen()),
+      MaterialPageRoute(builder: (_) => ProductDetailScreen(product: product)),
     );
   }
 
@@ -638,9 +654,12 @@ class _PetMarketScreenState extends State<PetMarketScreen> {
       CartStore.instance.addItem(
         id: '${product.id}-$weight',
         imagePath: product.imagePath,
-        title: '${product.title} $weight',
+        title: product.title,
         unitPrice: price,
         oldPrice: oldPrice,
+        weight: weight,
+        brand: product.brand,
+        skt: product.skt,
       );
     }
     _showAddedToCartDialog(product.title);

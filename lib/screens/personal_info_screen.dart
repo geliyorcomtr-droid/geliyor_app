@@ -217,7 +217,12 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
           header: _buildHeader(),
           content: _inSecurityFlow
               ? Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+                  padding: const EdgeInsets.fromLTRB(
+                    AppPageFrame.contentHorizontalPadding,
+                    0,
+                    AppPageFrame.contentHorizontalPadding,
+                    8,
+                  ),
                   child: Column(
                     children: [
                       Expanded(
@@ -235,7 +240,12 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                 )
               : SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+                  padding: const EdgeInsets.fromLTRB(
+                    AppPageFrame.contentHorizontalPadding,
+                    0,
+                    AppPageFrame.contentHorizontalPadding,
+                    8,
+                  ),
                   child: Column(
                     children: [
                       _buildProfileSummary(),
@@ -382,8 +392,10 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                 ),
                 const SizedBox(height: 6),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.surface,
                     borderRadius: BorderRadius.circular(999),
@@ -438,11 +450,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
         children: [
           const Text(
             'Kişisel Bilgiler',
-            style: TextStyle(
-              color: AppColors.primary,
-              fontSize: 14,
-              fontWeight: FontWeight.w900,
-            ),
+            style: AppTextStyles.sectionHeader,
           ),
           const SizedBox(height: 10),
           _buildField(
@@ -661,11 +669,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
         children: [
           const Text(
             'Güvenlik Bilgileri',
-            style: TextStyle(
-              color: AppColors.primary,
-              fontSize: 14,
-              fontWeight: FontWeight.w900,
-            ),
+            style: AppTextStyles.sectionHeader,
           ),
           const SizedBox(height: 4),
           _buildSecurityRow(
@@ -807,15 +811,17 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   }
 
   Widget _buildContactVerifyForm({required bool forPhone}) {
-    final controller =
-        forPhone ? _securityPhoneController : _securityEmailController;
+    final controller = forPhone
+        ? _securityPhoneController
+        : _securityEmailController;
     return _buildFormCard(
       children: [
         _buildPlainField(
           label: forPhone ? 'Telefon Numarası' : 'E-posta Adresi',
           controller: controller,
-          keyboardType:
-              forPhone ? TextInputType.phone : TextInputType.emailAddress,
+          keyboardType: forPhone
+              ? TextInputType.phone
+              : TextInputType.emailAddress,
           icon: forPhone ? Icons.phone_outlined : Icons.mail_outline_rounded,
         ),
         if (_otpSent) ...[
@@ -910,14 +916,10 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
               switch (_securitySection) {
                 _SecuritySection.password => 'Şifreyi Güncelle',
                 _SecuritySection.phone ||
-                _SecuritySection.email =>
-                  _otpSent ? 'Doğrula' : 'Kod Gönder',
+                _SecuritySection.email => _otpSent ? 'Doğrula' : 'Kod Gönder',
                 _SecuritySection.none => 'Kaydet',
               },
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w900,
-              ),
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
             ),
           ),
         ),
@@ -953,8 +955,11 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
           ),
           child: Row(
             children: [
-              const Icon(Icons.lock_outline_rounded,
-                  color: AppColors.primary, size: 16),
+              const Icon(
+                Icons.lock_outline_rounded,
+                color: AppColors.primary,
+                size: 16,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: TextField(

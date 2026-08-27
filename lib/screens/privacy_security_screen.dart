@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
@@ -164,35 +164,50 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
           header: _buildHeader(),
           content: _inDetail
               ? (_isInteractiveDetail
-                  ? Padding(
-                      padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
-                      child: Column(
-                        children: [
-                          Expanded(
-                            child: SingleChildScrollView(
-                              physics: const BouncingScrollPhysics(),
-                              keyboardDismissBehavior:
-                                  ScrollViewKeyboardDismissBehavior.onDrag,
-                              child: _topic == _PrivacyTopic.changePassword
-                                  ? _buildPasswordForm()
-                                  : _buildSessionsView(),
+                    ? Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppPageFrame.contentHorizontalPadding,
+                          0,
+                          AppPageFrame.contentHorizontalPadding,
+                          8,
+                        ),
+                        child: Column(
+                          children: [
+                            Expanded(
+                              child: SingleChildScrollView(
+                                physics: const BouncingScrollPhysics(),
+                                keyboardDismissBehavior:
+                                    ScrollViewKeyboardDismissBehavior.onDrag,
+                                child: _topic == _PrivacyTopic.changePassword
+                                    ? _buildPasswordForm()
+                                    : _buildSessionsView(),
+                              ),
                             ),
-                          ),
-                          if (_topic == _PrivacyTopic.changePassword) ...[
-                            const SizedBox(height: 8),
-                            _buildPasswordActions(),
+                            if (_topic == _PrivacyTopic.changePassword) ...[
+                              const SizedBox(height: 8),
+                              _buildPasswordActions(),
+                            ],
                           ],
-                        ],
-                      ),
-                    )
-                  : SingleChildScrollView(
-                      physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
-                      child: _buildTopicDetail(),
-                    ))
+                        ),
+                      )
+                    : SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(
+                          AppPageFrame.contentHorizontalPadding,
+                          0,
+                          AppPageFrame.contentHorizontalPadding,
+                          8,
+                        ),
+                        child: _buildTopicDetail(),
+                      ))
               : SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+                  padding: const EdgeInsets.fromLTRB(
+                    AppPageFrame.contentHorizontalPadding,
+                    0,
+                    AppPageFrame.contentHorizontalPadding,
+                    8,
+                  ),
                   child: _buildMainContent(),
                 ),
           navbar: const AppBottomNavbar(activeTab: AppNavTab.profile),
@@ -247,7 +262,8 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
     final subtitle = switch (_topic) {
       _PrivacyTopic.none =>
         'Kişisel verilerinizin güvenliği bizim için önceliklidir',
-      _PrivacyTopic.changePassword => 'Hesap şifrenizi güvenli şekilde güncelleyin',
+      _PrivacyTopic.changePassword =>
+        'Hesap şifrenizi güvenli şekilde güncelleyin',
       _PrivacyTopic.sessions => 'Aktif cihazları görüntüleyin ve yönetin',
       _ => 'Standart bilgilendirme metni',
     };
@@ -385,10 +401,7 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
     return _buildGroupedCard(
       children: [
         for (int i = 0; i < items.length; i++) ...[
-          _buildNavRow(
-            items[i].$2,
-            onTap: () => _openTopic(items[i].$1),
-          ),
+          _buildNavRow(items[i].$2, onTap: () => _openTopic(items[i].$1)),
           if (i != items.length - 1) _buildDivider(),
         ],
       ],
@@ -403,8 +416,7 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
       _PrivacyTopic.disclosure => _disclosureSections,
       _PrivacyTopic.changePassword ||
       _PrivacyTopic.sessions ||
-      _PrivacyTopic.none =>
-        const <_InfoSection>[],
+      _PrivacyTopic.none => const <_InfoSection>[],
     };
 
     return Column(
@@ -457,7 +469,11 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
           child: const Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.info_outline_rounded, color: AppColors.primary, size: 18),
+              Icon(
+                Icons.info_outline_rounded,
+                color: AppColors.primary,
+                size: 18,
+              ),
               SizedBox(width: 8),
               Expanded(
                 child: Text(

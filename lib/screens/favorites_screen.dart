@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/screens/cart_screen.dart';
 import 'package:geliyor_app/screens/product_detail_screen.dart';
@@ -65,62 +65,77 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             content: Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+                  padding: const EdgeInsets.fromLTRB(
+                    AppPageFrame.contentHorizontalPadding,
+                    0,
+                    AppPageFrame.contentHorizontalPadding,
+                    8,
+                  ),
                   child: _buildTabs(pets.length, products.length),
                 ),
                 Expanded(
                   child: SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+                    padding: const EdgeInsets.fromLTRB(
+                      AppPageFrame.contentHorizontalPadding,
+                      0,
+                      AppPageFrame.contentHorizontalPadding,
+                      8,
+                    ),
                     child: Column(
                       children: [
                         ...switch (_activeTab) {
-                          _FavoriteTab.products => products.isEmpty
-                              ? [
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 24,
-                                    ),
-                                    child: Text(
-                                      'Henüz favori ürününüz yok.',
-                                      style: TextStyle(
-                                        color: AppColors.subText
-                                            .withValues(alpha: 0.95),
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
+                          _FavoriteTab.products =>
+                            products.isEmpty
+                                ? [
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 24,
+                                      ),
+                                      child: Text(
+                                        'Henüz favori ürününüz yok.',
+                                        style: TextStyle(
+                                          color: AppColors.subText.withValues(
+                                            alpha: 0.95,
+                                          ),
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                ]
-                              : products
-                                  .map(
-                                    (product) => Padding(
-                                      padding:
-                                          const EdgeInsets.only(bottom: 10),
-                                      child: _buildProductCard(product),
+                                  ]
+                                : products
+                                      .map(
+                                        (product) => Padding(
+                                          padding: const EdgeInsets.only(
+                                            bottom: 10,
+                                          ),
+                                          child: _buildProductCard(product),
+                                        ),
+                                      )
+                                      .toList(),
+                          _FavoriteTab.pets =>
+                            pets
+                                .map(
+                                  (pet) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 10),
+                                    child: _buildPetCard(
+                                      pet.name,
+                                      pet.species,
+                                      pet.imagePath,
                                     ),
-                                  )
-                                  .toList(),
-                          _FavoriteTab.pets => pets
-                              .map(
-                                (pet) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 10),
-                                  child: _buildPetCard(
-                                    pet.name,
-                                    pet.species,
-                                    pet.imagePath,
                                   ),
-                                ),
-                              )
-                              .toList(),
-                          _FavoriteTab.categories => _categories
-                              .map(
-                                (category) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 10),
-                                  child: _buildCategoryCard(category),
-                                ),
-                              )
-                              .toList(),
+                                )
+                                .toList(),
+                          _FavoriteTab.categories =>
+                            _categories
+                                .map(
+                                  (category) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 10),
+                                    child: _buildCategoryCard(category),
+                                  ),
+                                )
+                                .toList(),
                         },
                         _buildInfoBanner(),
                       ],
@@ -266,9 +281,9 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         brand: product.brand,
         quantity: qty,
       ),
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const ProductDetailScreen()),
-      ),
+      onTap: () => Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => const ProductDetailScreen())),
       onQuantityChanged: (next) {
         setState(() => _quantities[product.id] = next);
       },
@@ -283,6 +298,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             oldPrice: product.oldPrice,
             discountPercent: product.discountPercent,
             weight: product.weight,
+            brand: product.brand,
           );
         }
         _showAddedToCartDialog(product.title);
@@ -415,10 +431,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
               child: Image.asset(
                 imagePath,
                 fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => const Icon(
-                  Icons.pets_rounded,
-                  color: AppColors.primary,
-                ),
+                errorBuilder: (context, error, stackTrace) =>
+                    const Icon(Icons.pets_rounded, color: AppColors.primary),
               ),
             ),
           ),
@@ -448,8 +462,11 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
           ),
           const Icon(Icons.favorite_rounded, color: AppColors.error, size: 18),
           const SizedBox(width: 6),
-          const Icon(Icons.chevron_right_rounded,
-              color: AppColors.subText, size: 20),
+          const Icon(
+            Icons.chevron_right_rounded,
+            color: AppColors.subText,
+            size: 20,
+          ),
         ],
       ),
     );
@@ -500,8 +517,11 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
           ),
           const Icon(Icons.favorite_rounded, color: AppColors.error, size: 16),
           const SizedBox(width: 6),
-          const Icon(Icons.chevron_right_rounded,
-              color: AppColors.subText, size: 20),
+          const Icon(
+            Icons.chevron_right_rounded,
+            color: AppColors.subText,
+            size: 20,
+          ),
         ],
       ),
     );
@@ -526,7 +546,11 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
               color: AppColors.surface,
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.pets_rounded, color: AppColors.primary, size: 18),
+            child: const Icon(
+              Icons.pets_rounded,
+              color: AppColors.primary,
+              size: 18,
+            ),
           ),
           const SizedBox(width: 10),
           const Expanded(

@@ -1,4 +1,5 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:geliyor_app/data/product_repository.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
 import 'package:geliyor_app/screens/product_detail_screen.dart';
@@ -109,424 +110,18 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
     return '$base +${_selectedNeedIds.length - 1} için Önerilen Mamalar';
   }
 
-  List<_MamaProduct> get _products {
-    final petLabel = _isCat ? 'Kedi' : 'Köpek';
-    final ids = _selectedNeedIds.isEmpty
-        ? <String>{'sindirim'}
-        : _selectedNeedIds;
-
-    final list = <_MamaProduct>[];
-    for (final id in ids) {
-      list.addAll(_productsForNeed(id, petLabel));
-    }
-
-    final unique = <String, _MamaProduct>{};
-    for (final p in list) {
-      unique.putIfAbsent(p.id, () => p);
-    }
-    return unique.values.take(3).toList();
-  }
-
-  List<_MamaProduct> _productsForNeed(String id, String petLabel) {
-    switch (id) {
-      case 'bobre':
-        return [
-          _MamaProduct(
-            id: 'hm-renal-$petLabel',
-            brand: 'Royal Canin',
-            name: 'Renal Support $petLabel',
-            description: 'Böbrek fonksiyonlarını destekleyen özel formül.',
-            tags: const ['Düşük fosfor', 'Veteriner önerisi'],
-            weight: _isCat ? '2 kg' : '2.5 kg',
-            price: _isCat ? 1099 : 1249,
-            imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-          ),
-          _MamaProduct(
-            id: 'hm-kd-$petLabel',
-            brand: "Hill's Prescription",
-            name: 'k/d Kidney Care',
-            description: 'Böbrek sağlığı için dengeli besin profili.',
-            tags: const ['Böbrek desteği'],
-            weight: '1.5 kg',
-            price: _isCat ? 989 : 1120,
-            imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-          ),
-          _MamaProduct(
-            id: 'hm-renal2-$petLabel',
-            brand: 'Pro Plan',
-            name: 'NF Renal Function',
-            description: 'Uzun dönem böbrek desteği için formüle edildi.',
-            tags: const ['Klinik formül'],
-            weight: '2 kg',
-            price: _isCat ? 945 : 1080,
-            imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-          ),
-        ];
-      case 'tuy':
-        return [
-          _MamaProduct(
-            id: 'hm-skin-$petLabel',
-            brand: 'Royal Canin',
-            name: 'Skin & Coat Care',
-            description: 'Tüy parlaklığı ve deri bariyerini destekler.',
-            tags: const ['Omega 3-6', 'Deri & tüy'],
-            weight: _isCat ? '2 kg' : '3 kg',
-            price: _isCat ? 879 : 999,
-            imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-          ),
-          _MamaProduct(
-            id: 'hm-derma-$petLabel',
-            brand: 'Pro Plan',
-            name: 'Dermatosis Support',
-            description: 'Hassas deri için özel protein kaynağı.',
-            tags: const ['Hassas deri'],
-            weight: _isCat ? '1.5 kg' : '2 kg',
-            price: _isCat ? 765 : 889,
-            imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-          ),
-          _MamaProduct(
-            id: 'hm-coat-$petLabel',
-            brand: "Hill's",
-            name: 'Sensitive Skin',
-            description: 'Kaşıntı ve tüy dökülmesine karşı destek.',
-            tags: const ['Hassasiyet'],
-            weight: '1.5 kg',
-            price: _isCat ? 820 : 940,
-            imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-          ),
-        ];
-      case 'kilo':
-        return [
-          _MamaProduct(
-            id: 'hm-satiety-$petLabel',
-            brand: 'Royal Canin',
-            name: 'Satiety Weight Management',
-            description: 'Tokluk hissi ile sağlıklı kilo kontrolü.',
-            tags: const ['Düşük kalori', 'Lif desteği'],
-            weight: _isCat ? '1.5 kg' : '3 kg',
-            price: _isCat ? 799 : 920,
-            imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-          ),
-          _MamaProduct(
-            id: 'hm-meta-$petLabel',
-            brand: "Hill's Prescription",
-            name: 'Metabolic',
-            description: 'Metabolizmayı destekleyen klinik formül.',
-            tags: const ['Kilo yönetimi'],
-            weight: '1.5 kg',
-            price: _isCat ? 850 : 980,
-            imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-          ),
-          _MamaProduct(
-            id: 'hm-light-$petLabel',
-            brand: 'Pro Plan',
-            name: 'Light Adult',
-            description: 'Günlük aktiviteye uygun hafif formül.',
-            tags: const ['Light'],
-            weight: '2 kg',
-            price: _isCat ? 699 : 820,
-            imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-          ),
-        ];
-      case 'bagisiklik':
-        return [
-          _MamaProduct(
-            id: 'hm-immune-$petLabel',
-            brand: 'Royal Canin',
-            name: 'Immune Support',
-            description: 'Bağışıklık sistemini güçlendiren antioksidanlar.',
-            tags: const ['Antioksidan', 'Bağışıklık'],
-            weight: _isCat ? '2 kg' : '2.5 kg',
-            price: _isCat ? 919 : 1049,
-            imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-          ),
-          _MamaProduct(
-            id: 'hm-hypo-$petLabel',
-            brand: 'Brit Care',
-            name: 'Hypoallergenic',
-            description: 'Hassas dostlar için hipoalerjenik içerik.',
-            tags: const ['Hipoalerjenik'],
-            weight: _isCat ? '2 kg' : '3 kg',
-            price: _isCat ? 689 : 789,
-            imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-          ),
-          _MamaProduct(
-            id: 'hm-vital-$petLabel',
-            brand: 'Advance',
-            name: 'Vital Balance',
-            description: 'Günlük bağışıklık desteği sunar.',
-            tags: const ['Günlük destek'],
-            weight: '1.5 kg',
-            price: _isCat ? 640 : 740,
-            imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-          ),
-        ];
-      case 'mide':
-        return [
-          _MamaProduct(
-            id: 'hm-gastro-$petLabel',
-            brand: 'Royal Canin',
-            name: 'Gastrointestinal',
-            description: 'Hassas mide için kolay sindirilir formül.',
-            tags: const ['Mide dostu'],
-            weight: '2 kg',
-            price: _isCat ? 999 : 1099,
-            imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-          ),
-          _MamaProduct(
-            id: 'hm-id-$petLabel',
-            brand: "Hill's Prescription",
-            name: 'i/d Digestive Care',
-            description: 'Mide rahatsızlıklarında veteriner desteği.',
-            tags: const ['Veteriner önerisi'],
-            weight: '1.5 kg',
-            price: _isCat ? 865 : 945,
-            imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-          ),
-          _MamaProduct(
-            id: 'hm-sensitive-$petLabel',
-            brand: 'Pro Plan',
-            name: 'Sensitive Digestion',
-            description: 'Hassas sindirim sistemi için özel içerik.',
-            tags: const ['Hassas mide'],
-            weight: '2 kg',
-            price: _isCat ? 780 : 880,
-            imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-          ),
-        ];
-      case 'kalp':
-        return [
-          _MamaProduct(
-            id: 'hm-cardiac-$petLabel',
-            brand: 'Royal Canin',
-            name: 'Cardiac Support',
-            description: 'Kalp sağlığını destekleyen özel mineral dengesi.',
-            tags: const ['Kalp desteği'],
-            weight: '2 kg',
-            price: _isCat ? 1120 : 1240,
-            imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-          ),
-          _MamaProduct(
-            id: 'hm-hd-$petLabel',
-            brand: "Hill's Prescription",
-            name: 'h/d Heart Care',
-            description: 'Klinik kalp bakımı için formüle edildi.',
-            tags: const ['Klinik formül'],
-            weight: '1.5 kg',
-            price: _isCat ? 980 : 1080,
-            imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-          ),
-          _MamaProduct(
-            id: 'hm-heart-$petLabel',
-            brand: 'Advance',
-            name: 'Cardiac Care',
-            description: 'Günlük kalp sağlığı desteği.',
-            tags: const ['Taurin'],
-            weight: '1.5 kg',
-            price: _isCat ? 870 : 990,
-            imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-          ),
-        ];
-      case 'dis':
-        return [
-          _MamaProduct(
-            id: 'hm-dental-$petLabel',
-            brand: 'Royal Canin',
-            name: 'Dental Care',
-            description: 'Diş plağını azaltmaya yardımcı kibble yapısı.',
-            tags: const ['Diş sağlığı'],
-            weight: _isCat ? '1.5 kg' : '2 kg',
-            price: _isCat ? 759 : 879,
-            imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-          ),
-          _MamaProduct(
-            id: 'hm-td-$petLabel',
-            brand: "Hill's Prescription",
-            name: 't/d Dental Care',
-            description: 'Ağız hijyeni için özel fiber teknolojisi.',
-            tags: const ['Plaque control'],
-            weight: '1.5 kg',
-            price: _isCat ? 699 : 820,
-            imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-          ),
-          _MamaProduct(
-            id: 'hm-oral-$petLabel',
-            brand: 'Pro Plan',
-            name: 'Oral Care',
-            description: 'Günlük diş bakımı desteği sağlar.',
-            tags: const ['Ağız bakımı'],
-            weight: '2 kg',
-            price: _isCat ? 720 : 840,
-            imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-          ),
-        ];
-      case 'kisir':
-        return [
-          _MamaProduct(
-            id: 'hm-sterile-$petLabel',
-            brand: 'Royal Canin',
-            name: 'Sterilised',
-            description: 'Kısırlaştırılmış dostlar için ideal denge.',
-            tags: const ['Kısır', 'İdeal kilo'],
-            weight: _isCat ? '2 kg' : '3 kg',
-            price: _isCat ? 749 : 889,
-            imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-          ),
-          _MamaProduct(
-            id: 'hm-neutered-$petLabel',
-            brand: "Hill's",
-            name: 'Sterilised Young Adult',
-            description: 'Kısır sonrası metabolizma desteği.',
-            tags: const ['Metabolizma'],
-            weight: '1.5 kg',
-            price: _isCat ? 699 : 820,
-            imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-          ),
-          _MamaProduct(
-            id: 'hm-kisir-$petLabel',
-            brand: 'Pro Plan',
-            name: 'Sterilised Adult',
-            description: 'Kısırlaştırılmış yetişkinler için günlük mama.',
-            tags: const ['Günlük bakım'],
-            weight: '2 kg',
-            price: _isCat ? 680 : 790,
-            imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-          ),
-        ];
-      case 'tahilsiz':
-        return [
-          _MamaProduct(
-            id: 'hm-gf-$petLabel',
-            brand: 'N&D',
-            name: 'Grain Free $petLabel',
-            description: 'Tahılsız, doğal protein ağırlıklı formül.',
-            tags: const ['Tahılsız', 'Doğal'],
-            weight: _isCat ? '1.5 kg' : '2.5 kg',
-            price: _isCat ? 829 : 949,
-            imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-          ),
-          _MamaProduct(
-            id: 'hm-acana-$petLabel',
-            brand: 'Acana',
-            name: 'Regionals Grain-Free',
-            description: 'Yüksek et oranı, tahılsız içerik.',
-            tags: const ['Yüksek protein'],
-            weight: '2 kg',
-            price: _isCat ? 899 : 1049,
-            imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-          ),
-          _MamaProduct(
-            id: 'hm-go-$petLabel',
-            brand: 'Go!',
-            name: 'Sensitivity + Shine',
-            description: 'Tahılsız ve hassas sindirim dostu.',
-            tags: const ['Tahılsız'],
-            weight: '1.6 kg',
-            price: _isCat ? 760 : 880,
-            imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-          ),
-        ];
-      case 'idrar':
-        return [
-          _MamaProduct(
-            id: 'hm-urinary-$petLabel',
-            brand: 'Royal Canin',
-            name: 'Urinary Care',
-            description: 'İdrar yolu sağlığını destekleyen özel formül.',
-            tags: const ['İdrar yolu', 'Mineral denge'],
-            weight: _isCat ? '2 kg' : '2.5 kg',
-            price: _isCat ? 879 : 999,
-            imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-          ),
-          _MamaProduct(
-            id: 'hm-c-d-$petLabel',
-            brand: "Hill's Prescription",
-            name: 'c/d Multicare',
-            description: 'İdrar kristali riskini azaltmaya yardımcı olur.',
-            tags: const ['Klinik formül'],
-            weight: '1.5 kg',
-            price: _isCat ? 920 : 1050,
-            imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-          ),
-          _MamaProduct(
-            id: 'hm-urinary2-$petLabel',
-            brand: 'Pro Plan',
-            name: 'UR Urinary',
-            description: 'İdrar yolu rahatlığı için dengeli içerik.',
-            tags: const ['İdrar desteği'],
-            weight: '2 kg',
-            price: _isCat ? 845 : 960,
-            imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-          ),
-        ];
-      case 'eklem':
-        return [
-          _MamaProduct(
-            id: 'hm-joint-$petLabel',
-            brand: 'Royal Canin',
-            name: 'Mobility Support',
-            description: 'Eklem esnekliği ve hareket kabiliyetini destekler.',
-            tags: const ['Eklem', 'Hareket'],
-            weight: _isCat ? '2 kg' : '3 kg',
-            price: _isCat ? 899 : 1049,
-            imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-          ),
-          _MamaProduct(
-            id: 'hm-j-d-$petLabel',
-            brand: "Hill's Prescription",
-            name: 'j/d Joint Care',
-            description: 'Eklem sağlığı için klinik beslenme desteği.',
-            tags: const ['Veteriner önerisi'],
-            weight: '1.5 kg',
-            price: _isCat ? 860 : 990,
-            imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-          ),
-          _MamaProduct(
-            id: 'hm-joint2-$petLabel',
-            brand: 'Pro Plan',
-            name: 'Joint Care Adult',
-            description: 'Günlük eklem bakımı için dengeli formül.',
-            tags: const ['Eklem bakımı'],
-            weight: '2 kg',
-            price: _isCat ? 790 : 910,
-            imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-          ),
-        ];
-      case 'sindirim':
-      default:
-        return [
-          _MamaProduct(
-            id: 'hm-digest-$petLabel',
-            brand: 'Royal Canin',
-            name: 'Digestive Care',
-            description: 'Hassas sindirim sistemi için özel formül.',
-            tags: const ['Yüksek sindirilebilir protein'],
-            weight: '2 kg',
-            price: _isCat ? 899 : 999,
-            imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-          ),
-          _MamaProduct(
-            id: 'hm-gut-$petLabel',
-            brand: "Hill's Prescription",
-            name: 'Gut Biome',
-            description: 'Bağırsak florasını destekleyen klinik mama.',
-            tags: const ['Prebiyotik fiber', 'Veteriner önerisi'],
-            weight: '1.5 kg',
-            price: _isCat ? 765 : 845,
-            imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-          ),
-          _MamaProduct(
-            id: 'hm-sensitive-gut-$petLabel',
-            brand: 'Pro Plan',
-            name: 'Digestive Comfort',
-            description: 'Günlük sindirim konforu için dengeli içerik.',
-            tags: const ['Sindirim konforu'],
-            weight: '2 kg',
-            price: _isCat ? 720 : 840,
-            imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-          ),
-        ];
-    }
+  List<_MamaProduct> _exampleFrom(MarketProductData item) {
+    return [_MamaProduct(
+      id: item.id,
+      brand: item.brand,
+      name: item.title,
+      description: item.subtitle,
+      tags: [item.dietTag],
+      weight: item.weights.isNotEmpty ? item.weights.first : '',
+      price: item.prices.isNotEmpty ? item.prices.first : 0,
+      imagePath: item.imagePath,
+      source: item,
+    )];
   }
 
   void _toggleNeed(String id) {
@@ -591,8 +186,6 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final products = _products;
-
     return Scaffold(
       backgroundColor: AppColors.background,
       body: AppPageFrame.standard(
@@ -616,7 +209,17 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
                   const SizedBox(height: 14),
                   _buildProductsHeader(),
                   const SizedBox(height: 8),
-                  _buildProductsGrid(products),
+                  StreamBuilder<List<MarketProductData>>(
+                    stream: ProductRepository.instance.watchMarketProducts(),
+                    builder: (context, snapshot) {
+                      final catalog =
+                          snapshot.data ?? const <MarketProductData>[];
+                      if (catalog.isEmpty) {
+                        return _buildProductsGrid(const []);
+                      }
+                      return _buildProductsGrid(_exampleFrom(catalog.first));
+                    },
+                  ),
                 ],
               ),
             ),
@@ -1383,11 +986,7 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
           children: [
             Text(
               'İhtiyacını Seç',
-              style: TextStyle(
-                color: AppColors.text,
-                fontSize: 14,
-                fontWeight: FontWeight.w900,
-              ),
+              style: AppTextStyles.sectionHeader,
             ),
             SizedBox(width: 4),
             Icon(Icons.eco_rounded, color: AppColors.success, size: 16),
@@ -1511,11 +1110,7 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
       _listTitle,
       maxLines: 2,
       overflow: TextOverflow.ellipsis,
-      style: const TextStyle(
-        color: AppColors.success,
-        fontSize: 12,
-        fontWeight: FontWeight.w900,
-      ),
+      style: AppTextStyles.sectionHeader,
     );
   }
 
@@ -1565,17 +1160,18 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
   }
 
   Widget _buildProductCard(_MamaProduct product) {
-    final marketProduct = buildSimpleMarketProduct(
-      id: product.id,
-      imagePath: product.imagePath,
-      title: product.name,
-      subtitle: product.brand,
-      price: product.price,
-      oldPrice: product.price * 1.15,
-      weight: product.weight,
-      brand: product.brand,
-      dietTag: product.tags.isNotEmpty ? product.tags.first : 'Standart',
-    );
+    final marketProduct = product.source ??
+        buildSimpleMarketProduct(
+          id: product.id,
+          imagePath: product.imagePath,
+          title: product.name,
+          subtitle: product.brand,
+          price: product.price,
+          oldPrice: product.price * 1.15,
+          weight: product.weight,
+          brand: product.brand,
+          dietTag: product.tags.isNotEmpty ? product.tags.first : 'Standart',
+        );
     final price =
         marketProduct.prices.isNotEmpty ? marketProduct.prices.first : 0.0;
     final oldPrice = marketProduct.oldPrices.isNotEmpty
@@ -1585,15 +1181,19 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
     return MarketCompactProductCard(
       product: marketProduct,
       onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const ProductDetailScreen()),
+        MaterialPageRoute(
+          builder: (_) => ProductDetailScreen(product: marketProduct),
+        ),
       ),
       onAddToCart: () {
         CartStore.instance.addItem(
           id: product.id,
           imagePath: product.imagePath,
-          title: '${product.brand} ${product.name} ${product.weight}',
+          title: product.name,
           unitPrice: price,
           oldPrice: oldPrice,
+          weight: product.weight,
+          brand: product.brand,
         );
       },
     );
@@ -1622,6 +1222,7 @@ class _MamaProduct {
     required this.weight,
     required this.price,
     required this.imagePath,
+    this.source,
   });
 
   final String id;
@@ -1632,6 +1233,7 @@ class _MamaProduct {
   final String weight;
   final double price;
   final String imagePath;
+  final MarketProductData? source;
 }
 
 class _DashedLinePainter extends CustomPainter {

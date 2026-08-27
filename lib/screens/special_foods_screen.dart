@@ -1,15 +1,20 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:geliyor_app/data/product_repository.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/screens/cart_screen.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
 import 'package:geliyor_app/screens/filter_screen.dart';
 import 'package:geliyor_app/screens/product_detail_screen.dart';
 import 'package:geliyor_app/state/cart_store.dart';
+import 'package:geliyor_app/state/favorite_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:geliyor_app/utils/product_image.dart';
 import 'package:geliyor_app/utils/product_price.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
 import 'package:geliyor_app/widgets/app_pressable_button.dart';
+import 'package:geliyor_app/widgets/market_product_card.dart';
+import 'package:geliyor_app/widgets/product_favorite_corner.dart';
 
 enum _PetType { cat, dog }
 
@@ -91,42 +96,6 @@ class _SpecialFoodsScreenState extends State<SpecialFoodsScreen> {
   _HealthProblem get _selectedProblem =>
       _problems.firstWhere((e) => e.id == _selectedProblemId);
 
-  List<_SpecialProduct> get _products {
-    final isCat = _petType == _PetType.cat;
-    final petLabel = isCat ? 'Kedi' : 'Köpek';
-    final tag = _selectedProblem.title;
-
-    return [
-      _SpecialProduct(
-        id: 'rc-$_selectedProblemId-$petLabel',
-        brand: 'Royal Canin',
-        name: '$tag Support $petLabel',
-        tag: tag,
-        weight: isCat ? '2 kg' : '2.5 kg',
-        price: isCat ? 999 : 1149,
-        imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-      ),
-      _SpecialProduct(
-        id: 'hills-$_selectedProblemId-$petLabel',
-        brand: "Hill's Prescription",
-        name: '$tag Care',
-        tag: 'Veteriner Önerisi',
-        weight: isCat ? '1.5 kg' : '1.5 kg',
-        price: isCat ? 889 : 1020,
-        imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-      ),
-      _SpecialProduct(
-        id: 'proplan-$_selectedProblemId-$petLabel',
-        brand: 'Pro Plan Veterinary',
-        name: '$tag Formula',
-        tag: tag,
-        weight: isCat ? '1.5 kg' : '2 kg',
-        price: isCat ? 849 : 965,
-        imagePath: 'assets/images/nd_kuzu_kisir.jpg',
-      ),
-    ];
-  }
-
   @override
   void dispose() {
     _searchController.dispose();
@@ -135,8 +104,6 @@ class _SpecialFoodsScreenState extends State<SpecialFoodsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final products = _products;
-
     return Scaffold(
       backgroundColor: AppColors.surface,
       body: AppPageFrame.standard(
@@ -176,7 +143,28 @@ class _SpecialFoodsScreenState extends State<SpecialFoodsScreen> {
               const SizedBox(height: 12),
               _buildProductsHeader(),
               const SizedBox(height: 8),
-              _buildProductGrid(products),
+              StreamBuilder<List<MarketProductData>>(
+                stream: ProductRepository.instance.watchMarketProducts(),
+                builder: (context, snapshot) {
+                  final catalog = snapshot.data ?? const <MarketProductData>[];
+                  if (catalog.isEmpty) return const SizedBox.shrink();
+                  final item = catalog.first;
+                  return _buildProductGrid([
+                    _SpecialProduct(
+                      id: item.id,
+                      brand: item.brand,
+                      name: item.title,
+                      tag: _selectedProblem.title,
+                      weight: item.weights.isNotEmpty
+                          ? item.weights.first
+                          : '',
+                      price: item.prices.isNotEmpty ? item.prices.first : 0,
+                      imagePath: item.imagePath,
+                      source: item,
+                    ),
+                  ]);
+                },
+              ),
             ],
           ),
         ),
@@ -505,25 +493,17 @@ class _SpecialFoodsScreenState extends State<SpecialFoodsScreen> {
             '$title İçin Önerilen Mamalar',
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: AppColors.text,
-              fontSize: 12,
-              fontWeight: FontWeight.w900,
-            ),
+            style: AppTextStyles.sectionHeader,
           ),
         ),
         const Text(
           'Tümü',
-          style: TextStyle(
-            color: AppColors.primary,
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-          ),
+          style: AppTextStyles.seeAllAction,
         ),
         const Icon(
           Icons.chevron_right_rounded,
           color: AppColors.primary,
-          size: 16,
+          size: 20,
         ),
       ],
     );
@@ -534,9 +514,13 @@ class _SpecialFoodsScreenState extends State<SpecialFoodsScreen> {
       height: 148,
       child: Row(
         children: [
-          for (int i = 0; i < products.length; i++) ...[
+          for (int i = 0; i < 3; i++) ...[
             if (i > 0) const SizedBox(width: 8),
-            Expanded(child: _buildProductCard(products[i])),
+            Expanded(
+              child: i < products.length
+                  ? _buildProductCard(products[i])
+                  : const SizedBox.shrink(),
+            ),
           ],
         ],
       ),
@@ -548,7 +532,9 @@ class _SpecialFoodsScreenState extends State<SpecialFoodsScreen> {
 
     return GestureDetector(
       onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const ProductDetailScreen()),
+        MaterialPageRoute(
+          builder: (_) => ProductDetailScreen(product: product.source),
+        ),
       ),
       child: Container(
         width: double.infinity,
@@ -562,17 +548,51 @@ class _SpecialFoodsScreenState extends State<SpecialFoodsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
-              child: Center(
-                child: Image.asset(
-                  product.imagePath,
-                  fit: BoxFit.contain,
-                  filterQuality: FilterQuality.high,
-                  errorBuilder: (context, error, stackTrace) => const Icon(
-                    Icons.image_outlined,
-                    color: AppColors.subText,
-                    size: 36,
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: Center(
+                      child: buildProductImage(
+                        product.imagePath,
+                        fit: BoxFit.contain,
+                        filterQuality: FilterQuality.high,
+                        errorWidget: const Icon(
+                          Icons.image_outlined,
+                          color: AppColors.subText,
+                          size: 36,
+                        ),
+                      ),
+                    ),
                   ),
-                ),
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    child: ProductFavoriteCorner(
+                      productId: product.id,
+                      onToggle: () {
+                        FavoriteStore.instance.toggle(
+                          FavoriteItem(
+                            id: product.id,
+                            imagePath: product.imagePath,
+                            title:
+                                '${product.brand} ${product.name} ${product.weight}',
+                            unitPrice: product.price,
+                            oldPrice: oldPrice,
+                            discountPercent: discountPercentFromPrices(
+                                  product.price,
+                                  oldPrice,
+                                ) ??
+                                15,
+                            weight: product.weight,
+                            brand: product.brand,
+                          ),
+                        );
+                      },
+                      size: 22,
+                      iconSize: 12,
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 6),
@@ -639,9 +659,11 @@ class _SpecialFoodsScreenState extends State<SpecialFoodsScreen> {
     CartStore.instance.addItem(
       id: product.id,
       imagePath: product.imagePath,
-      title: '${product.brand} ${product.name} ${product.weight}',
+      title: product.name,
       unitPrice: product.price,
       oldPrice: oldPrice,
+      weight: product.weight,
+      brand: product.brand,
     );
     _showAddedToCartDialog(product.name);
   }
@@ -772,6 +794,7 @@ class _SpecialProduct {
     required this.weight,
     required this.price,
     required this.imagePath,
+    this.source,
   });
 
   final String id;
@@ -781,4 +804,5 @@ class _SpecialProduct {
   final String weight;
   final double price;
   final String imagePath;
+  final MarketProductData? source;
 }

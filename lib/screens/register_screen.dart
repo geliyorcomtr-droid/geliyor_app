@@ -20,6 +20,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _phoneController = TextEditingController();
   final _smsCodeController = TextEditingController();
   bool _smsCodeSent = false;
+  bool _busy = false;
 
   @override
   void dispose() {
@@ -29,18 +30,33 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  void _sendSmsCode() {
+  Future<void> _sendSmsCode() async {
+    final name = _nameController.text.trim();
     final phone = _phoneController.text.trim();
+    if (name.length < 3) {
+      _showMessage('Lütfen ad soyad bilginizi girin.');
+      return;
+    }
     if (phone.length < 10) {
       _showMessage('Önce geçerli bir telefon numarası girin.');
       return;
     }
     FocusScope.of(context).unfocus();
-    setState(() => _smsCodeSent = true);
-    _showMessage('SMS doğrulama kodu gönderildi.');
+    setState(() => _busy = true);
+    try {
+      await AuthStore.instance.sendCode(phone);
+      if (!mounted) return;
+      setState(() => _smsCodeSent = true);
+      _showMessage('SMS doğrulama kodu gönderildi.');
+    } catch (e) {
+      if (!mounted) return;
+      _showMessage(AuthStore.friendlyError(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
-  void _register() {
+  Future<void> _register() async {
     final name = _nameController.text.trim();
     final phone = _phoneController.text.trim();
     final smsCode = _smsCodeController.text.trim();
@@ -54,7 +70,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
     if (!_smsCodeSent) {
-      _showMessage('Lütfen önce SMS kodu gönderin.');
+      await _sendSmsCode();
       return;
     }
     if (smsCode.length < 4) {
@@ -62,14 +78,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
-    AuthStore.instance.register(fullName: name, phone: phone);
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(
-        settings: const RouteSettings(name: 'profile'),
-        builder: (_) => const AccountScreen(),
-      ),
-      (route) => false,
-    );
+    setState(() => _busy = true);
+    try {
+      await AuthStore.instance.verifyCode(smsCode: smsCode, fullName: name);
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          settings: const RouteSettings(name: 'profile'),
+          builder: (_) => const AccountScreen(),
+        ),
+        (route) => false,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _showMessage(AuthStore.friendlyError(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   void _showMessage(String message) {
@@ -93,7 +118,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
         header: _buildHeader(context),
         content: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+          padding: const EdgeInsets.fromLTRB(
+            AppPageFrame.contentHorizontalPadding,
+            0,
+            AppPageFrame.contentHorizontalPadding,
+            10,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -136,54 +166,57 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 hint: '05XX XXX XX XX',
                 icon: Icons.phone_outlined,
                 keyboardType: TextInputType.phone,
+                onChanged: (_) {
+                  if (_smsCodeSent) {
+                    setState(() {
+                      _smsCodeSent = false;
+                      _smsCodeController.clear();
+                    });
+                  }
+                },
                 inputFormatters: [
                   FilteringTextInputFormatter.digitsOnly,
                   LengthLimitingTextInputFormatter(11),
                 ],
               ),
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerRight,
-                child: AppPressableButton.primary(
-                  onTap: _sendSmsCode,
-                  height: 34,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Text(
-                    _smsCodeSent ? 'Kodu Tekrar Gönder' : 'SMS Kodu Gönder',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
+              const SizedBox(height: 14),
+              _fieldLabel('SMS Doğrulama Kodu'),
+              const SizedBox(height: 6),
+              _inputField(
+                controller: _smsCodeController,
+                hint: _smsCodeSent
+                    ? 'SMS ile gelen 6 haneli kod'
+                    : 'Önce kod gönderin',
+                icon: Icons.sms_outlined,
+                enabled: _smsCodeSent && !_busy,
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(6),
+                ],
               ),
-              if (_smsCodeSent) ...[
-                const SizedBox(height: 14),
-                _fieldLabel('SMS Doğrulama Kodu'),
-                const SizedBox(height: 6),
-                _inputField(
-                  controller: _smsCodeController,
-                  hint: '6 haneli kod',
-                  icon: Icons.sms_outlined,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    LengthLimitingTextInputFormatter(6),
-                  ],
-                ),
-              ],
               const SizedBox(height: 20),
               AppPressableButton.primary(
-                onTap: _register,
+                onTap: _busy ? null : (_smsCodeSent ? _register : _sendSmsCode),
+                enabled: !_busy,
                 width: double.infinity,
                 height: 48,
-                child: const Text(
-                  'Kayıt Ol',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
+                child: _busy
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.4,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Text(
+                        _smsCodeSent ? 'Kayıt Ol' : 'Kod Gönder',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
               ),
               const SizedBox(height: 18),
               _orDivider(),
@@ -197,7 +230,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
               _socialButton(
                 label: 'Google ile Kayıt Ol',
                 icon: Icons.g_mobiledata_rounded,
-                onTap: () => _showMessage('Google ile kayıt yakında eklenecek.'),
+                onTap: () =>
+                    _showMessage('Google ile kayıt yakında eklenecek.'),
               ),
               const SizedBox(height: 22),
               Row(
@@ -261,15 +295,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Widget _buildBrand() {
     return Image.asset(
-      'assets/images/geliyor_auth_logo.png',
-      height: 138,
+      'assets/images/geliyor_splash_logo.png',
+      height: 240,
       fit: BoxFit.contain,
       filterQuality: FilterQuality.high,
-      errorBuilder: (context, error, stackTrace) => const Icon(
-        Icons.pets_rounded,
-        color: AppColors.primary,
-        size: 48,
-      ),
+      errorBuilder: (context, error, stackTrace) =>
+          const Icon(Icons.pets_rounded, color: AppColors.primary, size: 48),
     );
   }
 
@@ -288,17 +319,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
     required TextEditingController controller,
     required String hint,
     required IconData icon,
+    bool enabled = true,
     TextInputType? keyboardType,
     List<TextInputFormatter>? inputFormatters,
     TextCapitalization textCapitalization = TextCapitalization.none,
+    ValueChanged<String>? onChanged,
   }) {
     return TextField(
       controller: controller,
+      enabled: enabled,
+      onChanged: onChanged,
       keyboardType: keyboardType,
       inputFormatters: inputFormatters,
       textCapitalization: textCapitalization,
-      style: const TextStyle(
-        color: AppColors.text,
+      style: TextStyle(
+        color: enabled ? AppColors.text : AppColors.subText,
         fontSize: 14,
         fontWeight: FontWeight.w600,
       ),
@@ -311,13 +346,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
         prefixIcon: Icon(icon, color: AppColors.subText, size: 20),
         filled: true,
-        fillColor: AppColors.surface,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        fillColor: enabled ? AppColors.surface : AppColors.selected,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 14,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
           borderSide: const BorderSide(color: AppColors.border),
         ),
         enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(color: AppColors.border),
+        ),
+        disabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
           borderSide: const BorderSide(color: AppColors.border),
         ),
@@ -365,10 +407,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           const SizedBox(width: 8),
           Text(
             label,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-            ),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
           ),
         ],
       ),

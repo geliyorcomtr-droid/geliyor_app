@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:geliyor_app/data/brand_repository.dart';
 import 'package:geliyor_app/screens/pet_market_products_screen.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/widgets/filter_subpage_layout.dart';
@@ -8,28 +9,13 @@ class BrandsScreen extends StatelessWidget {
 
   static const int _gridColumns = 3;
 
-  static const List<_BrandItem> _brands = [
-    _BrandItem(name: 'Royal Canin', logoPath: 'assets/images/brands/royal_canin.png'),
-    _BrandItem(name: "Hill's", logoPath: 'assets/images/brands/hills.png'),
-    _BrandItem(name: 'N&D', logoPath: 'assets/images/brands/nd.png'),
-    _BrandItem(name: 'Advance', logoPath: 'assets/images/brands/advance.png'),
-    _BrandItem(name: 'Pro Plan', logoPath: 'assets/images/brands/proplan.png'),
-    _BrandItem(name: 'Purina ONE', logoPath: 'assets/images/brands/purina_one.png'),
-    _BrandItem(name: 'Acana', logoPath: 'assets/images/brands/acana.png'),
-    _BrandItem(name: 'GimCat', logoPath: 'assets/images/brands/gimcat.png'),
-    _BrandItem(name: 'Wanpy', logoPath: 'assets/images/brands/wanpy.png'),
-    _BrandItem(name: 'Felix', logoPath: 'assets/images/brands/felix.png'),
-    _BrandItem(name: 'Dreamies', logoPath: 'assets/images/brands/dreamies.png'),
-    _BrandItem(name: 'Cat Chow', logoPath: 'assets/images/brands/catchow.png'),
-    _BrandItem(name: 'Dog Chow', logoPath: 'assets/images/brands/dogchow.png'),
-    _BrandItem(name: 'Reflex', logoPath: 'assets/images/brands/reflex.png'),
-    _BrandItem(name: 'Proline', logoPath: 'assets/images/brands/proline.png'),
-  ];
-
-  static void _openProducts(BuildContext context) {
+  static void _openProducts(BuildContext context, AppBrand brand) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => const PetMarketProductsScreen(initialMainCategory: 'cat'),
+        builder: (_) => PetMarketProductsScreen(
+          initialMainCategory: 'cat',
+          initialBrand: brand.name,
+        ),
       ),
     );
   }
@@ -38,28 +24,61 @@ class BrandsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return FilterSubpageLayout(
       title: 'Markaya Göre Alışveriş',
-      content: GridView.builder(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.all(12),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: _gridColumns,
-          crossAxisSpacing: 10,
-          mainAxisSpacing: 10,
-          childAspectRatio: 1,
-        ),
-        itemCount: _brands.length,
-        itemBuilder: (context, index) {
-          return _buildBrandTile(context, _brands[index]);
+      content: StreamBuilder<List<AppBrand>>(
+        stream: BrandRepository.instance.watchAll(activeOnly: true),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(
+              child: Text(
+                'Markalar yüklenemedi.',
+                style: const TextStyle(
+                  color: AppColors.subText,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            );
+          }
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final brands = snapshot.data!;
+          if (brands.isEmpty) {
+            return const Center(
+              child: Text(
+                'Henüz marka eklenmedi.',
+                style: TextStyle(
+                  color: AppColors.subText,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            );
+          }
+
+          return GridView.builder(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.all(12),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: _gridColumns,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              childAspectRatio: 1,
+            ),
+            itemCount: brands.length,
+            itemBuilder: (context, index) {
+              return _buildBrandTile(context, brands[index]);
+            },
+          );
         },
       ),
     );
   }
 
-  Widget _buildBrandTile(BuildContext context, _BrandItem brand) {
+  Widget _buildBrandTile(BuildContext context, AppBrand brand) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () => _openProducts(context),
+        onTap: () => _openProducts(context, brand),
         borderRadius: BorderRadius.circular(18),
         child: Container(
           decoration: BoxDecoration(
@@ -68,37 +87,40 @@ class BrandsScreen extends StatelessWidget {
             border: Border.all(color: AppColors.border),
           ),
           padding: const EdgeInsets.all(8),
-          child: Image.asset(
-            brand.logoPath,
-            fit: BoxFit.contain,
-            errorBuilder: (context, error, stackTrace) {
-              return Center(
-                child: Text(
-                  brand.name,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppColors.primary,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              );
-            },
-          ),
+          child: _brandImage(brand),
         ),
       ),
     );
   }
-}
 
-class _BrandItem {
-  const _BrandItem({
-    required this.name,
-    required this.logoPath,
-  });
-
-  final String name;
-  final String logoPath;
+  Widget _brandImage(AppBrand brand) {
+    final fallback = Center(
+      child: Text(
+        brand.name,
+        textAlign: TextAlign.center,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          color: AppColors.primary,
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+    if (brand.imageUrl.isNotEmpty) {
+      return Image.network(
+        brand.imageUrl,
+        fit: BoxFit.contain,
+        errorBuilder: (_, _, _) => fallback,
+      );
+    }
+    if (brand.assetPath.isNotEmpty) {
+      return Image.asset(
+        brand.assetPath,
+        fit: BoxFit.contain,
+        errorBuilder: (_, _, _) => fallback,
+      );
+    }
+    return fallback;
+  }
 }

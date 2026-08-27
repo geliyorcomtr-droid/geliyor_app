@@ -50,56 +50,57 @@ class _FilterScreenState extends State<FilterScreen> {
     _FilterCategory(
       imagePath: 'assets/images/urunler_kedi.png',
       title: 'Kedi',
-      emoji: '🐾',
+      badgeIcon: Icons.pets_rounded,
       subtitle: 'Mama, yavru, kum, ödül ve daha fazlası',
       route: _FilterRoute.cat,
     ),
     _FilterCategory(
       imagePath: 'assets/images/urunler_kopek.png',
       title: 'Köpek',
-      emoji: '🐾',
+      badgeIcon: Icons.pets_rounded,
       subtitle: 'Mama, yavru, mini ırk ve ödül',
       route: _FilterRoute.dog,
     ),
     _FilterCategory(
       imagePath: 'assets/images/urunler_kus.png',
       title: 'Kuş',
-      emoji: '🐦',
+      badgeIcon: Icons.pets_rounded,
       subtitle: 'Kuş yemleri ve bakım ürünleri',
       route: _FilterRoute.bird,
     ),
     _FilterCategory(
       imagePath: 'assets/images/urunler_kemirgen.png',
       title: 'Kemirgen',
-      emoji: '🐾',
+      badgeIcon: Icons.pets_rounded,
       subtitle: 'Kemirgen mamaları ve yaşam alanları',
       route: _FilterRoute.rodent,
     ),
     _FilterCategory(
       imagePath: 'assets/images/urunler_akilli.png',
       title: 'Akıllı Pet Ürünleri',
-      emoji: '✨',
+      badgeIcon: Icons.auto_awesome_rounded,
       subtitle: 'Akıllı mama kabı, takip ve daha fazlası',
       route: _FilterRoute.smart,
     ),
     _FilterCategory(
       imagePath: 'assets/images/cok_satan_urunler.png',
       title: 'Çok Satanlar',
-      emoji: '⭐',
+      badgeIcon: Icons.star_rounded,
+      badgeIconColor: AppColors.warning,
       subtitle: 'En çok tercih edilen ürünler',
       route: _FilterRoute.bestSellers,
     ),
     _FilterCategory(
       imagePath: 'assets/images/kampanya_urunleri.png',
       title: 'Kampanyalar',
-      emoji: '🎁',
+      badgeIcon: Icons.card_giftcard_rounded,
       subtitle: 'İndirimli ve avantajlı ürünler',
       route: _FilterRoute.campaigns,
     ),
     _FilterCategory(
       imagePath: 'assets/images/markaya_gore_urunleri.png',
       title: 'Markaya Göre Alışveriş',
-      emoji: '🏷️',
+      badgeIcon: Icons.sell_rounded,
       subtitle: 'Sevdiğin markaların ürünleri',
       route: _FilterRoute.brands,
     ),
@@ -369,9 +370,10 @@ class _FilterScreenState extends State<FilterScreen> {
                           ),
                         ),
                         const SizedBox(width: 4),
-                        Text(
-                          item.emoji,
-                          style: const TextStyle(fontSize: 13),
+                        Icon(
+                          item.badgeIcon,
+                          size: 14,
+                          color: item.badgeIconColor,
                         ),
                       ],
                     ),
@@ -455,7 +457,7 @@ class _FilterScreenState extends State<FilterScreen> {
                   title: 'Akıllı Pet',
                   subtitle: 'Akıllı mama kabı, takip ve kamera',
                   imagePath: 'assets/images/petmarket_akilli_ikon.png',
-                  emoji: '✨',
+                  badgeIcon: Icons.auto_awesome_rounded,
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(
@@ -505,14 +507,16 @@ class _FilterCategory {
   const _FilterCategory({
     required this.imagePath,
     required this.title,
-    required this.emoji,
+    required this.badgeIcon,
     required this.subtitle,
     required this.route,
+    this.badgeIconColor = AppColors.primary,
   });
 
   final String imagePath;
   final String title;
-  final String emoji;
+  final IconData badgeIcon;
+  final Color badgeIconColor;
   final String subtitle;
   final _FilterRoute route;
 }

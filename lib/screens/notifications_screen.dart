@@ -31,7 +31,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       _NotificationItem(
         id: 'n1',
         title: 'Plan hatırlatması',
-        emoji: '💚',
         description: 'Minnoş için tıraş saati yaklaşıyor. Planını kontrol et.',
         detail:
             'Minnoş için planladığın tıraş hatırlatmasının zamanı yaklaşıyor. '
@@ -49,7 +48,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       _NotificationItem(
         id: 'n2',
         title: 'Özel kampanya',
-        emoji: '🎉',
         description: 'Seçili mamalarda %20 indirim seni bekliyor.',
         detail:
             'Seçili mama ürünlerinde %20 indirim kampanyası başladı. '
@@ -66,7 +64,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       _NotificationItem(
         id: 'n3',
         title: 'Puan kazandınız',
-        emoji: '✨',
         description: 'Son siparişinden 150 Pati Puan kazandın.',
         detail:
             'Son siparişin başarıyla tamamlandı ve hesabına 150 Pati Puan eklendi. '
@@ -82,7 +79,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       _NotificationItem(
         id: 'n4',
         title: 'Sipariş kargoya verildi',
-        emoji: '📦',
         description: 'GL-10428 numaralı siparişin yola çıktı.',
         detail:
             'GL-10428 numaralı siparişin kargoya verildi ve yola çıktı. '
@@ -98,7 +94,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       _NotificationItem(
         id: 'n5',
         title: "Asistan'dan öneri",
-        emoji: '💙',
         description: 'Minnoş için uygun ödül mamaları önerildi.',
         detail:
             'Asistan, Minnoş’un profiline göre ödül mamaları önerdi. '
@@ -114,7 +109,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       _NotificationItem(
         id: 'n6',
         title: 'Sağlık hatırlatması',
-        emoji: '🛡️',
         description: 'Parazit koruma uygulaması için hatırlatma.',
         detail:
             'Parazit koruma uygulaması için hatırlatma zamanı geldi. '
@@ -132,7 +126,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       _NotificationItem(
         id: 'n7',
         title: 'Hoş geldiniz!',
-        emoji: '👋',
         description: 'geliyor.tr ailesine katıldığın için teşekkürler.',
         detail:
             'geliyor.tr ailesine katıldığın için teşekkürler. '
@@ -148,7 +141,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       _NotificationItem(
         id: 'n8',
         title: 'Sistem bildirimi',
-        emoji: '🔔',
         description: 'Profil bilgilerin başarıyla güncellendi.',
         detail:
             'Profil bilgilerin başarıyla güncellendi. '
@@ -260,7 +252,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     return Column(
       children: [
         const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 14),
+          padding: EdgeInsets.symmetric(
+            horizontal: AppPageFrame.contentHorizontalPadding,
+          ),
           child: Text(
             'Tüm bildirimlerinizi burada görüntüleyebilirsiniz.',
             textAlign: TextAlign.center,
@@ -279,7 +273,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               ? _buildEmptyState()
               : ListView.separated(
                   physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(14, 2, 14, 12),
+                  padding: const EdgeInsets.fromLTRB(
+                    AppPageFrame.contentHorizontalPadding,
+                    2,
+                    AppPageFrame.contentHorizontalPadding,
+                    12,
+                  ),
                   itemCount: items.length + 1,
                   separatorBuilder: (_, index) {
                     if (index == items.length - 1) {
@@ -301,7 +300,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   Widget _buildDetail(_NotificationItem item) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+      padding: const EdgeInsets.fromLTRB(
+        AppPageFrame.contentHorizontalPadding,
+        0,
+        AppPageFrame.contentHorizontalPadding,
+        8,
+      ),
       child: Column(
         children: [
           Expanded(
@@ -346,7 +350,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                '${item.title} ${item.emoji}',
+                                item.title,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
@@ -480,7 +484,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   Widget _buildFilters() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppPageFrame.contentHorizontalPadding,
+      ),
       child: Row(
         children: [
           for (int i = 0; i < filters.length; i++) ...[
@@ -592,20 +598,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  RichText(
+                  Text(
+                    item.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    text: TextSpan(
-                      style: const TextStyle(
-                        color: AppColors.text,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w900,
-                        height: 1.15,
-                      ),
-                      children: [
-                        TextSpan(text: item.title),
-                        TextSpan(text: ' ${item.emoji}'),
-                      ],
+                    style: const TextStyle(
+                      color: AppColors.text,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                      height: 1.15,
                     ),
                   ),
                   const SizedBox(height: 3),
@@ -746,7 +747,6 @@ class _NotificationItem {
   _NotificationItem({
     required this.id,
     required this.title,
-    required this.emoji,
     required this.description,
     required this.detail,
     required this.time,
@@ -760,7 +760,6 @@ class _NotificationItem {
 
   final String id;
   final String title;
-  final String emoji;
   final String description;
   final String detail;
   final String time;

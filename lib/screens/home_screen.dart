@@ -1,4 +1,5 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:geliyor_app/data/banner_repository.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/screens/easy_order_screen.dart';
 import 'package:geliyor_app/screens/filter_screen.dart';
@@ -14,6 +15,7 @@ import 'package:geliyor_app/state/food_tracking_store.dart';
 import 'package:geliyor_app/state/order_store.dart';
 import 'package:geliyor_app/state/pet_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:geliyor_app/widgets/app_banner_slider.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
@@ -27,12 +29,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  static const List<String> _bannerImages = [
-    'assets/images/banner_mutlu_patiler.png',
-    'assets/images/banner_geliyor.png',
-    'assets/images/banner1.png',
-  ];
-
   static const _healthKeywords = [
     'sağlık',
     'saglik',
@@ -53,19 +49,15 @@ class _HomeScreenState extends State<HomeScreen> {
     'muayene',
   ];
 
-  late final PageController _bannerController;
   final _searchController = TextEditingController();
-  int _bannerIndex = 0;
 
   @override
   void initState() {
     super.initState();
-    _bannerController = PageController();
   }
 
   @override
   void dispose() {
-    _bannerController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -78,15 +70,15 @@ class _HomeScreenState extends State<HomeScreen> {
     FocusScope.of(context).unfocus();
 
     if (isHealth) {
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const HealthScreen()),
-      );
+      Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => const HealthScreen()));
       return;
     }
 
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const PetMarketProductsScreen()),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const PetMarketProductsScreen()));
   }
 
   @override
@@ -101,6 +93,7 @@ class _HomeScreenState extends State<HomeScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Column(
             children: [
+              const SizedBox(height: 12),
               _buildBannerSlider(),
               const SizedBox(height: 12),
               _buildSearchRow(),
@@ -113,13 +106,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 ]),
                 builder: (context, _) => _buildSmartPlanCard(),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
               _buildSpecialServices(),
               const SizedBox(height: 12),
               _buildPetProfileBar(),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
               _buildPetMarket(),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
             ],
           ),
         ),
@@ -135,26 +128,33 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           IconButton(
             onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const FilterScreen()),
-              );
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const FilterScreen()));
             },
-            icon: const Icon(Icons.menu_rounded, color: AppColors.primary, size: 28),
+            icon: const Icon(
+              Icons.menu_rounded,
+              color: AppColors.primary,
+              size: 28,
+            ),
           ),
           Expanded(
             child: IgnorePointer(
-              child: Image.asset(
-                'assets/images/ana_logo.png',
-                height: 54,
-                fit: BoxFit.contain,
-                alignment: Alignment.center,
-                errorBuilder: (context, error, stackTrace) {
-                  return const Text(
-                    'geliyor.tr',
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.pageHeader,
-                  );
-                },
+              child: Transform.translate(
+                offset: const Offset(0, 6),
+                child: Image.asset(
+                  'assets/images/ana_logo.png',
+                  height: 46,
+                  fit: BoxFit.contain,
+                  alignment: Alignment.center,
+                  errorBuilder: (context, error, stackTrace) {
+                    return const Text(
+                      'geliyor.tr',
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.pageHeader,
+                    );
+                  },
+                ),
               ),
             ),
           ),
@@ -165,110 +165,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildBannerSlider() {
-    return Column(
-      children: [
-        SizedBox(
-          height: 132,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(24),
-                child: PageView.builder(
-                  controller: _bannerController,
-                  itemCount: _bannerImages.length,
-                  onPageChanged: (i) => setState(() => _bannerIndex = i),
-                  itemBuilder: (context, index) {
-                    final useContain = _bannerImages[index].contains('banner_geliyor');
-                    return ColoredBox(
-                      color: AppColors.selected,
-                      child: Image.asset(
-                        _bannerImages[index],
-                        fit: useContain ? BoxFit.contain : BoxFit.cover,
-                        width: double.infinity,
-                        height: double.infinity,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            color: AppColors.primaryLight,
-                            alignment: Alignment.center,
-                            child: const Text(
-                              'geliyor.tr',
-                              style: TextStyle(
-                                color: AppColors.surface,
-                                fontSize: 24,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    );
-                  },
-                ),
-              ),
-              Positioned(
-                left: 8,
-                child: _bannerArrow(
-                  Icons.chevron_left_rounded,
-                  () {
-                    final prev = (_bannerIndex - 1 + _bannerImages.length) % _bannerImages.length;
-                    _bannerController.animateToPage(
-                      prev,
-                      duration: const Duration(milliseconds: 240),
-                      curve: Curves.easeOut,
-                    );
-                  },
-                ),
-              ),
-              Positioned(
-                right: 8,
-                child: _bannerArrow(
-                  Icons.chevron_right_rounded,
-                  () {
-                    final next = (_bannerIndex + 1) % _bannerImages.length;
-                    _bannerController.animateToPage(
-                      next,
-                      duration: const Duration(milliseconds: 240),
-                      curve: Curves.easeOut,
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(5, (index) {
-            final active = index == _bannerIndex;
-            return Container(
-              margin: const EdgeInsets.symmetric(horizontal: 3),
-              width: 7,
-              height: 7,
-              decoration: BoxDecoration(
-                color: active ? AppColors.primary : AppColors.border,
-                shape: BoxShape.circle,
-              ),
-            );
-          }),
-        ),
+    return const AppBannerSlot(
+      placement: BannerPlacement.home,
+      fallbackAssets: [
+        'assets/images/banner_mutlu_patiler.png',
+        'assets/images/banner_geliyor.png',
+        'assets/images/banner1.png',
       ],
-    );
-  }
-
-  Widget _bannerArrow(IconData icon, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 28,
-        height: 28,
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
-          shape: BoxShape.circle,
-        ),
-        child: Icon(icon, color: AppColors.primary, size: 20),
-      ),
     );
   }
 
@@ -342,9 +245,9 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(width: 8),
         GestureDetector(
           onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const FilterScreen()),
-            );
+            Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const FilterScreen()));
           },
           child: Container(
             width: 44,
@@ -369,8 +272,11 @@ class _HomeScreenState extends State<HomeScreen> {
     return switch (level) {
       FoodStockLevel.safe => AppColors.primary,
       FoodStockLevel.watch => AppColors.warning,
-      FoodStockLevel.low =>
-        Color.lerp(AppColors.warning, AppColors.error, 0.45)!,
+      FoodStockLevel.low => Color.lerp(
+        AppColors.warning,
+        AppColors.error,
+        0.45,
+      )!,
       FoodStockLevel.critical => AppColors.error,
     };
   }
@@ -379,9 +285,11 @@ class _HomeScreenState extends State<HomeScreen> {
     return switch (level) {
       FoodStockLevel.safe => AppColors.primary.withValues(alpha: 0.14),
       FoodStockLevel.watch => AppColors.warning.withValues(alpha: 0.18),
-      FoodStockLevel.low =>
-        Color.lerp(AppColors.warning, AppColors.error, 0.45)!
-            .withValues(alpha: 0.16),
+      FoodStockLevel.low => Color.lerp(
+        AppColors.warning,
+        AppColors.error,
+        0.45,
+      )!.withValues(alpha: 0.16),
       FoodStockLevel.critical => AppColors.error.withValues(alpha: 0.16),
     };
   }
@@ -438,9 +346,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       backgroundColor: remaining == null
                           ? AppColors.selected
                           : ringColor.withValues(alpha: 0.18),
-                      color: remaining == null
-                          ? AppColors.primary
-                          : ringColor,
+                      color: remaining == null ? AppColors.primary : ringColor,
                       strokeCap: StrokeCap.round,
                     ),
                   ),
@@ -476,9 +382,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Text(
                         'Gün Kaldı',
                         style: TextStyle(
-                          color: remaining == null
-                              ? AppColors.text
-                              : ringColor,
+                          color: remaining == null ? AppColors.text : ringColor,
                           fontSize: 9,
                           fontWeight: FontWeight.w700,
                         ),
@@ -494,20 +398,29 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text(
-                    'Akıllı Planla 🐾',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.2,
-                      height: 1.1,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          'Akıllı Planla',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.sectionHeader,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(
+                        Icons.pets_rounded,
+                        size: 16,
+                        color: AppColors.primary,
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 4),
                   const Text(
-                    'Minik dostunun düzenli bakımını seninle planlar 💚',
+                    'Minik dostunun düzenli bakımını seninle planlar',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: AppColors.subText,
@@ -546,7 +459,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   fit: BoxFit.contain,
                   alignment: Alignment.center,
                   errorBuilder: (context, error, stackTrace) {
-                    return const Icon(Icons.rice_bowl_rounded, color: AppColors.primary, size: 48);
+                    return const Icon(
+                      Icons.rice_bowl_rounded,
+                      color: AppColors.primary,
+                      size: 48,
+                    );
                   },
                 ),
               ),
@@ -563,19 +480,12 @@ class _HomeScreenState extends State<HomeScreen> {
         const Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              'Size Özel Hizmetler',
-              style: TextStyle(
-                color: AppColors.primary,
-                fontSize: 16,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
+            Text('Size Özel Hizmetler', style: AppTextStyles.sectionHeader),
             SizedBox(width: 4),
-            Text('🐾', style: TextStyle(fontSize: 14)),
+            Icon(Icons.pets_rounded, size: 15, color: AppColors.primary),
           ],
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         SizedBox(
           height: 118,
           child: Row(
@@ -678,11 +588,12 @@ class _HomeScreenState extends State<HomeScreen> {
               Container(
                 width: 22,
                 height: 22,
-                decoration: BoxDecoration(
-                  color: color,
-                  shape: BoxShape.circle,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                child: const Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppColors.surface,
+                  size: 16,
                 ),
-                child: const Icon(Icons.chevron_right_rounded, color: AppColors.surface, size: 16),
               ),
             ],
           ),
@@ -717,7 +628,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   border: Border.all(color: AppColors.border),
                 ),
                 child: pet == null
-                    ? const Icon(Icons.pets_rounded, color: AppColors.primary, size: 16)
+                    ? const Icon(
+                        Icons.pets_rounded,
+                        color: AppColors.primary,
+                        size: 16,
+                      )
                     : Image.asset(
                         pet.imagePath,
                         fit: BoxFit.cover,
@@ -752,7 +667,10 @@ class _HomeScreenState extends State<HomeScreen> {
                             icon: Icons.calendar_month_rounded,
                             label: pet.shortAge,
                           ),
-                          _PetMeta(icon: Icons.pets_rounded, label: pet.species),
+                          _PetMeta(
+                            icon: Icons.pets_rounded,
+                            label: pet.species,
+                          ),
                           _PetMeta(
                             icon: Icons.monitor_weight_outlined,
                             label: pet.weight ?? '-',
@@ -770,10 +688,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 width: 92,
                 height: 26,
                 padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: const Text(
-                  'Dost Ekle',
-                  style: TextStyle(fontSize: 11),
-                ),
+                child: const Text('Dost Ekle', style: TextStyle(fontSize: 11)),
               ),
             ],
           ),
@@ -785,9 +700,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildPetMarket() {
     return GestureDetector(
       onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const PetMarketScreen()),
-        );
+        Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (_) => const PetMarketScreen()));
       },
       child: Container(
         height: 56,
@@ -806,22 +721,32 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: AppColors.selected,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.shopping_cart_outlined, color: AppColors.primary, size: 24),
+              child: const Icon(
+                Icons.shopping_cart_outlined,
+                color: AppColors.primary,
+                size: 24,
+              ),
             ),
             const SizedBox(width: 10),
             const Expanded(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    'Pet Market 🐾',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 19,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.2,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Pet Market',
+                        textAlign: TextAlign.center,
+                        style: AppTextStyles.sectionHeader,
+                      ),
+                      SizedBox(width: 4),
+                      Icon(
+                        Icons.pets_rounded,
+                        size: 17,
+                        color: AppColors.primary,
+                      ),
+                    ],
                   ),
                   Text(
                     'Binlerce ürün seni bekliyor',
@@ -843,7 +768,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: AppColors.primary,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.chevron_right_rounded, color: AppColors.surface, size: 18),
+              child: const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.surface,
+                size: 18,
+              ),
             ),
           ],
         ),

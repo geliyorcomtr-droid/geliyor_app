@@ -1,14 +1,18 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:geliyor_app/data/banner_repository.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/data/cat_feeding_guide.dart';
+import 'package:geliyor_app/data/dog_feeding_guide.dart';
 import 'package:geliyor_app/state/food_tracking_store.dart';
 import 'package:geliyor_app/state/pet_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
+import 'package:geliyor_app/widgets/app_banner_slider.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
 import 'package:geliyor_app/widgets/app_pressable_button.dart';
 import 'package:geliyor_app/widgets/cat_feeding_table.dart';
+import 'package:geliyor_app/widgets/dog_feeding_table.dart';
 
 class FoodTrackingScreen extends StatefulWidget {
   const FoodTrackingScreen({super.key});
@@ -21,42 +25,64 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
   int _weightKg = 10;
   DateTime _purchaseDate = DateTime.now();
   final TextEditingController _foodController = TextEditingController();
-  final TextEditingController _customKgController = TextEditingController();
+  String? _selectedPetName;
 
-  static const List<int> _weights = [1, 2, 3, 5, 10, 15];
+  static const int _minKg = 1;
+  static const int _maxKg = 19;
+
+  /// Akıllı Plan → Mama Takibi / Hangi Mama rengi.
+  static const Color _accent = Color(0xFF8B5CF6);
+
+  Color get _soft => _accent.withValues(alpha: 0.12);
+  Color get _line => _accent.withValues(alpha: 0.45);
+  Color get _lineSoft => _accent.withValues(alpha: 0.28);
+  Color get _buttonFill =>
+      Color.lerp(_accent, Colors.white, 0.28) ?? _accent;
+
+  TextStyle get _titleStyle => AppTextStyles.pageHeaderWith(
+        color: _accent,
+      );
+
+  TextStyle get _sectionTitleStyle => AppTextStyles.sectionHeaderWith(
+        color: _accent,
+      );
 
   @override
   void initState() {
     super.initState();
     final tracking = FoodTrackingStore.instance;
+    final pets = PetStore.instance.pets;
+    _selectedPetName =
+        tracking.petName ??
+        PetStore.instance.activePet?.name ??
+        (pets.isNotEmpty ? pets.first.name : null);
     if (!tracking.isActive) return;
     _foodController.text = tracking.foodName;
     _purchaseDate = tracking.purchaseDate;
-    final kg = tracking.bagKg;
-    if (kg == kg.roundToDouble() && _weights.contains(kg.round())) {
-      _weightKg = kg.round();
-    } else {
-      _weightKg = -1;
-      _customKgController.text = kg == kg.roundToDouble()
-          ? kg.toStringAsFixed(0)
-          : kg.toStringAsFixed(1).replaceAll('.', ',');
-    }
+    final kg = tracking.bagKg.round().clamp(_minKg, _maxKg);
+    _weightKg = kg;
   }
 
   @override
   void dispose() {
     _foodController.dispose();
-    _customKgController.dispose();
     super.dispose();
   }
 
   PetData? get _guidePet {
     final pets = PetStore.instance.pets;
-    for (final pet in pets) {
-      if (pet.species.toLowerCase().contains('kedi')) return pet;
+    final selectedName = _selectedPetName;
+    if (selectedName != null) {
+      for (final pet in pets) {
+        if (pet.name == selectedName) return pet;
+      }
     }
     return pets.isEmpty ? null : pets.first;
   }
+
+  bool get _isDog =>
+      _guidePet?.species.toLowerCase().contains('köpek') == true ||
+      _guidePet?.species.toLowerCase().contains('kopek') == true;
 
   CatFeedingRow? get _feedingRow {
     final pet = _guidePet;
@@ -66,28 +92,33 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
     return CatFeedingGuide.fromWeightLabel(pet.weight);
   }
 
-  double get _bagKg {
-    if (_weightKg > 0) return _weightKg.toDouble();
-    final typed = _customKgController.text.trim().replaceAll(',', '.');
-    return double.tryParse(typed) ?? 0;
+  DogFeedingRow? get _dogFeedingRow {
+    if (!_isDog) return null;
+    return DogFeedingGuide.fromSizeLabel(_guidePet?.ageRange);
   }
+
+  double get _bagKg => _weightKg.toDouble();
 
   int get _profileDailyGrams {
     final pet = _guidePet;
-    final row = _feedingRow;
-    if (pet == null || row == null) return 0;
-    return row.gramsFor(
-      bodyType: pet.bodyType,
-      activityLevel: pet.activityLevel,
-    );
+    if (pet == null) return 0;
+    if (pet.dailyFoodGrams != null && pet.dailyFoodGrams! > 0) {
+      return pet.dailyFoodGrams!;
+    }
+    if (_isDog) {
+      return _dogFeedingRow?.gramsFor(pet.activityLevel) ?? 0;
+    }
+    return _feedingRow?.gramsFor(
+          bodyType: pet.bodyType,
+          activityLevel: pet.activityLevel,
+        ) ??
+        0;
   }
 
   int get _estimatedDays {
     if (_bagKg <= 0) return 0;
-    final row = _feedingRow;
-    if (row != null) {
-      return row.daysForBagKg(_bagKg, daily: _profileDailyGrams);
-    }
+    final daily = _profileDailyGrams;
+    if (daily > 0) return ((_bagKg * 1000) / daily).round();
     return (_bagKg * 2.4).round().clamp(7, 120);
   }
 
@@ -129,7 +160,7 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: const ColorScheme.light(
-              primary: AppColors.primary,
+              primary: _accent,
               onPrimary: AppColors.surface,
               surface: AppColors.surface,
               onSurface: AppColors.text,
@@ -160,76 +191,102 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-              const Text(
-                'Mamanız bitmeden sizi haberdar edelim.',
-                style: TextStyle(
-                  color: AppColors.subText,
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 12),
-              _buildBanner(),
-              const SizedBox(height: 14),
-              _buildFoodSection(),
-              const SizedBox(height: 14),
-              _buildWeightSection(),
-              const SizedBox(height: 14),
-              _buildDateSection(),
-              const SizedBox(height: 14),
-              _buildEstimateCard(),
-              const SizedBox(height: 12),
-              CatFeedingTableCard(
-                highlighted: _feedingRow,
-                bodyType: _guidePet?.bodyType,
-                activityLevel: _guidePet?.activityLevel,
-              ),
-              const SizedBox(height: 12),
-              AppPressableButton.primary(
-                onTap: () {
-                  final bagKg = _bagKg;
-                  if (bagKg <= 0) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Lütfen mama kilosunu girin.'),
-                        backgroundColor: AppColors.error,
-                      ),
-                    );
-                    return;
-                  }
-                  FoodTrackingStore.instance.start(
-                    foodName: _foodController.text,
-                    bagKg: bagKg,
-                    purchaseDate: _purchaseDate,
-                  );
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Mama takibi başlatıldı. Manuel kg esas alındı.'),
-                      backgroundColor: AppColors.primary,
+                  const Text(
+                    'Mamanız bitmeden sizi haberdar edelim.',
+                    style: TextStyle(
+                      color: AppColors.subText,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w500,
                     ),
-                  );
-                  Navigator.of(context).maybePop();
-                },
-                width: double.infinity,
-                height: 48,
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.pets_rounded, size: 18),
-                    SizedBox(width: 8),
-                    Text(
-                      'Takibi Başlat',
-                      style: TextStyle(
-                        fontSize: 15,
+                  ),
+                  const SizedBox(height: 12),
+                  _buildBanner(),
+                  const SizedBox(height: 14),
+                  _buildPetSection(),
+                  const SizedBox(height: 14),
+                  _buildFoodSection(),
+                  const SizedBox(height: 14),
+                  _buildWeightSection(),
+                  const SizedBox(height: 14),
+                  _buildDateSection(),
+                  const SizedBox(height: 14),
+                  _buildEstimateCard(),
+                  const SizedBox(height: 12),
+                  CatFeedingTableCard(
+                    highlighted: _isDog ? null : _feedingRow,
+                    bodyType: _isDog ? null : _guidePet?.bodyType,
+                    activityLevel: _isDog ? null : _guidePet?.activityLevel,
+                  ),
+                  const SizedBox(height: 10),
+                  DogFeedingTableCard(
+                    highlighted: _isDog ? _dogFeedingRow : null,
+                    activityLevel: _isDog ? _guidePet?.activityLevel : null,
+                  ),
+                  const SizedBox(height: 12),
+                  AppPressableButton(
+                    onTap: () {
+                      final bagKg = _bagKg;
+                      if (bagKg <= 0) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Lütfen mama kilosunu girin.'),
+                            backgroundColor: AppColors.error,
+                          ),
+                        );
+                        return;
+                      }
+                      FoodTrackingStore.instance.start(
+                        foodName: _foodController.text,
+                        bagKg: bagKg,
+                        purchaseDate: _purchaseDate,
+                        petName: _guidePet?.name,
+                        petSpecies: _guidePet?.species,
+                      );
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Mama takibi başlatıldı. Manuel kg esas alındı.',
+                          ),
+                          backgroundColor: _accent,
+                        ),
+                      );
+                      Navigator.of(context).maybePop();
+                    },
+                    width: double.infinity,
+                    height: 48,
+                    backgroundColor: _buttonFill,
+                    pressedBackgroundColor: _accent,
+                    foregroundColor: AppColors.surface,
+                    pressedForegroundColor: AppColors.surface,
+                    borderColor: _buttonFill,
+                    pressedBorderColor: _accent,
+                    builder: (pressed) => DefaultTextStyle.merge(
+                      style: const TextStyle(
+                        color: AppColors.surface,
                         fontWeight: FontWeight.w900,
                       ),
+                      child: IconTheme.merge(
+                        data: const IconThemeData(color: AppColors.surface),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.pets_rounded, size: 18),
+                            SizedBox(width: 8),
+                            Text(
+                              'Takibi Başlat',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
-          ),
-        );
+            );
           },
         ),
         navbar: const AppBottomNavbar(),
@@ -243,7 +300,7 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
       child: Row(
         children: [
           const AppBackButton(),
-          const Expanded(
+          Expanded(
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -252,11 +309,11 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
                     'Mama Takibini Başlat',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.pageHeader,
+                    style: _titleStyle,
                   ),
                 ),
-                SizedBox(width: 4),
-                Icon(Icons.pets_rounded, color: AppColors.primary, size: 16),
+                const SizedBox(width: 4),
+                const Icon(Icons.pets_rounded, color: _accent, size: 16),
               ],
             ),
           ),
@@ -267,31 +324,9 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
   }
 
   Widget _buildBanner() {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Image.asset(
-          'assets/images/mama_takibi_banner.png',
-          width: double.infinity,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            return Container(
-              height: 140,
-              color: AppColors.selected,
-              alignment: Alignment.center,
-              child: const Icon(
-                Icons.pets_rounded,
-                color: AppColors.primary,
-                size: 40,
-              ),
-            );
-          },
-        ),
-      ),
+    return const AppBannerSlot(
+      placement: BannerPlacement.foodTracking,
+      fallbackAssets: ['assets/images/mama_takibi_banner.png'],
     );
   }
 
@@ -303,7 +338,7 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
           height: 22,
           alignment: Alignment.center,
           decoration: const BoxDecoration(
-            color: AppColors.primary,
+            color: _accent,
             shape: BoxShape.circle,
           ),
           child: Text(
@@ -317,15 +352,90 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
           ),
         ),
         const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            title,
-            style: const TextStyle(
-              color: AppColors.text,
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-            ),
+        Expanded(child: Text(title, style: _sectionTitleStyle)),
+      ],
+    );
+  }
+
+  Widget _buildPetSection() {
+    final pets = PetStore.instance.pets;
+    if (pets.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: _soft,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: _lineSoft),
+        ),
+        child: const Text(
+          'Önce Dost Ekle sayfasından dostunuzu kaydedin.',
+          style: TextStyle(
+            color: AppColors.subText,
+            fontSize: 11.5,
+            fontWeight: FontWeight.w600,
           ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Takip edilecek dost',
+          style: TextStyle(
+            color: _accent,
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final pet in pets)
+              GestureDetector(
+                onTap: () => setState(() => _selectedPetName = pet.name),
+                child: Container(
+                  height: 34,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: _selectedPetName == pet.name
+                        ? _accent
+                        : AppColors.surface,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: _selectedPetName == pet.name ? _accent : _lineSoft,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.pets_rounded,
+                        size: 14,
+                        color: _selectedPetName == pet.name
+                            ? AppColors.surface
+                            : _accent,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        '${pet.name} · ${pet.species}',
+                        style: TextStyle(
+                          color: _selectedPetName == pet.name
+                              ? AppColors.surface
+                              : AppColors.text,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
         ),
       ],
     );
@@ -343,15 +453,20 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: _lineSoft),
           ),
           child: Row(
             children: [
-              const Icon(Icons.search_rounded, color: AppColors.primary, size: 20),
+              const Icon(
+                Icons.search_rounded,
+                color: _accent,
+                size: 20,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: TextField(
                   controller: _foodController,
+                  cursorColor: _accent,
                   decoration: const InputDecoration(
                     hintText: 'Mama markası veya adı yazın',
                     hintStyle: TextStyle(
@@ -371,27 +486,44 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
               ),
               const Icon(
                 Icons.qr_code_scanner_rounded,
-                color: AppColors.primary,
+                color: _accent,
                 size: 20,
               ),
             ],
           ),
         ),
         const SizedBox(height: 8),
-        AppPressableButton.soft(
+        AppPressableButton(
           onTap: () {},
           width: double.infinity,
           padding: const EdgeInsets.symmetric(vertical: 12),
-          child: const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.photo_camera_outlined, size: 18),
-              SizedBox(width: 8),
-              Text(
-                'Mama paketini fotoğraflayın',
-                style: TextStyle(fontSize: 12.5),
+          backgroundColor: _soft,
+          pressedBackgroundColor: _accent,
+          foregroundColor: _accent,
+          pressedForegroundColor: AppColors.surface,
+          borderColor: _lineSoft,
+          pressedBorderColor: _accent,
+          builder: (pressed) => DefaultTextStyle.merge(
+            style: TextStyle(
+              color: pressed ? AppColors.surface : _accent,
+              fontWeight: FontWeight.w800,
+            ),
+            child: IconTheme.merge(
+              data: IconThemeData(
+                color: pressed ? AppColors.surface : _accent,
               ),
-            ],
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.photo_camera_outlined, size: 18),
+                  SizedBox(width: 8),
+                  Text(
+                    'Mama paketini fotoğraflayın',
+                    style: TextStyle(fontSize: 12.5),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ],
@@ -404,84 +536,198 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
       children: [
         _sectionTitle(2, 'Ne kadar mama aldınız?'),
         const SizedBox(height: 8),
-        Row(
-          children: [
-            for (var i = 0; i < _weights.length; i++) ...[
-              if (i > 0) const SizedBox(width: 5),
-              Expanded(child: _weightChip(_weights[i])),
+        _buildWeightDropdown(
+          value: '$_weightKg kg',
+          placeholder: 'Kilo seç',
+          onTap: () => _openSelectSheet(
+            title: 'Mama kilosu',
+            options: [
+              for (var kg = _minKg; kg <= _maxKg; kg++) '$kg kg',
             ],
-            const SizedBox(width: 5),
-            Expanded(child: _weightChip(-1, label: 'Diğer')),
-          ],
-        ),
-        if (_weightKg < 0) ...[
-          const SizedBox(height: 8),
-          Container(
-            height: 44,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: TextField(
-              controller: _customKgController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              onChanged: (_) => setState(() {}),
-              decoration: const InputDecoration(
-                hintText: 'Kaç kg? (ör. 4,5)',
-                hintStyle: TextStyle(
-                  color: AppColors.subText,
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w500,
-                ),
-                border: InputBorder.none,
-                isDense: true,
-                suffixText: 'kg',
-                suffixStyle: TextStyle(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              style: const TextStyle(
-                color: AppColors.text,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+            selected: '$_weightKg kg',
+            onSelect: (value) {
+              final parsed = int.tryParse(value.replaceAll(' kg', ''));
+              if (parsed != null) {
+                setState(() => _weightKg = parsed.clamp(_minKg, _maxKg));
+              }
+            },
           ),
-        ],
+        ),
       ],
     );
   }
 
-  Widget _weightChip(int kg, {String? label}) {
-    final selected = _weightKg == kg;
-    return GestureDetector(
-      onTap: () => setState(() => _weightKg = kg),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 120),
-        height: 32,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: selected ? AppColors.primary : AppColors.surface,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-            color: selected ? AppColors.primary : AppColors.border,
+  Widget _buildWeightDropdown({
+    required String? value,
+    required String placeholder,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Ink(
+          height: 36,
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: _lineSoft),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-        ),
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(
-            label ?? '$kg kg',
-            style: TextStyle(
-              color: selected ? AppColors.surface : AppColors.text,
-              fontSize: 10.5,
-              fontWeight: FontWeight.w800,
-            ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  value ?? placeholder,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: value == null ? AppColors.subText : AppColors.text,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: _accent,
+                size: 22,
+              ),
+            ],
           ),
         ),
       ),
+    );
+  }
+
+  Future<void> _openSelectSheet({
+    required String title,
+    required List<String> options,
+    required String? selected,
+    required ValueChanged<String> onSelect,
+  }) async {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withValues(alpha: 0.28),
+      builder: (sheetContext) {
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 36),
+            child: Material(
+              color: AppColors.surface,
+              elevation: 8,
+              shadowColor: Colors.black.withValues(alpha: 0.18),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+                side: BorderSide(color: _lineSoft),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: AppPageFrame.width - 72,
+                  maxHeight: 280,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              title,
+                              style: const TextStyle(
+                                color: AppColors.text,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () => Navigator.of(sheetContext).pop(),
+                            child: const Icon(
+                              Icons.close_rounded,
+                              color: AppColors.subText,
+                              size: 18,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Flexible(
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          padding: EdgeInsets.zero,
+                          itemCount: options.length,
+                          separatorBuilder: (_, _) => Divider(
+                            height: 1,
+                            thickness: 1,
+                            color: _lineSoft,
+                          ),
+                          itemBuilder: (context, index) {
+                            final option = options[index];
+                            final isSelected = selected == option;
+                            return Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: () {
+                                  onSelect(option);
+                                  Navigator.of(sheetContext).pop();
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 10,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          option,
+                                          style: TextStyle(
+                                            color: isSelected
+                                                ? _accent
+                                                : AppColors.text,
+                                            fontSize: 12.5,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                        ),
+                                      ),
+                                      Icon(
+                                        isSelected
+                                            ? Icons.radio_button_checked
+                                            : Icons.radio_button_unchecked,
+                                        color: isSelected
+                                            ? _accent
+                                            : _lineSoft,
+                                        size: 18,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -499,13 +745,13 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
             decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: _lineSoft),
             ),
             child: Row(
               children: [
                 const Icon(
                   Icons.calendar_month_rounded,
-                  color: AppColors.primary,
+                  color: _accent,
                   size: 20,
                 ),
                 const SizedBox(width: 10),
@@ -521,7 +767,7 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
                 ),
                 const Icon(
                   Icons.keyboard_arrow_down_rounded,
-                  color: AppColors.subText,
+                  color: _accent,
                   size: 22,
                 ),
               ],
@@ -534,21 +780,31 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
 
   Widget _buildEstimateCard() {
     final row = _feedingRow;
+    final dogRow = _dogFeedingRow;
     final pet = _guidePet;
     final remaining = (_remainingRatio * 100).round();
     final daily = _profileDailyGrams;
-    final hint = row != null && pet != null && daily > 0
-        ? '${pet.name} (${pet.weight}, ${CatFeedingGuide.profileLabel(bodyType: pet.bodyType, activityLevel: pet.activityLevel)}) '
-            'için günde $daily g, 30 günde ${row.monthlyFor(daily)}. '
-            '${_bagKg.toStringAsFixed(0)} kg mama yaklaşık $_estimatedDays gün yeter.'
-        : 'Tahmin kilo, vücut tipi ve aktiviteye göre hesaplanır.';
+    final monthlyKg = (daily * 30 / 1000)
+        .toStringAsFixed(2)
+        .replaceAll('.', ',');
+    final hint = pet != null && daily > 0
+        ? _isDog && dogRow != null
+              ? '${pet.name} (${dogRow.size}, ${DogFeedingGuide.normalizeActivity(pet.activityLevel)} aktivite) '
+                    'için tablo aralığı ${dogRow.rangeFor(pet.activityLevel)}, tahmini günlük $daily g ve 30 günde $monthlyKg kg. '
+                    '${_bagKg.toStringAsFixed(0)} kg mama yaklaşık $_estimatedDays gün yeter.'
+              : row != null
+              ? '${pet.name} (${pet.weight}, ${CatFeedingGuide.profileLabel(bodyType: pet.bodyType, activityLevel: pet.activityLevel)}) '
+                    'için günde $daily g, 30 günde ${row.monthlyFor(daily)}. '
+                    '${_bagKg.toStringAsFixed(0)} kg mama yaklaşık $_estimatedDays gün yeter.'
+              : 'Dostun bilgileriyle günlük tüketim hesaplanamadı.'
+        : 'Tahmin dostun boyutu, kilosu ve aktivitesine göre hesaplanır.';
 
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.selected,
+        color: _soft,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: _line),
       ),
       child: Column(
         children: [
@@ -562,7 +818,7 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
                       children: [
                         Icon(
                           Icons.eco_rounded,
-                          color: AppColors.primary,
+                          color: _accent,
                           size: 16,
                         ),
                         SizedBox(width: 4),
@@ -580,7 +836,7 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
                     Text(
                       _formatDate(_estimatedEnd),
                       style: const TextStyle(
-                        color: AppColors.primary,
+                        color: _accent,
                         fontSize: 16,
                         fontWeight: FontWeight.w900,
                       ),
@@ -600,15 +856,15 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
                       child: CircularProgressIndicator(
                         value: _remainingRatio,
                         strokeWidth: 5,
-                        backgroundColor: AppColors.border,
-                        color: AppColors.primary,
+                        backgroundColor: _lineSoft,
+                        color: _accent,
                         strokeCap: StrokeCap.round,
                       ),
                     ),
                     Text(
                       '%$remaining',
                       style: const TextStyle(
-                        color: AppColors.primary,
+                        color: _accent,
                         fontSize: 12,
                         fontWeight: FontWeight.w900,
                       ),
@@ -623,7 +879,7 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
             children: [
               const Icon(
                 Icons.info_outline_rounded,
-                color: AppColors.primary,
+                color: _accent,
                 size: 14,
               ),
               const SizedBox(width: 6),
@@ -631,7 +887,7 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
                 child: Text(
                   hint,
                   style: const TextStyle(
-                    color: AppColors.primary,
+                    color: _accent,
                     fontSize: 10.5,
                     fontWeight: FontWeight.w600,
                   ),

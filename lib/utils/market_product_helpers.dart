@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:geliyor_app/data/pet_market_catalog.dart';
 import 'package:geliyor_app/utils/product_price.dart';
+import 'package:geliyor_app/utils/product_skt.dart';
 import 'package:geliyor_app/widgets/market_product_card.dart';
 
 Widget marketProductListCard({
@@ -49,7 +50,7 @@ MarketProductData buildSimpleMarketProduct({
   List<double>? prices,
   List<double>? oldPrices,
   String brand = 'Pro Plan',
-  String expiryLabel = 'SKT: 12.2027',
+  String expiryLabel = 'SKT: —',
   int? discount,
 }) {
   final disc =
@@ -70,6 +71,7 @@ MarketProductData buildSimpleMarketProduct({
     oldPrices: oldPrices ?? [oldPrice],
     features: petMarketCatFeatures,
     brand: brand,
-    expiryLabel: expiryLabel,
+    skt: ProductSkt.display(expiryLabel),
+    expiryLabel: ProductSkt.label(expiryLabel),
   );
 }

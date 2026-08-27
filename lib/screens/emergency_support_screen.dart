@@ -1,8 +1,10 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:geliyor_app/data/banner_repository.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
+import 'package:geliyor_app/widgets/app_banner_slider.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
 
@@ -23,8 +25,7 @@ class _EmergencySupportScreenState extends State<EmergencySupportScreen> {
       color: Color(0xFFE60000),
       soft: Color(0xFFFFF7F7),
       detailTitle: 'Zehirlenme Şüphesi',
-      detailSubtitle:
-          'Yaygın toksik maddelere ve belirtilere dikkat edin.',
+      detailSubtitle: 'Yaygın toksik maddelere ve belirtilere dikkat edin.',
       symptoms: ['Ağız salyası', 'Kusma', 'Titreme', 'Halsizlik'],
       doList: [
         'Hayvanı sakin ve güvenli alana alın.',
@@ -43,9 +44,13 @@ class _EmergencySupportScreenState extends State<EmergencySupportScreen> {
       color: Color(0xFFFF6600),
       soft: Color(0xFFFFF9F4),
       detailTitle: 'Kusma Durumu',
-      detailSubtitle:
-          'Sıklık, içerik ve genel durumu takip edin.',
-      symptoms: ['Tekrarlayan kusma', 'İştahsızlık', 'Halsizlik', 'Dehidrasyon'],
+      detailSubtitle: 'Sıklık, içerik ve genel durumu takip edin.',
+      symptoms: [
+        'Tekrarlayan kusma',
+        'İştahsızlık',
+        'Halsizlik',
+        'Dehidrasyon',
+      ],
       doList: [
         'Su ve mamayı kısa süre kesin.',
         'Kusma sıklığını ve içeriğini not edin.',
@@ -63,8 +68,7 @@ class _EmergencySupportScreenState extends State<EmergencySupportScreen> {
       color: AppColors.primary,
       soft: Color(0xFFF7FBFF),
       detailTitle: 'Nefes Darlığı',
-      detailSubtitle:
-          'Nefes almada zorlanma acil müdahale gerektirir.',
+      detailSubtitle: 'Nefes almada zorlanma acil müdahale gerektirir.',
       symptoms: ['Hızlı nefes', 'Açık ağız', 'Mavi diş eti', 'Huzursuzluk'],
       doList: [
         'Serin ve sakin ortama alın.',
@@ -83,8 +87,7 @@ class _EmergencySupportScreenState extends State<EmergencySupportScreen> {
       color: Color(0xFF00A859),
       soft: Color(0xFFF6FBF8),
       detailTitle: 'Yaralanma',
-      detailSubtitle:
-          'Kanama ve kırık şüphesinde hızlı ve sakin hareket edin.',
+      detailSubtitle: 'Kanama ve kırık şüphesinde hızlı ve sakin hareket edin.',
       symptoms: ['Kanama', 'Topallama', 'Şişlik', 'Ağrı belirtisi'],
       doList: [
         'Temiz bezle hafif baskı uygulayın.',
@@ -103,8 +106,7 @@ class _EmergencySupportScreenState extends State<EmergencySupportScreen> {
       color: Color(0xFF9B4DCA),
       soft: Color(0xFFFBF7FF),
       detailTitle: 'Yabancı Cisim Yutma',
-      detailSubtitle:
-          'Oyuncak, kemik veya ip yutma şüphesinde dikkatli olun.',
+      detailSubtitle: 'Oyuncak, kemik veya ip yutma şüphesinde dikkatli olun.',
       symptoms: ['Kusma', 'İştahsızlık', 'Karın ağrısı', 'Kabızlık'],
       doList: [
         'Yuttuğu cismin ne olduğunu belirleyin.',
@@ -211,32 +213,9 @@ class _EmergencySupportScreenState extends State<EmergencySupportScreen> {
   }
 
   Widget _buildBanner() {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.border, width: 1.3),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Image.asset(
-        'assets/images/acil_destek_banner.png',
-        width: double.infinity,
-        fit: BoxFit.fitWidth,
-        alignment: Alignment.center,
-        errorBuilder: (context, error, stackTrace) {
-          return Container(
-            height: 120,
-            color: AppColors.selected,
-            alignment: Alignment.center,
-            child: const Icon(
-              Icons.emergency_outlined,
-              color: AppColors.primary,
-              size: 36,
-            ),
-          );
-        },
-      ),
+    return const AppBannerSlot(
+      placement: BannerPlacement.emergency,
+      fallbackAssets: ['assets/images/acil_destek_banner.png'],
     );
   }
 
@@ -257,8 +236,7 @@ class _EmergencySupportScreenState extends State<EmergencySupportScreen> {
   Widget _buildProblemChip(int index) {
     final item = _cases[index];
     final selected = _selectedIndex == index;
-    final softBorder =
-        Color.lerp(item.color, Colors.white, 0.55) ?? item.color;
+    final softBorder = Color.lerp(item.color, Colors.white, 0.55) ?? item.color;
     return GestureDetector(
       onTap: () => setState(() => _selectedIndex = index),
       child: Container(
@@ -364,8 +342,10 @@ class _EmergencySupportScreenState extends State<EmergencySupportScreen> {
             children: [
               for (final s in item.symptoms)
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 5,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.surface,
                     borderRadius: BorderRadius.circular(999),
@@ -418,11 +398,7 @@ class _EmergencySupportScreenState extends State<EmergencySupportScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          Container(
-            width: double.infinity,
-            height: 1,
-            color: AppColors.border,
-          ),
+          Container(width: double.infinity, height: 1, color: AppColors.border),
           const SizedBox(height: 8),
           _thinSectionBox(
             color: AppColors.error,
@@ -574,7 +550,11 @@ class _EmergencySupportScreenState extends State<EmergencySupportScreen> {
       ),
       child: const Row(
         children: [
-          Icon(Icons.lightbulb_outline_rounded, color: AppColors.primary, size: 20),
+          Icon(
+            Icons.lightbulb_outline_rounded,
+            color: AppColors.primary,
+            size: 20,
+          ),
           SizedBox(width: 8),
           Expanded(
             child: Column(
