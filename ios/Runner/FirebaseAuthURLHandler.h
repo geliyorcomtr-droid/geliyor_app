@@ -3,8 +3,8 @@
 NS_ASSUME_NONNULL_BEGIN
 
 @interface FirebaseAuthURLHandler : NSObject
-+ (BOOL)handleURL:(NSURL *)url;
-+ (BOOL)handleNotification:(NSDictionary *)userInfo;
++ (BOOL)handleIncomingURL:(NSURL *)url;
++ (BOOL)handleRemoteNotification:(NSDictionary *)userInfo;
 @end
 
 NS_ASSUME_NONNULL_END

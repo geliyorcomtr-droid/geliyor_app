@@ -20,7 +20,7 @@ import UIKit
     open url: URL,
     options: [UIApplication.OpenURLOptionsKey: Any] = [:]
   ) -> Bool {
-    if FirebaseAuthURLHandler.handleURL(url) {
+    if FirebaseAuthURLHandler.handleIncomingURL(url) {
       return true
     }
     return super.application(app, open: url, options: options)
@@ -31,7 +31,7 @@ import UIKit
     didReceiveRemoteNotification userInfo: [AnyHashable: Any],
     fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
   ) {
-    if FirebaseAuthURLHandler.handleNotification(userInfo) {
+    if FirebaseAuthURLHandler.handleRemoteNotification(userInfo) {
       completionHandler(.noData)
       return
     }

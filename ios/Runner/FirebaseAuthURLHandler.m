@@ -2,7 +2,7 @@
 
 @implementation FirebaseAuthURLHandler
 
-+ (BOOL)handleURL:(NSURL *)url {
++ (BOOL)handleIncomingURL:(NSURL *)url {
   Class authClass = NSClassFromString(@"FIRAuth");
   if (authClass == nil) {
     return NO;
@@ -31,7 +31,7 @@
   return handled;
 }
 
-+ (BOOL)handleNotification:(NSDictionary *)userInfo {
++ (BOOL)handleRemoteNotification:(NSDictionary *)userInfo {
   Class authClass = NSClassFromString(@"FIRAuth");
   if (authClass == nil) {
     return NO;

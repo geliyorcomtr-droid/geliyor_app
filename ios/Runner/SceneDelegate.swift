@@ -7,7 +7,7 @@ class SceneDelegate: FlutterSceneDelegate {
     openURLContexts URLContexts: Set<UIOpenURLContext>
   ) {
     for context in URLContexts {
-      _ = FirebaseAuthURLHandler.handleURL(context.url)
+      _ = FirebaseAuthURLHandler.handleIncomingURL(context.url)
     }
     super.scene(scene, openURLContexts: URLContexts)
   }
