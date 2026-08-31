@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geliyor_app/firebase_options.dart';
 import 'package:geliyor_app/screens/splash_screen.dart';
+import 'package:geliyor_app/services/food_reminder_sync.dart';
+import 'package:geliyor_app/services/push_service.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/widgets/mobile_web_shell.dart';
 
@@ -11,6 +13,8 @@ Future<void> main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  await PushService.instance.start();
+  FoodReminderSync.start();
 
   // Durum çubuğu (saat / Wi‑Fi) ile uygulama aynı zeminde görünsün;
   // gri şerit “sayfa üstünde sayfa” etkisini kaldırır.

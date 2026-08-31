@@ -314,6 +314,9 @@ class AdminOrder {
     this.paymentMethod = '',
     this.deliverySlot = '',
     this.createdAt,
+    this.smsCreatedAt,
+    this.smsDeliveredAt,
+    this.smsLastError = '',
   });
 
   final String id;
@@ -328,6 +331,9 @@ class AdminOrder {
   final String paymentMethod;
   final String deliverySlot;
   final DateTime? createdAt;
+  final DateTime? smsCreatedAt;
+  final DateTime? smsDeliveredAt;
+  final String smsLastError;
 
   int get itemCount => items.fold(0, (sum, item) => sum + item.quantity);
 
@@ -358,6 +364,13 @@ class AdminOrder {
       paymentMethod: (d[OrderFields.paymentMethod] as String?) ?? '',
       deliverySlot: (d[OrderFields.deliverySlot] as String?) ?? '',
       createdAt: created is Timestamp ? created.toDate() : null,
+      smsCreatedAt: d[OrderFields.smsCreatedAt] is Timestamp
+          ? (d[OrderFields.smsCreatedAt] as Timestamp).toDate()
+          : null,
+      smsDeliveredAt: d[OrderFields.smsDeliveredAt] is Timestamp
+          ? (d[OrderFields.smsDeliveredAt] as Timestamp).toDate()
+          : null,
+      smsLastError: (d[OrderFields.smsLastError] as String?) ?? '',
     );
   }
 }

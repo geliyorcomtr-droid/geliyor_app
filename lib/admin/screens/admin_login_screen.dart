@@ -104,12 +104,22 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                         ),
                         const SizedBox(height: 6),
                         const Text(
-                          'Admin Paneli',
+                          'Yönetim paneli v2',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: AppColors.text,
                             fontSize: 18,
                             fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Sipariş · Ürün · Üye · Kampanya · Banner',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: AppColors.subText,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                         const SizedBox(height: 24),
@@ -228,12 +238,8 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                             border: Border.all(color: AppColors.border),
                           ),
                           child: const Text(
-                            'Oturumun açık kalması için paneli her zaman aynı '
-                            'adresten açın:\n'
-                            'flutter run -d chrome -t lib/admin/main_admin.dart '
-                            '--web-port 5000\n\n'
-                            'Port değişirse tarayıcı oturumu yeni adres sayar ve '
-                            'giriş tekrar sorulur.',
+                            'Oturumun açık kalması için paneli her zaman '
+                            'https://geliyortrapp.web.app adresinden açın.',
                             style: TextStyle(
                               color: AppColors.subText,
                               fontSize: 11,

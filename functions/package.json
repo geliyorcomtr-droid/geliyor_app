@@ -1,0 +1,13 @@
+{
+  "name": "geliyor-functions",
+  "description": "NetGSM SMS for geliyor.tr",
+  "engines": {
+    "node": "22"
+  },
+  "main": "index.js",
+  "private": true,
+  "dependencies": {
+    "firebase-admin": "^13.4.0",
+    "firebase-functions": "^6.4.0"
+  }
+}

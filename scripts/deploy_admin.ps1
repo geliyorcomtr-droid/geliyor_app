@@ -4,16 +4,42 @@
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path $PSScriptRoot -Parent)
 
-Write-Host "Admin panel web build basliyor..." -ForegroundColor Cyan
+$stamp = Get-Date -Format "yyyyMMddHHmmss"
+Write-Host "Admin panel web build basliyor (v=$stamp)..." -ForegroundColor Cyan
 flutter build web `
   -t lib/admin/main_admin.dart `
   --release `
-  --no-wasm-dry-run
+  --no-wasm-dry-run `
+  --web-define=CACHE_BUST=$stamp
 
 if ($LASTEXITCODE -ne 0) {
   Write-Host "Build basarisiz." -ForegroundColor Red
   exit 1
 }
+
+$killSwitch = @'
+'use strict';
+self.addEventListener('install', function () { self.skipWaiting(); });
+self.addEventListener('activate', function (event) {
+  event.waitUntil((async function () {
+    try {
+      var keys = await caches.keys();
+      await Promise.all(keys.map(function (k) { return caches.delete(k); }));
+    } catch (e) {}
+    try { await self.registration.unregister(); } catch (e) {}
+    try {
+      var clients = await self.clients.matchAll({ type: 'window' });
+      await Promise.all(clients.map(function (client) {
+        if (client.url && client.navigate) return client.navigate(client.url);
+      }));
+    } catch (e) {}
+  })());
+});
+'@
+[System.IO.File]::WriteAllText(
+  (Join-Path (Get-Location) "build\web\flutter_service_worker.js"),
+  $killSwitch
+)
 
 Write-Host "Firebase Hosting deploy basliyor..." -ForegroundColor Cyan
 firebase deploy --only hosting --project geliyortrapp

@@ -283,6 +283,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               icon: const Icon(Icons.chat_outlined, size: 18),
               label: const Text('Talepler'),
             ),
+            FilledButton.tonalIcon(
+              onPressed: () => _open(AdminPage.broadcasts),
+              icon: const Icon(Icons.notifications_active_outlined, size: 18),
+              label: const Text('Duyuru'),
+            ),
           ],
         ),
         const SizedBox(height: 18),

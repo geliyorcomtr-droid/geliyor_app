@@ -8,11 +8,13 @@ class FirestoreCollections {
   static const reviews = 'reviews';
   static const banners = 'banners';
   static const campaigns = 'campaigns';
+  static const broadcasts = 'broadcasts';
   static const supportTickets = 'support_tickets';
   static const categories = 'categories';
   static const brands = 'brands';
   static const trustBadges = 'trust_badges';
   static const productAdvantages = 'product_advantages';
+  static const settings = 'settings';
 }
 
 /// `users/{uid}` alanları
@@ -36,6 +38,45 @@ class UserFields {
   static const riskyCustomer = 'risky_customer';
   static const active = 'active';
   static const createdTime = 'created_time';
+  static const updatedAt = 'updatedAt';
+  static const smsWelcomeAt = 'smsWelcomeAt';
+  static const smsWelcomeJobId = 'smsWelcomeJobId';
+  static const smsLastError = 'smsLastError';
+}
+
+class NotificationFields {
+  NotificationFields._();
+
+  static const title = 'title';
+  static const body = 'body';
+  static const category = 'category';
+  static const unread = 'unread';
+  static const createdAt = 'createdAt';
+  static const data = 'data';
+}
+
+class FcmTokenFields {
+  FcmTokenFields._();
+
+  static const token = 'token';
+  static const platform = 'platform';
+  static const updatedAt = 'updatedAt';
+}
+
+class FoodReminderFields {
+  FoodReminderFields._();
+
+  static const collection = 'food_reminders';
+  static const currentId = 'current';
+  static const enabled = 'enabled';
+  static const prefsEnabled = 'prefsEnabled';
+  static const daysBefore = 'daysBefore';
+  static const reminderDate = 'reminderDate';
+  static const estimatedEndDate = 'estimatedEndDate';
+  static const remainingDays = 'remainingDays';
+  static const petName = 'petName';
+  static const foodTitle = 'foodTitle';
+  static const sentFor = 'sentFor';
   static const updatedAt = 'updatedAt';
 }
 
@@ -93,6 +134,11 @@ class OrderFields {
   static const createdAt = 'createdAt';
   static const updatedAt = 'updatedAt';
   static const statusMessage = 'statusMessage';
+  static const smsCreatedAt = 'smsCreatedAt';
+  static const smsCreatedJobId = 'smsCreatedJobId';
+  static const smsDeliveredAt = 'smsDeliveredAt';
+  static const smsDeliveredJobId = 'smsDeliveredJobId';
+  static const smsLastError = 'smsLastError';
 }
 
 /// Sipariş durumları

@@ -51,3 +51,5 @@ android/key.properties
 
 # Local secrets
 assets/config/gemini_api_key.txt
+functions/.env
+functions/.env.*

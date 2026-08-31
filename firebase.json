@@ -3,6 +3,19 @@
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
   },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ]
+    }
+  ],
   "storage": {
     "rules": "storage.rules"
   },
@@ -15,7 +28,16 @@
     ],
     "headers": [
       {
-        "source": "**/*.@(js|wasm|css|png|jpg|jpeg|gif|webp|svg|ico|woff|woff2|ttf)",
+        "source": "**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "**/*.@(png|jpg|jpeg|gif|webp|svg|ico|woff|woff2|ttf|otf)",
         "headers": [
           {
             "key": "Cache-Control",
@@ -24,11 +46,15 @@
         ]
       },
       {
-        "source": "index.html",
+        "source": "/flutter_service_worker.js",
         "headers": [
           {
             "key": "Cache-Control",
-            "value": "no-cache"
+            "value": "no-cache, no-store, must-revalidate"
+          },
+          {
+            "key": "Clear-Site-Data",
+            "value": "\"cache\", \"storage\""
           }
         ]
       }

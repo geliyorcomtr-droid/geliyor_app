@@ -1,11 +1,13 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 class AuthStore extends ChangeNotifier {
   AuthStore._() {
+    unawaited(_auth.setLanguageCode('tr'));
     _auth.authStateChanges().listen(_onAuthChanged);
   }
 
@@ -13,14 +15,15 @@ class AuthStore extends ChangeNotifier {
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  FirebaseFunctions get _functions =>
+      FirebaseFunctions.instanceFor(region: 'europe-west1');
 
   bool _isLoggedIn = false;
   bool _isBusy = false;
   String _fullName = '';
   String _phone = '';
   String? _uid;
-  String? _verificationId;
-  int? _resendToken;
+  bool _otpReady = false;
 
   bool get isLoggedIn => _isLoggedIn;
   bool get isBusy => _isBusy;
@@ -31,6 +34,19 @@ class AuthStore extends ChangeNotifier {
   String get firstName {
     final parts = _fullName.trim().split(RegExp(r'\s+'));
     return parts.isEmpty ? '' : parts.first;
+  }
+
+  static bool _isPlaceholderName(String value) {
+    final n = value.trim().toLowerCase();
+    return n.isEmpty || n == 'üye' || n == 'uye' || n == 'member';
+  }
+
+  static String _realName(Iterable<String?> values) {
+    for (final value in values) {
+      final n = (value ?? '').trim();
+      if (!_isPlaceholderName(n)) return n;
+    }
+    return '';
   }
 
   /// TR numarayı E.164 (+90...) formatına çevirir.
@@ -72,10 +88,13 @@ class AuthStore extends ChangeNotifier {
       final snap = await _db.collection('users').doc(user.uid).get();
       final data = snap.data();
       if (data != null) {
-        _fullName =
-            (data['display_name'] as String?)?.trim() ??
-            (data['fullName'] as String?)?.trim() ??
-            _fullName;
+        final fromDoc = _realName([
+          data['display_name'] as String?,
+          data['fullName'] as String?,
+        ]);
+        if (fromDoc.isNotEmpty) {
+          _fullName = fromDoc;
+        }
         _phone =
             (data['phone_number'] as String?)?.trim() ??
             (data['phone'] as String?)?.trim() ??
@@ -85,10 +104,11 @@ class AuthStore extends ChangeNotifier {
       // Offline / rules: local state yeterli.
     }
 
-    if (_fullName.isEmpty) {
-      _fullName = user.displayName?.trim().isNotEmpty == true
-          ? user.displayName!.trim()
-          : 'Üye';
+    if (_isPlaceholderName(_fullName)) {
+      _fullName = _realName([user.displayName]);
+      if (_fullName.isEmpty) {
+        _fullName = 'Üye';
+      }
     }
     notifyListeners();
   }
@@ -96,44 +116,15 @@ class AuthStore extends ChangeNotifier {
   Future<void> sendCode(String phoneRaw) async {
     final e164 = normalizePhone(phoneRaw);
     _setBusy(true);
-    final completer = Completer<void>();
-
     try {
-      await _auth.verifyPhoneNumber(
-        phoneNumber: e164,
-        forceResendingToken: _resendToken,
-        timeout: const Duration(seconds: 60),
-        verificationCompleted: (credential) async {
-          try {
-            await _auth.signInWithCredential(credential);
-            if (!completer.isCompleted) completer.complete();
-          } catch (e) {
-            if (!completer.isCompleted) completer.completeError(e);
-          }
-        },
-        verificationFailed: (e) {
-          if (!completer.isCompleted) completer.completeError(e);
-        },
-        codeSent: (verificationId, resendToken) {
-          _verificationId = verificationId;
-          _resendToken = resendToken;
-          _phone = e164;
-          notifyListeners();
-          if (!completer.isCompleted) completer.complete();
-        },
-        codeAutoRetrievalTimeout: (verificationId) {
-          _verificationId = verificationId;
-        },
-      );
-
-      await completer.future.timeout(
-        const Duration(seconds: 70),
-        onTimeout: () {
-          throw FirebaseAuthException(
-            code: 'timeout',
-            message: 'SMS gönderimi zaman aşımına uğradı.',
-          );
-        },
+      await _functions.httpsCallable('sendLoginCode').call({'phone': e164});
+      _otpReady = true;
+      _phone = e164;
+      notifyListeners();
+    } on FirebaseFunctionsException catch (e) {
+      throw FirebaseAuthException(
+        code: e.code,
+        message: e.message ?? 'SMS gönderilemedi.',
       );
     } finally {
       _setBusy(false);
@@ -145,8 +136,7 @@ class AuthStore extends ChangeNotifier {
     String? fullName,
     bool requireExistingUser = false,
   }) async {
-    final id = _verificationId;
-    if (id == null) {
+    if (!_otpReady) {
       throw FirebaseAuthException(
         code: 'missing-verification',
         message: 'Önce SMS kodu gönderin.',
@@ -154,12 +144,29 @@ class AuthStore extends ChangeNotifier {
     }
     _setBusy(true);
     try {
-      final credential = PhoneAuthProvider.credential(
-        verificationId: id,
-        smsCode: smsCode.trim(),
-      );
-      final result = await _auth.signInWithCredential(credential);
-      final user = result.user;
+      final result = await _functions.httpsCallable('verifyLoginCode').call({
+        'phone': _phone,
+        'code': smsCode.trim(),
+        'fullName': (fullName ?? _fullName).trim(),
+        'requireExistingUser': requireExistingUser,
+      });
+      final raw = result.data;
+      if (raw is! Map) {
+        throw FirebaseAuthException(
+          code: 'null-user',
+          message: 'Giriş başarısız.',
+        );
+      }
+      final data = Map<String, dynamic>.from(raw);
+      final token = data['token'] as String?;
+      if (token == null || token.isEmpty) {
+        throw FirebaseAuthException(
+          code: 'null-user',
+          message: 'Giriş başarısız.',
+        );
+      }
+      final cred = await _auth.signInWithCustomToken(token);
+      final user = cred.user;
       if (user == null) {
         throw FirebaseAuthException(
           code: 'null-user',
@@ -167,24 +174,32 @@ class AuthStore extends ChangeNotifier {
         );
       }
 
-      final doc = _db.collection('users').doc(user.uid);
+      await user.reload();
+      final signedIn = _auth.currentUser ?? user;
+      final doc = _db.collection('users').doc(signedIn.uid);
       final existing = await doc.get();
-      if (requireExistingUser && !existing.exists) {
-        await _auth.signOut();
-        throw FirebaseAuthException(
-          code: 'user-not-found',
-          message: 'Bu telefon numarası sistemde kayıtlı değil.',
-        );
+
+      final resolvedName = _realName([
+        fullName,
+        data['displayName'] as String?,
+        existing.data()?['display_name'] as String?,
+        existing.data()?['fullName'] as String?,
+        signedIn.displayName,
+        _fullName,
+      ]);
+      if (resolvedName.isNotEmpty) {
+        if (signedIn.displayName != resolvedName) {
+          await signedIn.updateDisplayName(resolvedName);
+        }
+        _fullName = resolvedName;
+      } else {
+        _fullName = 'Üye';
       }
 
-      final name = (fullName ?? _fullName).trim();
-      if (name.isNotEmpty) {
-        await user.updateDisplayName(name);
-        _fullName = name;
-      }
-
-      final resolvedName = _fullName.isEmpty ? 'Üye' : _fullName;
-      final resolvedPhone = user.phoneNumber ?? _phone;
+      final resolvedPhone =
+          signedIn.phoneNumber ??
+          (data['phone'] as String?) ??
+          _phone;
 
       try {
         final existingRole =
@@ -192,8 +207,8 @@ class AuthStore extends ChangeNotifier {
             (existing.data()?['role'] as String?);
         final keepAdmin = existingRole == 'admin';
         await doc.set({
-          'uid': user.uid,
-          'display_name': resolvedName,
+          'uid': signedIn.uid,
+          if (!_isPlaceholderName(_fullName)) 'display_name': _fullName,
           'phone_number': resolvedPhone,
           'user_role': keepAdmin ? 'admin' : 'customer',
           'is_guest': false,
@@ -204,11 +219,15 @@ class AuthStore extends ChangeNotifier {
         debugPrint('Firestore user profile write failed: $e');
       }
 
-      _uid = user.uid;
+      _uid = signedIn.uid;
       _phone = resolvedPhone;
-      _fullName = resolvedName;
       _isLoggedIn = true;
       notifyListeners();
+    } on FirebaseFunctionsException catch (e) {
+      throw FirebaseAuthException(
+        code: e.code,
+        message: e.message ?? 'Doğrulama başarısız.',
+      );
     } finally {
       _setBusy(false);
     }
@@ -218,8 +237,7 @@ class AuthStore extends ChangeNotifier {
     _setBusy(true);
     try {
       await _auth.signOut();
-      _verificationId = null;
-      _resendToken = null;
+      _otpReady = false;
       _isLoggedIn = false;
       _fullName = '';
       _phone = '';
@@ -241,26 +259,51 @@ class AuthStore extends ChangeNotifier {
       return 'Gerçek SMS için Firebase’de Blaze (faturalandırma) gerekir. Test numarası + 123456 kullanın.';
     }
 
+    if (text.contains('Error code:39') ||
+        text.contains('Error code: 39') ||
+        text.contains('error-code:-39')) {
+      return 'Firebase SMS kotası doldu. Kod artık NetGSM ile gider; yeni uygulama sürümünü yükleyin veya 1 saat sonra deneyin.';
+    }
+
     if (error is FirebaseAuthException) {
       switch (error.code) {
         case 'invalid-phone-number':
+        case 'invalid-argument':
           return 'Geçersiz telefon numarası.';
         case 'too-many-requests':
+        case 'resource-exhausted':
           return 'Çok fazla deneme. Bir süre sonra tekrar deneyin.';
         case 'invalid-verification-code':
         case 'invalid-verification-id':
+        case 'permission-denied':
           return 'SMS kodu hatalı veya süresi dolmuş. Kodu tekrar gönderin.';
         case 'session-expired':
-          return 'Oturum süresi doldu. Kodu tekrar gönderin.';
+        case 'deadline-exceeded':
+          return 'Kodun süresi doldu. Kodu tekrar gönderin.';
+        case 'unavailable':
+          return 'SMS gönderilemedi. Biraz sonra tekrar deneyin.';
         case 'user-not-found':
+        case 'not-found':
           return 'Bu telefon numarası sistemde kayıtlı değil. Önce kayıt olun.';
         case 'missing-verification':
+        case 'failed-precondition':
           return 'Önce “Kod Gönder”e basıp SMS kodunu alın.';
         case 'missing-client-identifier':
         case 'app-not-authorized':
+          if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+            return 'iOS doğrulaması tamamlanamadı. Uygulamayı kapatıp tekrar deneyin.';
+          }
           return 'Android SHA-1 eksik. Firebase Console’a SHA-1 ekleyin.';
         case 'timeout':
           return 'SMS gönderimi zaman aşımına uğradı.';
+        case 'custom-token-mismatch':
+        case 'invalid-custom-token':
+          return 'Giriş oturumu oluşturulamadı. Kodu tekrar gönderip deneyin.';
+        case 'internal':
+          final internalMsg = error.message ?? '';
+          return internalMsg.isNotEmpty && internalMsg != 'internal'
+              ? internalMsg
+              : 'Giriş tamamlanamadı. Kodu tekrar gönderip deneyin.';
         default:
           final msg = error.message ?? '';
           if (msg.contains('BILLING_NOT_ENABLED')) {

@@ -58,6 +58,36 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
         }, SetOptions(merge: true));
   }
 
+  Future<void> _confirmDelivered(AdminOrder order) async {
+    if (order.status == OrderStatuses.delivered) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Siparişi teslim et'),
+        content: const Text(
+          'Sipariş teslim edildi olarak işaretlenecek ve müşteriye '
+          'NetGSM üzerinden “siparişiniz teslim edilmiştir” SMS’i gidecek.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Teslim et ve SMS gönder'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    await _setStatus(order, OrderStatuses.delivered);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Teslim kaydedildi. SMS gönderiliyor.')),
+    );
+  }
+
   List<AdminOrder> _filter(List<AdminOrder> orders) {
     var list = [...orders]
       ..sort((a, b) {
@@ -296,6 +326,23 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                       ),
                     ),
                   ),
+                  IconButton(
+                    tooltip: order.status == OrderStatuses.delivered
+                        ? 'Teslim edildi'
+                        : 'Teslim et — müşteriye SMS gider',
+                    visualDensity: VisualDensity.compact,
+                    onPressed: order.status == OrderStatuses.delivered
+                        ? null
+                        : () => _confirmDelivered(order),
+                    icon: Icon(
+                      order.status == OrderStatuses.delivered
+                          ? Icons.check_circle_rounded
+                          : Icons.check_circle_outline_rounded,
+                      color: order.status == OrderStatuses.delivered
+                          ? AppColors.success
+                          : AppColors.primary,
+                    ),
+                  ),
                   Text(
                     AdminUi.money(order.total),
                     style: const TextStyle(fontWeight: FontWeight.w800),
@@ -381,6 +428,20 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
             ),
           ),
           const SizedBox(height: 14),
+          if (order.status != OrderStatuses.delivered)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: FilledButton.icon(
+                onPressed: () => _confirmDelivered(order),
+                icon: const Icon(Icons.check_circle_rounded),
+                label: const Text('Teslim edildi — SMS gönder'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.success,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size.fromHeight(44),
+                ),
+              ),
+            ),
           Wrap(
             spacing: 16,
             runSpacing: 10,
@@ -392,8 +453,33 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                 order.deliverySlot.isEmpty ? '—' : order.deliverySlot,
               ),
               _info('Telefon', order.phone.isEmpty ? '—' : order.phone),
+              _info(
+                'Sipariş SMS',
+                order.smsCreatedAt != null
+                    ? AdminUi.dateTime(order.smsCreatedAt)
+                    : 'Bekleniyor',
+              ),
+              _info(
+                'Teslim SMS',
+                order.smsDeliveredAt != null
+                    ? AdminUi.dateTime(order.smsDeliveredAt)
+                    : (order.status == OrderStatuses.delivered
+                          ? 'Gönderiliyor'
+                          : 'Teslim ikonuna basınca'),
+              ),
             ],
           ),
+          if (order.smsLastError.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              'SMS hatası: ${order.smsLastError}',
+              style: const TextStyle(
+                color: AppColors.error,
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           const Text(
             'Adres',

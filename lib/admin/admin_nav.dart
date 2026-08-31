@@ -11,6 +11,7 @@ enum AdminPage {
   advantages,
   members,
   campaigns,
+  broadcasts,
   banners,
   support,
 }
@@ -112,6 +113,12 @@ const adminNavItems = <AdminNavItem>[
     accent: AdminAccents.campaigns,
   ),
   AdminNavItem(
+    page: AdminPage.broadcasts,
+    label: 'Duyurular',
+    icon: Icons.notifications_active_rounded,
+    accent: AdminAccents.broadcasts,
+  ),
+  AdminNavItem(
     page: AdminPage.banners,
     label: 'Bannerlar',
     icon: Icons.image_rounded,
@@ -142,6 +149,7 @@ String adminPageTitle(AdminPage page, {String? orderStatus}) {
     AdminPage.advantages => 'Ürün Avantajları',
     AdminPage.members => 'Üyeler',
     AdminPage.campaigns => 'Kampanyalar',
+    AdminPage.broadcasts => 'Duyurular',
     AdminPage.banners => 'Sayfa bannerları',
     AdminPage.support => 'Müşteri talepleri',
   };
