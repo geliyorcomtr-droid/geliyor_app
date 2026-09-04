@@ -47,6 +47,7 @@ class MarketProductData {
     this.proteinValue = '',
     this.preferredRank = '',
     this.repurchaseRate = '',
+    this.barcode = '',
   });
 
   final String id;
@@ -72,6 +73,7 @@ class MarketProductData {
   final String proteinValue;
   final String preferredRank;
   final String repurchaseRate;
+  final String barcode;
 }
 
 /// Pet Market ürün kartı — 393×852 tuvale sığacak kompakt mockup kartı.
@@ -408,7 +410,7 @@ class _MarketProductCardState extends State<MarketProductCard> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     const Icon(
-                      Icons.local_shipping_outlined,
+                      Icons.delivery_dining_rounded,
                       size: 12,
                       color: AppColors.success,
                     ),

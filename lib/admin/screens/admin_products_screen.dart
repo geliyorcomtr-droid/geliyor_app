@@ -288,6 +288,8 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
                       else
                         'SKT yok',
                       if (product.category.isNotEmpty) product.category,
+                      if (product.extraCategories.isNotEmpty)
+                        '+ ${product.extraCategories.join(', ')}',
                     ].join(' · '),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -309,6 +311,11 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
                 style: const TextStyle(fontWeight: FontWeight.w800),
               ),
             ),
+            const SizedBox(width: 8),
+            AdminStatusChip(
+              label: 'KDV %${product.vatRate}',
+              color: AppColors.primary,
+            ),
             const SizedBox(width: 10),
             AdminStatusChip(
               label: 'Stok ${product.stock}',
@@ -323,6 +330,17 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
               label: product.active ? 'Vitrinde' : 'Gizli',
               color: product.active ? AppColors.success : AppColors.subText,
             ),
+            if (product.showAsGift || product.showAsPremiumGift) ...[
+              const SizedBox(width: 8),
+              AdminStatusChip(
+                label: product.showAsGift && product.showAsPremiumGift
+                    ? 'Hediye + Premium'
+                    : product.showAsPremiumGift
+                    ? 'Premium hediye'
+                    : 'Hediye',
+                color: AppColors.primary,
+              ),
+            ],
             PopupMenuButton<String>(
               onSelected: (value) {
                 switch (value) {

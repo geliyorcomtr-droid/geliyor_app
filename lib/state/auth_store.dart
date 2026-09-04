@@ -4,14 +4,24 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:geliyor_app/data/user_doc_persist.dart';
 
 class AuthStore extends ChangeNotifier {
   AuthStore._() {
     unawaited(_auth.setLanguageCode('tr'));
-    _auth.authStateChanges().listen(_onAuthChanged);
+    _auth.authStateChanges().listen((user) async {
+      await _onAuthChanged(user);
+      if (!_authReady) {
+        _authReady = true;
+        notifyListeners();
+      }
+    });
   }
 
   static final AuthStore instance = AuthStore._();
+
+  /// Çıkıştan hemen önce (kedi/mama kaydı için).
+  static Future<void> Function()? beforeLogout;
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -20,16 +30,33 @@ class AuthStore extends ChangeNotifier {
 
   bool _isLoggedIn = false;
   bool _isBusy = false;
+  bool _authReady = false;
   String _fullName = '';
   String _phone = '';
+  String _email = '';
+  String _birthDate = '';
+  String _gender = '';
   String? _uid;
   bool _otpReady = false;
+  bool _emailVerified = false;
 
   bool get isLoggedIn => _isLoggedIn;
   bool get isBusy => _isBusy;
+  bool get authReady => _authReady;
   String get fullName => _fullName;
   String get phone => _phone;
+  String get email => _email;
+  String get birthDate => _birthDate;
+  String get gender => _gender;
   String? get uid => _uid;
+
+  bool get isPhoneVerified {
+    final phone = _auth.currentUser?.phoneNumber;
+    return phone != null && phone.isNotEmpty;
+  }
+
+  bool get isEmailVerified =>
+      _emailVerified || _auth.currentUser?.emailVerified == true;
 
   String get firstName {
     final parts = _fullName.trim().split(RegExp(r'\s+'));
@@ -75,7 +102,11 @@ class AuthStore extends ChangeNotifier {
       _isLoggedIn = false;
       _fullName = '';
       _phone = '';
+      _email = '';
+      _birthDate = '';
+      _gender = '';
       _uid = null;
+      _emailVerified = false;
       notifyListeners();
       return;
     }
@@ -85,21 +116,16 @@ class AuthStore extends ChangeNotifier {
     _isLoggedIn = true;
 
     try {
-      final snap = await _db.collection('users').doc(user.uid).get();
-      final data = snap.data();
-      if (data != null) {
-        final fromDoc = _realName([
-          data['display_name'] as String?,
-          data['fullName'] as String?,
-        ]);
-        if (fromDoc.isNotEmpty) {
-          _fullName = fromDoc;
-        }
-        _phone =
-            (data['phone_number'] as String?)?.trim() ??
-            (data['phone'] as String?)?.trim() ??
-            _phone;
+      DocumentSnapshot<Map<String, dynamic>> snap;
+      try {
+        snap = await _db
+            .collection('users')
+            .doc(user.uid)
+            .get(const GetOptions(source: Source.server));
+      } catch (_) {
+        snap = await _db.collection('users').doc(user.uid).get();
       }
+      applyProfileDoc(snap.data(), replaceMissing: true);
     } catch (_) {
       // Offline / rules: local state yeterli.
     }
@@ -111,6 +137,84 @@ class AuthStore extends ChangeNotifier {
       }
     }
     notifyListeners();
+  }
+
+  void applyProfileDoc(
+    Map<String, dynamic>? data, {
+    bool replaceMissing = false,
+  }) {
+    if (data == null) {
+      if (replaceMissing) {
+        _email = '';
+        _birthDate = '';
+        _gender = '';
+        _emailVerified = false;
+      }
+      return;
+    }
+    final fromDoc = _realName([
+      data['display_name'] as String?,
+      data['fullName'] as String?,
+    ]);
+    if (fromDoc.isNotEmpty) {
+      _fullName = fromDoc;
+    }
+    _phone =
+        (data['phone_number'] as String?)?.trim() ??
+        (data['phone'] as String?)?.trim() ??
+        _phone;
+    final email = (data['email'] as String?)?.trim() ?? '';
+    if (replaceMissing || email.isNotEmpty) _email = email;
+    if (data.containsKey('email_verified') || data.containsKey('emailVerified')) {
+      _emailVerified =
+          data['email_verified'] == true || data['emailVerified'] == true;
+    }
+    final birth = (data['birth_date'] as String?)?.trim() ?? '';
+    if (replaceMissing || birth.isNotEmpty) _birthDate = birth;
+    final gender = (data['gender'] as String?)?.trim() ?? '';
+    if (replaceMissing || gender.isNotEmpty) _gender = gender;
+  }
+
+  void notifyProfileUpdated() => notifyListeners();
+
+  Future<void> updateProfile({
+    String? fullName,
+    String? email,
+    String? birthDate,
+    String? gender,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    final name = (fullName ?? _fullName).trim();
+    final nextEmail = (email ?? _email).trim();
+    final nextBirth = (birthDate ?? _birthDate).trim();
+    final nextGender = (gender ?? _gender).trim();
+
+    if (!_isPlaceholderName(name)) {
+      _fullName = name;
+      if (user.displayName != name) {
+        await user.updateDisplayName(name);
+      }
+    }
+    _email = nextEmail;
+    _birthDate = nextBirth;
+    _gender = nextGender;
+    notifyListeners();
+
+    try {
+      await _db.collection('users').doc(user.uid).set({
+        if (!_isPlaceholderName(_fullName)) 'display_name': _fullName,
+        'email': _email,
+        'email_verified': _emailVerified,
+        'birth_date': _birthDate,
+        'gender': _gender,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('Firestore profile update failed: $e');
+    }
+    await UserDocPersist.waitForServer();
   }
 
   Future<void> sendCode(String phoneRaw) async {
@@ -125,6 +229,54 @@ class AuthStore extends ChangeNotifier {
       throw FirebaseAuthException(
         code: e.code,
         message: e.message ?? 'SMS gönderilemedi.',
+      );
+    } finally {
+      _setBusy(false);
+    }
+  }
+
+  Future<void> sendEmailCode(String rawEmail) async {
+    final email = rawEmail.trim().toLowerCase();
+    if (_auth.currentUser == null) {
+      throw FirebaseAuthException(
+        code: 'unauthenticated',
+        message: 'Giriş yapın.',
+      );
+    }
+    _setBusy(true);
+    try {
+      await _functions.httpsCallable('sendEmailCode').call({'email': email});
+      _email = email;
+      _emailVerified = false;
+      notifyListeners();
+    } on FirebaseFunctionsException catch (e) {
+      throw FirebaseAuthException(
+        code: e.code,
+        message: e.message ?? 'Doğrulama kodu gönderilemedi.',
+      );
+    } finally {
+      _setBusy(false);
+    }
+  }
+
+  Future<void> verifyEmailCode({
+    required String email,
+    required String code,
+  }) async {
+    _setBusy(true);
+    try {
+      await _functions.httpsCallable('verifyEmailCode').call({
+        'email': email.trim().toLowerCase(),
+        'code': code.trim(),
+      });
+      _email = email.trim();
+      _emailVerified = true;
+      notifyListeners();
+      await updateProfile(email: _email);
+    } on FirebaseFunctionsException catch (e) {
+      throw FirebaseAuthException(
+        code: e.code,
+        message: e.message ?? 'E-posta doğrulanamadı.',
       );
     } finally {
       _setBusy(false);
@@ -222,6 +374,7 @@ class AuthStore extends ChangeNotifier {
       _uid = signedIn.uid;
       _phone = resolvedPhone;
       _isLoggedIn = true;
+      _authReady = true;
       notifyListeners();
     } on FirebaseFunctionsException catch (e) {
       throw FirebaseAuthException(
@@ -236,12 +389,17 @@ class AuthStore extends ChangeNotifier {
   Future<void> logout() async {
     _setBusy(true);
     try {
+      await beforeLogout?.call();
       await _auth.signOut();
       _otpReady = false;
       _isLoggedIn = false;
       _fullName = '';
       _phone = '';
+      _email = '';
+      _birthDate = '';
+      _gender = '';
       _uid = null;
+      _emailVerified = false;
       notifyListeners();
     } finally {
       _setBusy(false);
@@ -268,20 +426,32 @@ class AuthStore extends ChangeNotifier {
     if (error is FirebaseAuthException) {
       switch (error.code) {
         case 'invalid-phone-number':
-        case 'invalid-argument':
           return 'Geçersiz telefon numarası.';
+        case 'invalid-argument':
+          final argMsg = error.message ?? '';
+          return argMsg.isNotEmpty ? argMsg : 'Geçersiz bilgi girdiniz.';
         case 'too-many-requests':
         case 'resource-exhausted':
           return 'Çok fazla deneme. Bir süre sonra tekrar deneyin.';
         case 'invalid-verification-code':
         case 'invalid-verification-id':
         case 'permission-denied':
-          return 'SMS kodu hatalı veya süresi dolmuş. Kodu tekrar gönderin.';
+          return 'Doğrulama kodu hatalı veya süresi dolmuş. Kodu tekrar gönderin.';
         case 'session-expired':
         case 'deadline-exceeded':
           return 'Kodun süresi doldu. Kodu tekrar gönderin.';
         case 'unavailable':
-          return 'SMS gönderilemedi. Biraz sonra tekrar deneyin.';
+          return error.message ?? 'Kod gönderilemedi. Biraz sonra tekrar deneyin.';
+        case 'already-exists':
+        case 'email-already-in-use':
+        case 'email-already-exists':
+          return 'Bu e-posta başka bir hesapta kayıtlı.';
+        case 'invalid-email':
+          return 'Geçerli bir e-posta girin.';
+        case 'user-token-expired':
+        case 'invalid-user-token':
+        case 'user-disabled':
+          return 'Oturumun yenilenmeli. Çıkış yapıp tekrar giriş yapın.';
         case 'user-not-found':
         case 'not-found':
           return 'Bu telefon numarası sistemde kayıtlı değil. Önce kayıt olun.';

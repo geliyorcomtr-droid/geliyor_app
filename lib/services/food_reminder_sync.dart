@@ -58,6 +58,7 @@ class FoodReminderSync {
       _hydratedUid = null;
       return;
     }
+    if (!PetStore.instance.isBoundTo(uid)) return;
     if (_hydratedUid != uid) {
       await _hydratePrefs(ref);
       _hydratedUid = uid;
@@ -65,13 +66,13 @@ class FoodReminderSync {
 
     final settings = NotificationSettingsStore.instance;
     final estimate = FoodRemainingEstimator.compute();
-    final canRemind = settings.canSendFoodReminder && estimate != null;
-    if (!canRemind || estimate == null) {
+    if (!settings.canSendFoodReminder || estimate == null) {
       await ref.set({
         _map: {
           FoodReminderFields.enabled: false,
           FoodReminderFields.prefsEnabled: settings.smartFoodReminderEnabled,
           FoodReminderFields.daysBefore: settings.effectiveSmartFoodReminderDays,
+          FoodReminderFields.autoOrderEnabled: false,
         },
         UserFields.updatedAt: FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -91,11 +92,24 @@ class FoodReminderSync {
     }
     final reminderDate = _ymd(notifyAt);
 
+    var autoNotifyAt = end.subtract(
+      Duration(days: settings.autoOrderDaysBefore.clamp(1, 30)),
+    );
+    if (autoNotifyAt.isAfter(end)) autoNotifyAt = end;
+    if (autoNotifyAt.isBefore(today)) autoNotifyAt = today;
+    final autoOrderDate = _ymd(autoNotifyAt);
+    final autoOrderEnabled =
+        settings.canSendOrderNotifications && estimate.remainingDays >= 0;
+
     final existing = await ref.get();
     final prev = existing.data()?[_map] as Map<String, dynamic>?;
     final prevDate = prev?[FoodReminderFields.reminderDate] as String?;
     final prevSent = prev?[FoodReminderFields.sentFor] as String?;
     final sentFor = prevDate == reminderDate ? (prevSent ?? '') : '';
+    final prevAutoDate = prev?[FoodReminderFields.autoOrderDate] as String?;
+    final prevAutoSent = prev?[FoodReminderFields.autoOrderSentFor] as String?;
+    final autoOrderSentFor =
+        prevAutoDate == autoOrderDate ? (prevAutoSent ?? '') : '';
 
     await ref.set({
       _map: {
@@ -105,9 +119,12 @@ class FoodReminderSync {
         FoodReminderFields.reminderDate: reminderDate,
         FoodReminderFields.estimatedEndDate: _ymd(end),
         FoodReminderFields.remainingDays: estimate.remainingDays,
-        FoodReminderFields.petName: estimate.pet.name,
+        FoodReminderFields.petName: estimate.shareLabel,
         FoodReminderFields.foodTitle: estimate.foodTitle,
         FoodReminderFields.sentFor: sentFor,
+        FoodReminderFields.autoOrderEnabled: autoOrderEnabled,
+        FoodReminderFields.autoOrderDate: autoOrderDate,
+        FoodReminderFields.autoOrderSentFor: autoOrderSentFor,
       },
       UserFields.updatedAt: FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));

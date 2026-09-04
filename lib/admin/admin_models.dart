@@ -10,12 +10,15 @@ class AdminProduct {
     required this.brand,
     required this.weight,
     this.barcode = '',
+    this.vatRate = 20,
     this.skt = '',
     required this.unitPrice,
     required this.oldPrice,
     required this.discountPercent,
     required this.imageUrl,
     required this.category,
+    this.extraCategories = const [],
+    this.placements = const [],
     this.mainCategory = 'cat',
     required this.description,
     required this.active,
@@ -41,8 +44,11 @@ class AdminProduct {
   final String brand;
   final String weight;
 
-  /// Ürün barkodu (kopyalanırken boş bırakılır).
+  /// Ürün barkodu / stok kodu (aynı numara).
   final String barcode;
+
+  /// Satış fiyatı KDV dahil; fatura bu orana göre ayrılır.
+  final int vatRate;
 
   /// Son kullanma (gösterim: `11.2027`)
   final String skt;
@@ -51,6 +57,8 @@ class AdminProduct {
   final int discountPercent;
   final String imageUrl;
   final String category;
+  final List<String> extraCategories;
+  final List<String> placements;
   final String mainCategory;
   final String description;
   final bool active;
@@ -70,6 +78,10 @@ class AdminProduct {
   final String metaDescription;
   final DateTime? createdAt;
 
+  bool get showAsGift => placements.contains(ProductPlacements.gift);
+  bool get showAsPremiumGift =>
+      placements.contains(ProductPlacements.giftPremium);
+
   factory AdminProduct.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final d = doc.data() ?? <String, dynamic>{};
     final created = d[ProductFields.createdAt];
@@ -79,12 +91,15 @@ class AdminProduct {
       brand: (d[ProductFields.brand] as String?) ?? '',
       weight: (d[ProductFields.weight] as String?) ?? '',
       barcode: (d[ProductFields.barcode] as String?) ?? '',
+      vatRate: ProductFields.vatRateFrom(d[ProductFields.vatRate]),
       skt: ProductSkt.fromFirestore(d),
       unitPrice: (d[ProductFields.unitPrice] as num?)?.toDouble() ?? 0,
       oldPrice: (d[ProductFields.oldPrice] as num?)?.toDouble() ?? 0,
       discountPercent: (d[ProductFields.discountPercent] as num?)?.toInt() ?? 0,
       imageUrl: (d[ProductFields.imageUrl] as String?) ?? '',
       category: (d[ProductFields.category] as String?) ?? '',
+      extraCategories: _stringList(d[ProductFields.extraCategories]),
+      placements: _stringList(d[ProductFields.placements]),
       mainCategory: (d[ProductFields.mainCategory] as String?) ?? 'cat',
       description: (d[ProductFields.description] as String?) ?? '',
       active: d[ProductFields.active] as bool? ?? true,
@@ -127,12 +142,18 @@ class AdminProduct {
       ProductFields.brand: brand.trim(),
       ProductFields.weight: weight.trim(),
       ProductFields.barcode: barcode.trim(),
+      ProductFields.vatRate: ProductFields.vatRateFrom(vatRate),
       ...ProductSkt.toFirestoreFields(skt),
       ProductFields.unitPrice: unitPrice,
       ProductFields.oldPrice: oldPrice,
       ProductFields.discountPercent: discountPercent,
       ProductFields.imageUrl: imageUrl.trim(),
       ProductFields.category: category.trim(),
+      ProductFields.extraCategories: extraCategories
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList(),
+      ProductFields.placements: placements,
       ProductFields.mainCategory: mainCategory.trim(),
       ProductFields.description: description.trim(),
       ProductFields.active: active,
@@ -155,6 +176,15 @@ class AdminProduct {
       ProductFields.updatedAt: FieldValue.serverTimestamp(),
       if (isCreate) ProductFields.createdAt: FieldValue.serverTimestamp(),
     };
+  }
+
+  static List<String> _stringList(dynamic raw) {
+    if (raw is! List) return const [];
+    return raw
+        .whereType<String>()
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
   }
 
   static List<AdminProductFeature> _featuresFrom(dynamic raw) {
@@ -215,12 +245,15 @@ class AdminProduct {
       brand: brand,
       weight: weight,
       barcode: '',
+      vatRate: vatRate,
       skt: skt,
       unitPrice: unitPrice,
       oldPrice: oldPrice,
       discountPercent: discountPercent,
       imageUrl: imageUrl,
       category: category,
+      extraCategories: extraCategories,
+      placements: placements,
       mainCategory: mainCategory,
       description: description,
       active: active,
@@ -300,6 +333,50 @@ class AdminOrderItem {
   }
 }
 
+class AdminOrderGift {
+  const AdminOrderGift({
+    required this.productId,
+    required this.title,
+    this.imageUrl = '',
+    this.premium = false,
+  });
+
+  final String productId;
+  final String title;
+  final String imageUrl;
+  final bool premium;
+
+  factory AdminOrderGift.fromMap(Map<String, dynamic> map) {
+    return AdminOrderGift(
+      productId: (map['productId'] as String?) ?? (map['id'] as String?) ?? '',
+      title: (map['title'] as String?) ?? '',
+      imageUrl:
+          (map['imageUrl'] as String?) ?? (map['imagePath'] as String?) ?? '',
+      premium: map['premium'] as bool? ?? false,
+    );
+  }
+
+  static List<AdminOrderGift> parseList(dynamic raw) {
+    final parsed = <AdminOrderGift>[];
+    void add(dynamic item) {
+      if (item is Map) {
+        parsed.add(AdminOrderGift.fromMap(Map<String, dynamic>.from(item)));
+      }
+    }
+
+    if (raw is List) {
+      for (final item in raw) {
+        add(item);
+      }
+    } else if (raw is Map) {
+      for (final item in raw.values) {
+        add(item);
+      }
+    }
+    return parsed;
+  }
+}
+
 class AdminOrder {
   const AdminOrder({
     required this.id,
@@ -308,13 +385,32 @@ class AdminOrder {
     required this.total,
     required this.statusMessage,
     required this.items,
+    this.subtotal = 0,
+    this.courierFee = 0,
     this.address = '',
     this.customerName = '',
     this.phone = '',
     this.paymentMethod = '',
     this.deliverySlot = '',
+    this.couponCode = '',
+    this.couponDiscount = 0,
+    this.gifts = const [],
+    this.invoiceLink = '',
+    this.invoiceNumber = '',
+    this.invoiceDate = '',
+    this.cargoCompany = '',
+    this.cargoTrackingCode = '',
+    this.cargoTrackingUrl = '',
+    this.billingName = '',
+    this.billingAddress = '',
+    this.billingAccountType = '',
+    this.billingNationalId = '',
+    this.billingTaxId = '',
+    this.billingTaxOffice = '',
     this.createdAt,
     this.smsCreatedAt,
+    this.smsShippingAt,
+    this.smsCancelledAt,
     this.smsDeliveredAt,
     this.smsLastError = '',
   });
@@ -323,6 +419,8 @@ class AdminOrder {
   final String userId;
   final String status;
   final double total;
+  final double subtotal;
+  final double courierFee;
   final String statusMessage;
   final List<AdminOrderItem> items;
   final String address;
@@ -330,8 +428,25 @@ class AdminOrder {
   final String phone;
   final String paymentMethod;
   final String deliverySlot;
+  final String couponCode;
+  final double couponDiscount;
+  final List<AdminOrderGift> gifts;
+  final String invoiceLink;
+  final String invoiceNumber;
+  final String invoiceDate;
+  final String cargoCompany;
+  final String cargoTrackingCode;
+  final String cargoTrackingUrl;
+  final String billingName;
+  final String billingAddress;
+  final String billingAccountType;
+  final String billingNationalId;
+  final String billingTaxId;
+  final String billingTaxOffice;
   final DateTime? createdAt;
   final DateTime? smsCreatedAt;
+  final DateTime? smsShippingAt;
+  final DateTime? smsCancelledAt;
   final DateTime? smsDeliveredAt;
   final String smsLastError;
 
@@ -351,11 +466,22 @@ class AdminOrder {
         }
       }
     }
+    final parsedGifts = AdminOrderGift.parseList(d[OrderFields.gifts]);
+    final total = (d[OrderFields.total] as num?)?.toDouble() ?? 0;
+    final courierFee = (d[OrderFields.courierFee] as num?)?.toDouble() ?? 0;
+    final subtotal =
+        (d[OrderFields.subtotal] as num?)?.toDouble() ?? (total - courierFee);
+    final billingRaw = d[OrderFields.billing];
+    final billing = billingRaw is Map
+        ? Map<String, dynamic>.from(billingRaw)
+        : const <String, dynamic>{};
     return AdminOrder(
       id: doc.id,
       userId: (d[OrderFields.userId] as String?) ?? '',
       status: (d[OrderFields.status] as String?) ?? OrderStatuses.preparing,
-      total: (d[OrderFields.total] as num?)?.toDouble() ?? 0,
+      total: total,
+      subtotal: subtotal,
+      courierFee: courierFee,
       statusMessage: (d[OrderFields.statusMessage] as String?) ?? '',
       items: parsedItems,
       address: (d[OrderFields.address] as String?) ?? '',
@@ -363,9 +489,30 @@ class AdminOrder {
       phone: (d[OrderFields.phone] as String?) ?? '',
       paymentMethod: (d[OrderFields.paymentMethod] as String?) ?? '',
       deliverySlot: (d[OrderFields.deliverySlot] as String?) ?? '',
+      couponCode: (d[OrderFields.couponCode] as String?) ?? '',
+      couponDiscount: (d[OrderFields.couponDiscount] as num?)?.toDouble() ?? 0,
+      gifts: parsedGifts,
+      invoiceLink: (d[OrderFields.invoiceLink] as String?) ?? '',
+      invoiceNumber: (d[OrderFields.invoiceNumber] as String?) ?? '',
+      invoiceDate: (d[OrderFields.invoiceDate] as String?) ?? '',
+      cargoCompany: (d[OrderFields.cargoCompany] as String?) ?? '',
+      cargoTrackingCode: (d[OrderFields.cargoTrackingCode] as String?) ?? '',
+      cargoTrackingUrl: (d[OrderFields.cargoTrackingUrl] as String?) ?? '',
+      billingName: (billing['contactName'] as String?) ?? '',
+      billingAddress: (billing['address'] as String?) ?? '',
+      billingAccountType: (billing['accountType'] as String?) ?? '',
+      billingNationalId: (billing['nationalId'] as String?) ?? '',
+      billingTaxId: (billing['taxId'] as String?) ?? '',
+      billingTaxOffice: (billing['taxOffice'] as String?) ?? '',
       createdAt: created is Timestamp ? created.toDate() : null,
       smsCreatedAt: d[OrderFields.smsCreatedAt] is Timestamp
           ? (d[OrderFields.smsCreatedAt] as Timestamp).toDate()
+          : null,
+      smsShippingAt: d[OrderFields.smsShippingAt] is Timestamp
+          ? (d[OrderFields.smsShippingAt] as Timestamp).toDate()
+          : null,
+      smsCancelledAt: d[OrderFields.smsCancelledAt] is Timestamp
+          ? (d[OrderFields.smsCancelledAt] as Timestamp).toDate()
           : null,
       smsDeliveredAt: d[OrderFields.smsDeliveredAt] is Timestamp
           ? (d[OrderFields.smsDeliveredAt] as Timestamp).toDate()

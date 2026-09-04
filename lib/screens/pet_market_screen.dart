@@ -7,6 +7,7 @@ import 'package:geliyor_app/screens/pet_market_products_screen.dart';
 import 'package:geliyor_app/screens/product_detail_screen.dart';
 import 'package:geliyor_app/state/cart_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:geliyor_app/utils/advantage_search.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
@@ -128,6 +129,13 @@ class _PetMarketScreenState extends State<PetMarketScreen> {
     if (query.isEmpty) return;
 
     FocusScope.of(context).unfocus();
+    if (AdvantageSearch.openProductsIfMatched(
+      context,
+      query,
+      mainCategory: selectedMainCategory,
+    )) {
+      return;
+    }
     final matchedSub = _subCategoryFromQuery(query);
 
     Navigator.of(context).push(

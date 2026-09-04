@@ -11,9 +11,11 @@ enum AdminPage {
   advantages,
   members,
   campaigns,
+  coupons,
   broadcasts,
   banners,
   support,
+  bankTransfer,
 }
 
 class AdminNavChild {
@@ -56,7 +58,7 @@ const adminNavItems = <AdminNavItem>[
   AdminNavItem(
     page: AdminPage.orders,
     label: 'Siparişler',
-    icon: Icons.local_shipping_rounded,
+    icon: Icons.delivery_dining_rounded,
     accent: AdminAccents.orders,
     children: [
       AdminNavChild(page: AdminPage.orders, label: 'Tümü'),
@@ -67,7 +69,7 @@ const adminNavItems = <AdminNavItem>[
       ),
       AdminNavChild(
         page: AdminPage.orders,
-        label: 'Kargoda',
+        label: 'Kuryede',
         orderStatus: 'shipping',
       ),
       AdminNavChild(
@@ -97,7 +99,7 @@ const adminNavItems = <AdminNavItem>[
       AdminNavChild(page: AdminPage.brands, label: 'Markalar'),
       AdminNavChild(page: AdminPage.categories, label: 'Kategoriler'),
       AdminNavChild(page: AdminPage.trustBadges, label: 'Güven Rozetleri'),
-      AdminNavChild(page: AdminPage.advantages, label: 'Ürün Avantajları'),
+      AdminNavChild(page: AdminPage.advantages, label: 'Ürün Özellikleri'),
     ],
   ),
   AdminNavItem(
@@ -111,6 +113,10 @@ const adminNavItems = <AdminNavItem>[
     label: 'Kampanyalar',
     icon: Icons.campaign_rounded,
     accent: AdminAccents.campaigns,
+    children: [
+      AdminNavChild(page: AdminPage.campaigns, label: 'Kampanya Kartları'),
+      AdminNavChild(page: AdminPage.coupons, label: 'Kuponlar'),
+    ],
   ),
   AdminNavItem(
     page: AdminPage.broadcasts,
@@ -130,6 +136,12 @@ const adminNavItems = <AdminNavItem>[
     icon: Icons.support_agent_rounded,
     accent: AdminAccents.support,
   ),
+  AdminNavItem(
+    page: AdminPage.bankTransfer,
+    label: 'Havale / EFT',
+    icon: Icons.account_balance_rounded,
+    accent: AdminAccents.bankTransfer,
+  ),
 ];
 
 String adminPageTitle(AdminPage page, {String? orderStatus}) {
@@ -137,7 +149,7 @@ String adminPageTitle(AdminPage page, {String? orderStatus}) {
     AdminPage.dashboard => 'Panel',
     AdminPage.orders => switch (orderStatus) {
       'preparing' => 'Hazırlanan siparişler',
-      'shipping' => 'Kargodaki siparişler',
+      'shipping' => 'Kuryedeki siparişler',
       'delivered' => 'Teslim edilenler',
       'cancelled' => 'İptal edilenler',
       _ => 'Siparişler',
@@ -146,11 +158,13 @@ String adminPageTitle(AdminPage page, {String? orderStatus}) {
     AdminPage.brands => 'Markalar',
     AdminPage.categories => 'Kategoriler',
     AdminPage.trustBadges => 'Güven Rozetleri',
-    AdminPage.advantages => 'Ürün Avantajları',
+    AdminPage.advantages => 'Ürün Özellikleri',
     AdminPage.members => 'Üyeler',
     AdminPage.campaigns => 'Kampanyalar',
+    AdminPage.coupons => 'Kuponlar',
     AdminPage.broadcasts => 'Duyurular',
     AdminPage.banners => 'Sayfa bannerları',
     AdminPage.support => 'Müşteri talepleri',
+    AdminPage.bankTransfer => 'Havale / EFT',
   };
 }

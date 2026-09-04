@@ -10,6 +10,7 @@ import 'package:geliyor_app/screens/payment_methods_screen.dart';
 import 'package:geliyor_app/screens/privacy_security_screen.dart';
 import 'package:geliyor_app/screens/logout_success_screen.dart';
 import 'package:geliyor_app/screens/personal_info_screen.dart';
+import 'package:geliyor_app/services/user_profile_sync.dart';
 import 'package:geliyor_app/state/auth_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
@@ -41,7 +42,10 @@ class AccountScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildProfileCard(),
+              ListenableBuilder(
+                listenable: AuthStore.instance,
+                builder: (context, _) => _buildProfileCard(),
+              ),
               const SizedBox(height: 12),
               _buildMenuCard(
                 context: context,
@@ -451,6 +455,7 @@ class AccountScreen extends StatelessWidget {
               }
             : item.opensLogout
             ? () async {
+                await UserProfileSync.flush();
                 await AuthStore.instance.logout();
                 if (!context.mounted) return;
                 Navigator.of(context).pushReplacement(

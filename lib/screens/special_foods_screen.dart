@@ -10,6 +10,7 @@ import 'package:geliyor_app/state/favorite_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/utils/product_image.dart';
 import 'package:geliyor_app/utils/product_price.dart';
+import 'package:geliyor_app/utils/product_tag_filter.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
 import 'package:geliyor_app/widgets/app_pressable_button.dart';
@@ -96,6 +97,28 @@ class _SpecialFoodsScreenState extends State<SpecialFoodsScreen> {
   _HealthProblem get _selectedProblem =>
       _problems.firstWhere((e) => e.id == _selectedProblemId);
 
+  List<_SpecialProduct> _productsForSelection(List<MarketProductData> catalog) {
+    final petLabel = _petType == _PetType.cat ? 'Kedi' : 'Köpek';
+    final matched = ProductTagFilter.apply(
+      catalog: catalog,
+      tags: [_selectedProblemId],
+      petLabel: petLabel,
+    );
+    return [
+      for (final item in matched)
+        _SpecialProduct(
+          id: item.id,
+          brand: item.brand,
+          name: item.title,
+          tag: _selectedProblem.title,
+          weight: item.weights.isNotEmpty ? item.weights.first : '',
+          price: item.prices.isNotEmpty ? item.prices.first : 0,
+          imagePath: item.imagePath,
+          source: item,
+        ),
+    ];
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -147,22 +170,24 @@ class _SpecialFoodsScreenState extends State<SpecialFoodsScreen> {
                 stream: ProductRepository.instance.watchMarketProducts(),
                 builder: (context, snapshot) {
                   final catalog = snapshot.data ?? const <MarketProductData>[];
-                  if (catalog.isEmpty) return const SizedBox.shrink();
-                  final item = catalog.first;
-                  return _buildProductGrid([
-                    _SpecialProduct(
-                      id: item.id,
-                      brand: item.brand,
-                      name: item.title,
-                      tag: _selectedProblem.title,
-                      weight: item.weights.isNotEmpty
-                          ? item.weights.first
-                          : '',
-                      price: item.prices.isNotEmpty ? item.prices.first : 0,
-                      imagePath: item.imagePath,
-                      source: item,
-                    ),
-                  ]);
+                  final products = _productsForSelection(catalog);
+                  if (products.isEmpty) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 24),
+                      child: Center(
+                        child: Text(
+                          'Bu sağlık problemi için mama bulunamadı.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: AppColors.subText,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+                  return _buildProductGrid(products);
                 },
               ),
             ],
@@ -496,35 +521,35 @@ class _SpecialFoodsScreenState extends State<SpecialFoodsScreen> {
             style: AppTextStyles.sectionHeader,
           ),
         ),
-        const Text(
-          'Tümü',
-          style: AppTextStyles.seeAllAction,
-        ),
-        const Icon(
-          Icons.chevron_right_rounded,
-          color: AppColors.primary,
-          size: 20,
-        ),
       ],
     );
   }
 
   Widget _buildProductGrid(List<_SpecialProduct> products) {
-    return SizedBox(
-      height: 148,
-      child: Row(
-        children: [
-          for (int i = 0; i < 3; i++) ...[
-            if (i > 0) const SizedBox(width: 8),
-            Expanded(
-              child: i < products.length
-                  ? _buildProductCard(products[i])
-                  : const SizedBox.shrink(),
-            ),
-          ],
-        ],
-      ),
-    );
+    const columns = 3;
+    const gap = 8.0;
+    final rows = <Widget>[];
+    for (int start = 0; start < products.length; start += columns) {
+      if (rows.isNotEmpty) rows.add(const SizedBox(height: gap));
+      rows.add(
+        SizedBox(
+          height: 148,
+          child: Row(
+            children: [
+              for (int i = 0; i < columns; i++) ...[
+                if (i > 0) const SizedBox(width: gap),
+                Expanded(
+                  child: start + i < products.length
+                      ? _buildProductCard(products[start + i])
+                      : const SizedBox.shrink(),
+                ),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
+    return Column(children: rows);
   }
 
   Widget _buildProductCard(_SpecialProduct product) {

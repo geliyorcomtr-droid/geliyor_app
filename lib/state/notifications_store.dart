@@ -59,7 +59,7 @@ class AppNotification {
       case AppNotificationCategory.reminder:
         return Icons.notifications_active_rounded;
       case AppNotificationCategory.order:
-        return Icons.local_shipping_rounded;
+        return Icons.delivery_dining_rounded;
       case AppNotificationCategory.system:
         return Icons.notifications_rounded;
     }
@@ -110,7 +110,35 @@ class NotificationsStore extends ChangeNotifier {
             for (final doc in snap.docs) AppNotification.fromDoc(doc),
           ];
           notifyListeners();
-        }, onError: (_) {});
+        }, onError: (error) {
+          debugPrint('Bildirim listesi alınamadı: $error');
+          _listenWithoutOrder(uid);
+        });
+  }
+
+  void _listenWithoutOrder(String uid) {
+    unawaited(_sub?.cancel());
+    _sub = FirebaseFirestore.instance
+        .collection(FirestoreCollections.users)
+        .doc(uid)
+        .collection('notifications')
+        .limit(80)
+        .snapshots()
+        .listen((snap) {
+          final next = [
+            for (final doc in snap.docs) AppNotification.fromDoc(doc),
+          ]..sort((a, b) {
+              final left =
+                  a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+              final right =
+                  b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+              return right.compareTo(left);
+            });
+          items = next;
+          notifyListeners();
+        }, onError: (error) {
+          debugPrint('Bildirim listesi yedek sorgu da başarısız: $error');
+        });
   }
 
   Future<void> markRead(String id) async {

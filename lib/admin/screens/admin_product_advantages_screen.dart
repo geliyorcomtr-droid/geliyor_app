@@ -37,7 +37,7 @@ class _AdminProductAdvantagesScreenState
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ürün avantajları yüklenemedi: $error')),
+        SnackBar(content: Text('Ürün özellikleri yüklenemedi: $error')),
       );
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -63,7 +63,7 @@ class _AdminProductAdvantagesScreenState
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: Text(
-            existing == null ? 'Ürün Avantajı Ekle' : 'Avantajı Düzenle',
+            existing == null ? 'Ürün Özelliği Ekle' : 'Özelliği Düzenle',
           ),
           content: SizedBox(
             width: 540,
@@ -81,7 +81,7 @@ class _AdminProductAdvantagesScreenState
                   TextField(
                     controller: name,
                     decoration: InputDecoration(
-                      labelText: isStat ? 'Etiket (ör. Protein İçerir)' : 'Avantaj adı',
+                      labelText: isStat ? 'Etiket (ör. Protein İçerir)' : 'Özellik adı',
                       border: const OutlineInputBorder(),
                     ),
                   ),
@@ -267,7 +267,7 @@ class _AdminProductAdvantagesScreenState
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Ürün avantajını kaldır'),
+        title: const Text('Ürün özelliğini kaldır'),
         content: Text('"${item.name}" listeden kaldırılsın mı?'),
         actions: [
           TextButton(
@@ -338,7 +338,7 @@ class _AdminProductAdvantagesScreenState
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
           children: [
             const Text(
-              'Ürün Avantajları',
+              'Ürün Özellikleri',
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w800,
@@ -347,7 +347,7 @@ class _AdminProductAdvantagesScreenState
             ),
             const SizedBox(height: 6),
             const Text(
-              'Ürün detayında görselin sağında gösterilen avantajları yönetin.',
+              'Ürün detayında görselin sağında (ilk 5) ve alt listede gösterilen özellikleri yönetin.',
               style: TextStyle(
                 color: AppColors.subText,
                 fontWeight: FontWeight.w600,
@@ -416,7 +416,7 @@ class _AdminProductAdvantagesScreenState
               dataRowMaxHeight: 72,
               columns: const [
                 DataColumn(label: Text('Resim')),
-                DataColumn(label: Text('Avantaj Adı')),
+                DataColumn(label: Text('Özellik Adı')),
                 DataColumn(label: Text('Sıra No')),
                 DataColumn(label: Text('Yayın Durumu')),
                 DataColumn(label: Text('İşlem')),
@@ -576,7 +576,7 @@ class _AdminProductAdvantagesScreenState
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: AppColors.border),
       ),
-      child: const Text('Henüz ürün avantajı yok.'),
+      child: const Text('Henüz ürün özelliği yok.'),
     );
   }
 

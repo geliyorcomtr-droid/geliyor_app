@@ -4,6 +4,7 @@ import 'package:geliyor_app/admin/admin_theme.dart';
 import 'package:geliyor_app/admin/admin_ui.dart';
 import 'package:geliyor_app/data/firestore_collections.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:geliyor_app/utils/product_image.dart';
 
 class AdminSupportTicket {
   const AdminSupportTicket({
@@ -15,6 +16,10 @@ class AdminSupportTicket {
     required this.status,
     this.reply = '',
     this.userId = '',
+    this.kind = SupportTicketKinds.support,
+    this.imageUrl = '',
+    this.phone = '',
+    this.productName = '',
     this.createdAt,
   });
 
@@ -26,7 +31,13 @@ class AdminSupportTicket {
   final String status;
   final String reply;
   final String userId;
+  final String kind;
+  final String imageUrl;
+  final String phone;
+  final String productName;
   final DateTime? createdAt;
+
+  bool get isSupply => kind == SupportTicketKinds.supply;
 
   factory AdminSupportTicket.fromDoc(
     DocumentSnapshot<Map<String, dynamic>> doc,
@@ -43,6 +54,11 @@ class AdminSupportTicket {
           SupportTicketStatuses.open,
       reply: (data[SupportTicketFields.reply] as String?) ?? '',
       userId: (data[SupportTicketFields.userId] as String?) ?? '',
+      kind: (data[SupportTicketFields.kind] as String?) ??
+          SupportTicketKinds.support,
+      imageUrl: ((data[SupportTicketFields.imageUrl] as String?) ?? '').trim(),
+      phone: (data[SupportTicketFields.phone] as String?) ?? '',
+      productName: (data[SupportTicketFields.productName] as String?) ?? '',
       createdAt: created is Timestamp ? created.toDate() : null,
     );
   }
@@ -65,11 +81,20 @@ class _AdminSupportScreenState extends State<AdminSupportScreen> {
     _ => AppColors.subText,
   };
 
-  String _label(String status) => switch (status) {
-    SupportTicketStatuses.open => 'Açık',
-    SupportTicketStatuses.replied => 'Yanıtlandı',
-    _ => 'Kapalı',
-  };
+  String _label(AdminSupportTicket ticket) {
+    if (ticket.isSupply) {
+      return switch (ticket.status) {
+        SupportTicketStatuses.replied => 'Tedarik',
+        SupportTicketStatuses.closed => 'Tamamlandı',
+        _ => 'Yeni',
+      };
+    }
+    return switch (ticket.status) {
+      SupportTicketStatuses.open => 'Açık',
+      SupportTicketStatuses.replied => 'Yanıtlandı',
+      _ => 'Kapalı',
+    };
+  }
 
   Future<void> _update(
     AdminSupportTicket ticket, {
@@ -141,9 +166,12 @@ class _AdminSupportScreenState extends State<AdminSupportScreen> {
             final right = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
             return right.compareTo(left);
           });
-        final visible = _filter == 'all'
-            ? all
-            : all.where((t) => t.status == _filter).toList();
+        final visible = switch (_filter) {
+          'all' => all,
+          SupportTicketKinds.supply =>
+            all.where((t) => t.isSupply).toList(),
+          _ => all.where((t) => t.status == _filter).toList(),
+        };
 
         return Padding(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
@@ -153,7 +181,7 @@ class _AdminSupportScreenState extends State<AdminSupportScreen> {
               const AdminPageHeader(
                 title: 'Talepler',
                 subtitle:
-                    'Yardım formundan gelen sipariş, iade ve ürün soruları.',
+                    'Yardım formu ve hangi mama tedarik talepleri.',
               ),
               Wrap(
                 spacing: 8,
@@ -161,6 +189,7 @@ class _AdminSupportScreenState extends State<AdminSupportScreen> {
                   _chip('Açık', SupportTicketStatuses.open, all),
                   _chip('Yanıtlandı', SupportTicketStatuses.replied, all),
                   _chip('Kapalı', SupportTicketStatuses.closed, all),
+                  _chip('Mama tedarik', SupportTicketKinds.supply, all),
                   _chip('Tümü', 'all', all),
                 ],
               ),
@@ -191,18 +220,28 @@ class _AdminSupportScreenState extends State<AdminSupportScreen> {
                             return ListTile(
                               selected: _selectedId == ticket.id,
                               selectedTileColor: AppColors.selected,
-                              onTap: () =>
-                                  setState(() => _selectedId = ticket.id),
+                              onTap: () => _openTicket(ticket),
+                              leading: _ticketImage(ticket),
                               title: Text(
-                                ticket.subject.isEmpty
-                                    ? 'Talep'
-                                    : ticket.subject,
+                                ticket.isSupply
+                                    ? (ticket.productName.isEmpty
+                                        ? 'Mama tedarik talebi'
+                                        : ticket.productName)
+                                    : (ticket.subject.isEmpty
+                                        ? 'Talep'
+                                        : ticket.subject),
                                 style: const TextStyle(
                                   fontWeight: FontWeight.w800,
                                 ),
                               ),
                               subtitle: Text(
-                                '${ticket.name} · ${AdminUi.dateTime(ticket.createdAt)}\n${ticket.message}',
+                                [
+                                  if (ticket.isSupply) 'Mama tedarik',
+                                  if (ticket.name.isNotEmpty) ticket.name,
+                                  if (ticket.phone.isNotEmpty) ticket.phone,
+                                  AdminUi.dateTime(ticket.createdAt),
+                                  ticket.message,
+                                ].join(' · '),
                                 maxLines: 3,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -212,13 +251,23 @@ class _AdminSupportScreenState extends State<AdminSupportScreen> {
                                 crossAxisAlignment: WrapCrossAlignment.center,
                                 children: [
                                   AdminStatusChip(
-                                    label: _label(ticket.status),
+                                    label: _label(ticket),
                                     color: _color(ticket.status),
                                   ),
                                   TextButton(
                                     onPressed: () => _reply(ticket),
                                     child: const Text('Yanıtla'),
                                   ),
+                                  if (ticket.isSupply &&
+                                      ticket.status ==
+                                          SupportTicketStatuses.open)
+                                    TextButton(
+                                      onPressed: () => _update(
+                                        ticket,
+                                        status: SupportTicketStatuses.replied,
+                                      ),
+                                      child: const Text('Tedarik ediliyor'),
+                                    ),
                                   if (ticket.status !=
                                       SupportTicketStatuses.closed)
                                     TextButton(
@@ -226,7 +275,9 @@ class _AdminSupportScreenState extends State<AdminSupportScreen> {
                                         ticket,
                                         status: SupportTicketStatuses.closed,
                                       ),
-                                      child: const Text('Kapat'),
+                                      child: Text(
+                                        ticket.isSupply ? 'Tamamla' : 'Kapat',
+                                      ),
                                     ),
                                 ],
                               ),
@@ -242,11 +293,131 @@ class _AdminSupportScreenState extends State<AdminSupportScreen> {
     );
   }
 
+  Widget _ticketImage(AdminSupportTicket ticket) {
+    if (ticket.imageUrl.isEmpty) {
+      return CircleAvatar(
+        backgroundColor: AppColors.selected,
+        child: Icon(
+          ticket.isSupply
+              ? Icons.pets_rounded
+              : Icons.support_agent_rounded,
+          color: AppColors.primary,
+          size: 20,
+        ),
+      );
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: SizedBox(
+        width: 56,
+        height: 56,
+        child: buildProductImage(
+          ticket.imageUrl,
+          width: 56,
+          height: 56,
+          fit: BoxFit.cover,
+          errorWidget: CircleAvatar(
+            backgroundColor: AppColors.selected,
+            child: Icon(
+              Icons.broken_image_outlined,
+              color: AppColors.primary,
+              size: 20,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openTicket(AdminSupportTicket ticket) {
+    setState(() => _selectedId = ticket.id);
+    showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: Text(
+            ticket.isSupply
+                ? (ticket.productName.isEmpty
+                    ? 'Mama tedarik talebi'
+                    : ticket.productName)
+                : (ticket.subject.isEmpty ? 'Talep' : ticket.subject),
+          ),
+          content: SizedBox(
+            width: 480,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (ticket.imageUrl.isNotEmpty) ...[
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          maxHeight: 360,
+                          minWidth: 280,
+                        ),
+                        child: buildProductImage(
+                          ticket.imageUrl,
+                          width: double.infinity,
+                          fit: BoxFit.contain,
+                          errorWidget: const Padding(
+                            padding: EdgeInsets.all(24),
+                            child: Center(
+                              child: Text('Görsel yüklenemedi.'),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  Text(
+                    [
+                      if (ticket.isSupply) 'Mama tedarik',
+                      if (ticket.name.isNotEmpty) ticket.name,
+                      if (ticket.phone.isNotEmpty) ticket.phone,
+                      if (ticket.email.isNotEmpty) ticket.email,
+                      AdminUi.dateTime(ticket.createdAt),
+                    ].join('\n'),
+                    style: const TextStyle(
+                      color: AppColors.subText,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (ticket.message.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Text(ticket.message),
+                  ],
+                  if (ticket.reply.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      'Yanıt: ${ticket.reply}',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Kapat'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _chip(String label, String value, List<AdminSupportTicket> all) {
     final selected = _filter == value;
-    final count = value == 'all'
-        ? all.length
-        : all.where((t) => t.status == value).length;
+    final count = switch (value) {
+      'all' => all.length,
+      SupportTicketKinds.supply => all.where((t) => t.isSupply).length,
+      _ => all.where((t) => t.status == value).length,
+    };
     return FilterChip(
       label: Text('$label ($count)'),
       selected: selected,

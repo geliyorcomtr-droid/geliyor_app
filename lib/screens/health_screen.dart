@@ -1,4 +1,6 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:async';
+
+import 'package:flutter/material.dart';
 import 'package:geliyor_app/data/banner_repository.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/screens/emergency_support_screen.dart';
@@ -6,6 +8,7 @@ import 'package:geliyor_app/widgets/app_notification_button.dart';
 import 'package:geliyor_app/screens/medicine_treatment_screen.dart';
 import 'package:geliyor_app/screens/special_foods_screen.dart';
 import 'package:geliyor_app/screens/vaccine_calendar_screen.dart';
+import 'package:geliyor_app/state/health_calendar_store.dart';
 import 'package:geliyor_app/state/notification_settings_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
@@ -120,6 +123,29 @@ class _HealthScreenState extends State<HealthScreen> {
     for (final p in _procedures) {
       p.recalculateNextDue();
     }
+    _applySavedDates();
+    HealthCalendarStore.instance.addListener(_onCalendarChanged);
+  }
+
+  void _onCalendarChanged() {
+    if (!mounted) return;
+    setState(_applySavedDates);
+  }
+
+  void _applySavedDates() {
+    HealthCalendarStore.instance.overlayLastDone((title, lastDone) {
+      for (final p in _procedures) {
+        if (p.title == title) {
+          p.applyDoneDate(lastDone);
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    HealthCalendarStore.instance.removeListener(_onCalendarChanged);
+    super.dispose();
   }
 
   static DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
@@ -143,6 +169,13 @@ class _HealthScreenState extends State<HealthScreen> {
   static int _daysUntil(DateTime due) {
     final today = _dateOnly(DateTime.now());
     return _dateOnly(due).difference(today).inDays;
+  }
+
+  static String _healthCategoryFor(String title) {
+    final lower = title.toLowerCase();
+    if (lower.contains('parazit')) return 'parasite';
+    if (lower.contains('aşı') || lower.contains('asi')) return 'vaccine';
+    return 'checkup';
   }
 
   String _formatFullDate(DateTime date) =>
@@ -195,6 +228,15 @@ class _HealthScreenState extends State<HealthScreen> {
       p.applyDoneDate(doneDate);
       _reminderOpen = false;
     });
+    unawaited(
+      HealthCalendarStore.instance.recordDone(
+        title: p.title,
+        category: _healthCategoryFor(p.title),
+        frequency: p.frequency,
+        intervalMonths: p.intervalMonths,
+        doneDate: doneDate,
+      ),
+    );
 
     final notificationLine = store.healthNotificationLine(next);
 
@@ -246,6 +288,8 @@ class _HealthScreenState extends State<HealthScreen> {
                   ),
                   const SizedBox(height: 12),
                   _buildTopBanner(),
+                  const SizedBox(height: 10),
+                  _buildPetTypeSelector(),
                   const SizedBox(height: 12),
                   _buildServiceCards(context),
                   const SizedBox(height: 12),
@@ -295,6 +339,117 @@ class _HealthScreenState extends State<HealthScreen> {
     return const AppBannerSlot(
       placement: BannerPlacement.healthTop,
       fallbackAssets: ['assets/images/saglik_banner.png'],
+    );
+  }
+
+  Widget _buildPetTypeSelector() {
+    return Row(
+      children: [
+        Expanded(
+          child: _petTypeBox(
+            label: 'Kedi',
+            iconPath: 'assets/images/app_ikonlar/normal_kedi.png',
+            selected: true,
+            enabled: true,
+            onTap: () {},
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _petTypeBox(
+            label: 'Köpek',
+            iconPath: 'assets/images/app_ikonlar/kopek.png',
+            selected: false,
+            enabled: false,
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Köpek sağlığı yakında eklenecek.',
+                  ),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _petTypeBox({
+    required String label,
+    required String iconPath,
+    required bool selected,
+    required bool enabled,
+    required VoidCallback onTap,
+  }) {
+    return AppPressableButton(
+      onTap: onTap,
+      height: 36,
+      padding: EdgeInsets.zero,
+      backgroundColor: selected ? AppColors.selected : AppColors.surface,
+      pressedBackgroundColor: selected
+          ? AppColors.primary
+          : AppColors.selected,
+      foregroundColor: selected ? AppColors.primary : AppColors.subText,
+      pressedForegroundColor: selected
+          ? AppColors.surface
+          : AppColors.primary,
+      borderColor: selected ? AppColors.primaryLight : AppColors.border,
+      pressedBorderColor: AppColors.primary,
+      child: Opacity(
+        opacity: enabled ? 1 : 0.45,
+        child: Stack(
+          children: [
+            Center(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Image.asset(
+                    iconPath,
+                    width: 18,
+                    height: 18,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, _, _) => Icon(
+                      Icons.pets_rounded,
+                      size: 16,
+                      color: selected ? AppColors.primary : AppColors.subText,
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: selected ? AppColors.primary : AppColors.text,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (selected)
+              Positioned(
+                right: 6,
+                top: 6,
+                child: Container(
+                  width: 14,
+                  height: 14,
+                  decoration: const BoxDecoration(
+                    color: AppColors.primary,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.check_rounded,
+                    color: AppColors.surface,
+                    size: 10,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 

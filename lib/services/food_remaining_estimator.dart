@@ -10,7 +10,7 @@ class FoodRemainingEstimate {
     required this.totalDays,
     required this.bagKg,
     required this.dailyGrams,
-    required this.pet,
+    required this.pets,
     this.food,
     required this.foodTitle,
     this.imagePath,
@@ -21,11 +21,16 @@ class FoodRemainingEstimate {
   final int totalDays;
   final double bagKg;
   final int dailyGrams;
-  final PetData pet;
+  final List<PetData> pets;
   final LastOrderItem? food;
   final String foodTitle;
   final String? imagePath;
   final bool fromManual;
+
+  PetData get pet => pets.first;
+
+  /// Aynı paketi paylaşan dostların kısa etiketi.
+  String get shareLabel => FoodRemainingEstimator.shareLabelFor(pets);
 
   double get remainingRatio {
     if (totalDays <= 0) return 0;
@@ -54,12 +59,13 @@ abstract final class FoodRemainingEstimator {
   static FoodRemainingEstimate? compute() {
     final tracking = FoodTrackingStore.instance;
     if (tracking.isActive && tracking.bagKg > 0) {
-      final pet = _manualPet(tracking);
-      if (pet == null) return null;
-      final dailyGrams = _dailyGramsFor(pet);
+      final seed = _manualPet(tracking);
+      if (seed == null) return null;
+      final pets = sharingPetsFor(seed);
+      final dailyGrams = sharedDailyGrams(pets);
       if (dailyGrams <= 0) return null;
       return _build(
-        pet: pet,
+        pets: pets,
         bagKg: tracking.bagKg,
         startedAt: tracking.purchaseDate,
         dailyGrams: dailyGrams,
@@ -73,15 +79,15 @@ abstract final class FoodRemainingEstimator {
     final orderMatch = _lastDryFoodWithPet();
     if (orderMatch == null) return null;
     final food = orderMatch.$1;
-    final pet = orderMatch.$2;
-    final dailyGrams = _dailyGramsFor(pet);
+    final pets = sharingPetsFor(orderMatch.$2);
+    final dailyGrams = sharedDailyGrams(pets);
     if (dailyGrams <= 0) return null;
 
     final bagKg = kgFromLabel(food.weight) * food.quantity;
     if (bagKg <= 0) return null;
 
     return _build(
-      pet: pet,
+      pets: pets,
       bagKg: bagKg,
       startedAt: OrderStore.instance.lastOrderAt,
       dailyGrams: dailyGrams,
@@ -92,7 +98,7 @@ abstract final class FoodRemainingEstimator {
   }
 
   static FoodRemainingEstimate? _build({
-    required PetData pet,
+    required List<PetData> pets,
     required double bagKg,
     required DateTime startedAt,
     required int dailyGrams,
@@ -101,7 +107,7 @@ abstract final class FoodRemainingEstimator {
     String? imagePath,
     bool fromManual = false,
   }) {
-    if (bagKg <= 0 || dailyGrams <= 0) return null;
+    if (pets.isEmpty || bagKg <= 0 || dailyGrams <= 0) return null;
     final totalDays = ((bagKg * 1000) / dailyGrams).round();
     final elapsed = DateTime.now()
         .difference(_dateOnly(startedAt))
@@ -114,12 +120,42 @@ abstract final class FoodRemainingEstimator {
       totalDays: totalDays,
       bagKg: bagKg,
       dailyGrams: dailyGrams,
-      pet: pet,
+      pets: pets,
       food: food,
       foodTitle: foodTitle,
       imagePath: imagePath,
       fromManual: fromManual,
     );
+  }
+
+  static bool isDogPet(PetData pet) {
+    final species = pet.species.toLowerCase();
+    return species.contains('köpek') || species.contains('kopek');
+  }
+
+  /// Aynı türdeki tüm dostlar aynı paketi paylaşır.
+  static List<PetData> sharingPetsFor(PetData seed) {
+    final wantDog = isDogPet(seed);
+    final matched = PetStore.instance.pets
+        .where((pet) => isDogPet(pet) == wantDog)
+        .toList();
+    return matched.isEmpty ? [seed] : matched;
+  }
+
+  static int sharedDailyGrams(List<PetData> pets) {
+    var total = 0;
+    for (final pet in pets) {
+      total += _dailyGramsFor(pet);
+    }
+    return total;
+  }
+
+  static String shareLabelFor(List<PetData> pets) {
+    if (pets.isEmpty) return 'Dostlarınız';
+    if (pets.length == 1) return pets.first.name;
+    if (pets.length == 2) return '${pets[0].name} ve ${pets[1].name}';
+    final species = isDogPet(pets.first) ? 'köpek' : 'kedi';
+    return '${pets.length} $species · aynı paket';
   }
 
   static double kgFromLabel(String? text) {

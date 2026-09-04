@@ -21,10 +21,23 @@ class AssistantProduct {
 }
 
 class AssistantAction {
-  const AssistantAction({required this.label, required this.prompt});
+  const AssistantAction({
+    required this.label,
+    this.prompt = '',
+    this.intent = AssistantIntent.none,
+  });
 
   final String label;
   final String prompt;
+  final AssistantIntent intent;
+}
+
+enum AssistantIntent {
+  none,
+  enableVaccineReminder,
+  openVaccineCalendar,
+  declineVaccineReminder,
+  postponeVaccineReminder,
 }
 
 class AssistantReply {
@@ -47,11 +60,23 @@ class AssistantService {
   static final AssistantService instance = AssistantService._();
 
   static const _envApiKey = String.fromEnvironment('GEMINI_API_KEY');
-  static const _model = 'gemini-2.0-flash';
   static const _configAsset = 'assets/config/gemini_api_key.txt';
+  static const _models = [
+    'gemini-3.6-flash',
+    'gemini-3.5-flash',
+    'gemini-flash-latest',
+    'gemini-2.0-flash',
+  ];
 
   String? _cachedApiKey;
+  String? _resolvedModel;
   bool _configLoaded = false;
+  http.Client? _activeClient;
+
+  void cancelActive() {
+    _activeClient?.close();
+    _activeClient = null;
+  }
 
   Future<void> _ensureApiKeyLoaded() async {
     if (_configLoaded) return;
@@ -82,29 +107,119 @@ class AssistantService {
     String question, {
     List<({String role, String text})> history = const [],
   }) async {
+    final buffer = StringBuffer();
+    await for (final delta in askStream(question, history: history)) {
+      buffer.write(delta);
+    }
+    final text = buffer.toString().trim();
+    if (text.isEmpty) {
+      return _smartLocalReply(question);
+    }
+    return decorate(text, question);
+  }
+
+  AssistantReply decorate(String text, String question) {
+    final followUp = _followUpReply(question);
+    if (followUp != null) {
+      return AssistantReply(
+        text: text.trim().isEmpty ? followUp.text : text.trim(),
+        products: followUp.products,
+        actions: followUp.actions,
+        fromAi: false,
+      );
+    }
+    return _enrichReply(text.trim(), question);
+  }
+
+  AssistantReply? _followUpReply(String question) {
+    final lower = _normalize(question);
+
+    if (_containsAny(lower, ['istemiyorum', 'gerek yok']) &&
+        _containsAny(lower, ['hatirlat', 'asi'])) {
+      return const AssistantReply(
+        text:
+            'Tamam, şimdilik hatırlatıcı açmadım. İstediğin zaman Aşı Takvimi’nden açabilirsin.',
+      );
+    }
+    if (_containsAny(lower, ['daha sonra']) &&
+        _containsAny(lower, ['hatirlat'])) {
+      return const AssistantReply(
+        text:
+            'Tamam, daha sonra hatırlatırım. İstediğin zaman Aşı Takvimi’nden de açabilirsin.',
+      );
+    }
+    if (_containsAny(lower, [
+      'acmak istiyorum',
+      'hatirlaticiyi ac',
+      'hatirlaticisini ac',
+    ])) {
+      return const AssistantReply(
+        text:
+            'Aşı hatırlatıcısını açtım. Takvimden tarihleri işaretleyebilirsin.',
+        actions: [
+          AssistantAction(
+            label: 'Aşı takvimini aç',
+            intent: AssistantIntent.openVaccineCalendar,
+          ),
+        ],
+      );
+    }
+    if (_containsAny(lower, [
+      'takvimi goster',
+      'takvimi nasil',
+      'takvimi ac',
+    ])) {
+      return const AssistantReply(
+        text:
+            'Aşı takvimini şimdi açabilirim. Oradan tarihleri işaretleyip hatırlatıcıyı yönetebilirsin.',
+        actions: [
+          AssistantAction(
+            label: 'Takvimi aç',
+            intent: AssistantIntent.openVaccineCalendar,
+          ),
+        ],
+      );
+    }
+    return null;
+  }
+
+  Stream<String> askStream(
+    String question, {
+    List<({String role, String text})> history = const [],
+  }) async* {
     final trimmed = question.trim();
     if (trimmed.isEmpty) {
-      return const AssistantReply(
-        text: 'Lütfen dostunuzla ilgili bir soru yazın.',
-      );
+      yield 'Lütfen bir soru yazın.';
+      return;
+    }
+
+    final followUp = _followUpReply(trimmed);
+    if (followUp != null) {
+      yield followUp.text;
+      return;
     }
 
     if (await hasLiveApi) {
+      final streamed = StringBuffer();
       try {
-        return await _askGemini(trimmed, history: history);
+        await for (final delta in _streamGemini(trimmed, history: history)) {
+          streamed.write(delta);
+          yield delta;
+        }
+        if (streamed.isNotEmpty) return;
       } catch (error) {
         debugPrint('Assistant API error: $error');
+        if (streamed.isNotEmpty) return;
       }
     }
 
-    return _smartLocalReply(trimmed);
+    yield _smartLocalReply(trimmed).text;
   }
 
-  Future<AssistantReply> _askGemini(
-    String question, {
+  Map<String, dynamic> _geminiRequestBody({
+    required String question,
     required List<({String role, String text})> history,
-  }) async {
-    final apiKey = _cachedApiKey!;
+  }) {
     final pets = PetStore.instance.pets;
     final petContext = pets.isEmpty
         ? 'Kullanıcının kayıtlı dostu yok.'
@@ -119,44 +234,30 @@ class AssistantService {
             .join('; ');
 
     final systemPrompt = '''
-Sen Geliyor.tr uygulamasının Türkçe konuşan yapay zeka pet asistanısın.
+Sen Geliyor.tr uygulamasının ChatGPT benzeri yapay zeka asistanısın.
 Kurallar:
-- Her soruya özel, farklı ve somut cevap ver; kalıp cümle tekrarlama.
-- Kısa tut (2-5 cümle), sıcak ve pratik ol.
-- Veteriner teşhisi koyma; ciddi belirtilerde veterinere yönlendir.
-- Mümkünse kayıtlı dost bilgilerini kullanarak kişiselleştir.
-- Mama, aşı, bakım, kum, tüy, kilo, davranış konularında uygulama içi öneri ver.
+- Türkçe, doğal ve yardımcı konuş. Kalıp cümle tekrarlama.
+- Genel sohbet, pet bakımı, mama, aşı, kilo, tüy, davranış, sipariş ve uygulama kullanımında yardım et.
+- Cevabı anlaşılır tut; gerektiğinde kısa maddeler kullan, gereksiz uzatma.
+- Veteriner teşhisi koyma. Ciddi belirtilerde (kusma, ishal, ateş, nefes darlığı) veterinere yönlendir.
+- Kayıtlı dost bilgileri varsa kişiselleştir.
+- Ürün önerirken Geliyor.tr / Pet Market bağlamını koru.
+- Kullanıcı hatırlatıcıyı açmayı, ertelemeyi veya reddetmeyi söylediyse aynı soruyu tekrar sorma; kısaca onayla ve Aşı Takvimi'ne yönlendir.
 
 Kayıtlı dost bilgileri: $petContext
 ''';
 
-    final contents = <Map<String, dynamic>>[
-      {
-        'role': 'user',
-        'parts': [
-          {'text': systemPrompt},
-        ],
-      },
-      {
-        'role': 'model',
-        'parts': [
-          {
-            'text':
-                'Anladım. Geliyor.tr pet asistanıyım; kayıtlı dost bilgilerinize göre özel cevap vereceğim.',
-          },
-        ],
-      },
-    ];
-
-    for (final turn in history.take(8)) {
+    final contents = <Map<String, dynamic>>[];
+    for (final turn in history.take(16)) {
+      final text = turn.text.trim();
+      if (text.isEmpty) continue;
       contents.add({
         'role': turn.role == 'user' ? 'user' : 'model',
         'parts': [
-          {'text': turn.text},
+          {'text': text},
         ],
       });
     }
-
     contents.add({
       'role': 'user',
       'parts': [
@@ -164,40 +265,133 @@ Kayıtlı dost bilgileri: $petContext
       ],
     });
 
+    return {
+      'systemInstruction': {
+        'parts': [
+          {'text': systemPrompt},
+        ],
+      },
+      'contents': contents,
+      'generationConfig': {
+        'temperature': 0.8,
+        'maxOutputTokens': 2048,
+        'topP': 0.95,
+      },
+    };
+  }
+
+  Iterable<String> _modelsToTry() {
+    if (_resolvedModel == null) return _models;
+    return [
+      _resolvedModel!,
+      ..._models.where((model) => model != _resolvedModel),
+    ];
+  }
+
+  Stream<String> _streamGemini(
+    String question, {
+    required List<({String role, String text})> history,
+  }) async* {
+    final apiKey = _cachedApiKey!;
+    final body = jsonEncode(
+      _geminiRequestBody(question: question, history: history),
+    );
+    Object? lastError;
+
+    for (final model in _modelsToTry()) {
+      try {
+        yield* _streamGeminiModel(apiKey: apiKey, model: model, body: body);
+        _resolvedModel = model;
+        return;
+      } on _GeminiModelUnavailable catch (error) {
+        lastError = error;
+        continue;
+      }
+    }
+
+    throw lastError ?? Exception('Gemini modeli yanıt vermedi.');
+  }
+
+  Stream<String> _streamGeminiModel({
+    required String apiKey,
+    required String model,
+    required String body,
+  }) async* {
+    cancelActive();
+    final client = http.Client();
+    _activeClient = client;
+
     final uri = Uri.parse(
-      'https://generativelanguage.googleapis.com/v1beta/models/$_model:generateContent?key=$apiKey',
+      'https://generativelanguage.googleapis.com/v1beta/models/'
+      '$model:streamGenerateContent?alt=sse&key=$apiKey',
     );
+    final request = http.Request('POST', uri)
+      ..headers['Content-Type'] = 'application/json'
+      ..headers['Accept'] = 'text/event-stream'
+      ..body = body;
 
-    final response = await http.post(
-      uri,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'contents': contents,
-        'generationConfig': {
-          'temperature': 0.85,
-          'maxOutputTokens': 800,
-          'topP': 0.95,
-        },
-      }),
-    );
+    http.StreamedResponse response;
+    try {
+      response = await client.send(request);
+    } catch (error) {
+      if (_activeClient == client) _activeClient = null;
+      client.close();
+      rethrow;
+    }
 
+    if (response.statusCode == 404) {
+      if (_activeClient == client) _activeClient = null;
+      client.close();
+      throw _GeminiModelUnavailable(model);
+    }
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception('Gemini HTTP ${response.statusCode}: ${response.body}');
+      final raw = await response.stream.bytesToString();
+      if (_activeClient == client) _activeClient = null;
+      client.close();
+      throw Exception('Gemini HTTP ${response.statusCode}: $raw');
     }
 
-    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-    final text = _extractGeminiText(decoded);
-    if (text == null || text.trim().isEmpty) {
-      throw Exception('Empty Gemini response');
+    final pending = StringBuffer();
+    try {
+      await for (final chunk in response.stream.transform(utf8.decoder)) {
+        pending.write(chunk);
+        final lines = pending.toString().split('\n');
+        pending
+          ..clear()
+          ..write(lines.removeLast());
+        for (final line in lines) {
+          final delta = _parseSseLine(line);
+          if (delta != null && delta.isNotEmpty) yield delta;
+        }
+      }
+      final tail = _parseSseLine(pending.toString());
+      if (tail != null && tail.isNotEmpty) yield tail;
+    } finally {
+      if (_activeClient == client) _activeClient = null;
+      client.close();
     }
+  }
 
-    final enriched = _enrichReply(text.trim(), question);
-    return AssistantReply(
-      text: enriched.text,
-      products: enriched.products,
-      actions: enriched.actions,
-      fromAi: true,
-    );
+  String? _parseSseLine(String raw) {
+    var line = raw.trim();
+    if (line.isEmpty || line.startsWith(':')) return null;
+    if (line.startsWith('data:')) {
+      line = line.substring(5).trim();
+    }
+    if (line.isEmpty || line == '[DONE]') return null;
+
+    Map<String, dynamic> decoded;
+    try {
+      final parsed = jsonDecode(line);
+      if (parsed is! Map<String, dynamic>) return null;
+      decoded = parsed;
+    } catch (_) {
+      return null;
+    }
+    if (decoded['error'] != null) {
+      throw Exception('Gemini error: ${decoded['error']}');
+    }
+    return _extractGeminiText(decoded);
   }
 
   String? _extractGeminiText(Map<String, dynamic> decoded) {
@@ -210,11 +404,14 @@ Kayıtlı dost bilgileri: $petContext
     final parts = content['parts'];
     if (parts is! List || parts.isEmpty) return null;
 
-    final firstPart = parts.first;
-    if (firstPart is! Map<String, dynamic>) return null;
-
-    final text = firstPart['text'];
-    return text is String ? text : null;
+    final buffer = StringBuffer();
+    for (final part in parts) {
+      if (part is Map<String, dynamic> && part['text'] is String) {
+        buffer.write(part['text'] as String);
+      }
+    }
+    final text = buffer.toString();
+    return text.isEmpty ? null : text;
   }
 
   AssistantReply _smartLocalReply(String question) {
@@ -261,15 +458,15 @@ Kayıtlı dost bilgileri: $petContext
         actions: const [
           AssistantAction(
             label: 'Evet, hatırlatıcıyı aç',
-            prompt: 'Aşı hatırlatıcısını açmak istiyorum.',
+            intent: AssistantIntent.enableVaccineReminder,
           ),
           AssistantAction(
             label: 'Takvimi göster',
-            prompt: 'Aşı takvimini nasıl görürüm?',
+            intent: AssistantIntent.openVaccineCalendar,
           ),
           AssistantAction(
             label: 'Şimdilik gerek yok',
-            prompt: 'Şimdilik aşı hatırlatıcısı istemiyorum.',
+            intent: AssistantIntent.declineVaccineReminder,
           ),
         ],
       );
@@ -463,6 +660,7 @@ Kayıtlı dost bilgileri: $petContext
       'siparis',
       'sipariş',
       'kargo',
+      'kurye',
       'teslimat',
       'sepet',
       'market',
@@ -471,7 +669,7 @@ Kayıtlı dost bilgileri: $petContext
     ])) {
       return AssistantReply(
         text:
-            'Pet Market’ten sipariş verebilir, Sepetim’den ödeme adımlarını tamamlayabilirsin. Kampanyalar sekmesinde güncel indirimler var. Teslimat ve adres için Hesabım > Adreslerim bölümünü güncel tutman yeterli.',
+            'Pet Market’ten sipariş verebilir, Sepetim’den ödeme adımlarını tamamlayabilirsin. Teslimat kurye ile kısa sürede yapılır. 599 TL ve üzeri siparişlerde getirme ücreti yoktur; altında 99 TL getirme ücreti uygulanır. Adres için Hesabım > Adreslerim bölümünü güncel tutman yeterli.',
         actions: const [
           AssistantAction(
             label: 'Mama öner',
@@ -608,19 +806,26 @@ Kayıtlı dost bilgileri: $petContext
         ? _defaultProducts(isDog: isDog)
         : <AssistantProduct>[];
 
-    final actions = _containsAny(lower, ['asi', 'aşı', 'hatirlat', 'hatırlat'])
+    final answer = _normalize(text);
+    final asksReminder = _containsAny(answer, [
+      'hatirlatici acmam',
+      'ister misin',
+      'acayim mi',
+      'hatirlatici ister',
+    ]);
+    final actions = asksReminder
         ? const [
             AssistantAction(
               label: 'Evet, hatırlatıcıyı aç',
-              prompt: 'Aşı hatırlatıcısını açmak istiyorum.',
+              intent: AssistantIntent.enableVaccineReminder,
             ),
             AssistantAction(
-              label: 'Daha sonra hatırlat',
-              prompt: 'Aşı hatırlatmasını daha sonra istiyorum.',
+              label: 'Takvimi göster',
+              intent: AssistantIntent.openVaccineCalendar,
             ),
             AssistantAction(
-              label: 'Hayır, teşekkürler',
-              prompt: 'Şimdilik aşı hatırlatıcısı istemiyorum.',
+              label: 'Şimdilik gerek yok',
+              intent: AssistantIntent.declineVaccineReminder,
             ),
           ]
         : <AssistantAction>[];
@@ -651,4 +856,13 @@ Kayıtlı dost bilgileri: $petContext
     }
     return false;
   }
+}
+
+class _GeminiModelUnavailable implements Exception {
+  const _GeminiModelUnavailable(this.model);
+
+  final String model;
+
+  @override
+  String toString() => 'Gemini model unavailable: $model';
 }

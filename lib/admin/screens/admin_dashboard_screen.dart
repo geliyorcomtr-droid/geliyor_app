@@ -9,6 +9,7 @@ import 'package:geliyor_app/admin/admin_theme.dart';
 import 'package:geliyor_app/admin/admin_ui.dart';
 import 'package:geliyor_app/data/firestore_collections.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:geliyor_app/utils/order_no.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key, this.onOpenPage});
@@ -235,8 +236,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   width: width,
                   child: AdminStatCard(
                     value: '$shipping',
-                    label: 'Kargoda',
-                    icon: Icons.local_shipping_rounded,
+                    label: 'Kuryede',
+                    icon: Icons.delivery_dining_rounded,
                     color: AppColors.primary,
                     onTap: () => _open(
                       AdminPage.orders,
@@ -270,7 +271,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             ),
             FilledButton.tonalIcon(
               onPressed: () => _open(AdminPage.orders),
-              icon: const Icon(Icons.local_shipping_outlined, size: 18),
+              icon: const Icon(Icons.delivery_dining_rounded, size: 18),
               label: const Text('Siparişler'),
             ),
             FilledButton.tonalIcon(
@@ -287,6 +288,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               onPressed: () => _open(AdminPage.broadcasts),
               icon: const Icon(Icons.notifications_active_outlined, size: 18),
               label: const Text('Duyuru'),
+            ),
+            FilledButton.tonalIcon(
+              onPressed: () => _open(AdminPage.bankTransfer),
+              icon: const Icon(Icons.account_balance_outlined, size: 18),
+              label: const Text('Havale / EFT'),
             ),
           ],
         ),
@@ -361,7 +367,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 onTap: () => _open(AdminPage.orders),
                 title: Text(
                   order.customerName.isEmpty
-                      ? 'Sipariş ${order.id.length > 8 ? order.id.substring(0, 8) : order.id}'
+                      ? 'Sipariş ${OrderNo.labeled(order.id)}'
                       : order.customerName,
                   style: const TextStyle(
                     fontWeight: FontWeight.w800,

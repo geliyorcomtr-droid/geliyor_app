@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:geliyor_app/data/turkey_locations.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/state/address_store.dart';
+import 'package:geliyor_app/state/auth_store.dart';
+import 'package:geliyor_app/utils/login_gate.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
@@ -8,8 +12,16 @@ import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
 import 'package:geliyor_app/widgets/app_pressable_button.dart';
 
+enum _AddressMenuAction { makeDefault, edit, delete }
+
 class AddressesScreen extends StatefulWidget {
-  const AddressesScreen({super.key});
+  const AddressesScreen({
+    super.key,
+    this.selectForDelivery = false,
+  });
+
+  /// Sipariş onayından gelince kart tıklanınca adres seçilir ve geri dönülür.
+  final bool selectForDelivery;
 
   @override
   State<AddressesScreen> createState() => _AddressesScreenState();
@@ -22,10 +34,16 @@ class _AddressesScreenState extends State<AddressesScreen> {
 
   final _titleController = TextEditingController();
   final _contactController = TextEditingController();
-  final _phoneController = TextEditingController();
   final _addressController = TextEditingController();
+  final _nationalIdController = TextEditingController();
+  final _taxOfficeController = TextEditingController();
   bool _formIsDefault = false;
+  bool _formIsDelivery = true;
+  bool _formIsInvoice = true;
   IconData _formIcon = Icons.home_rounded;
+  AddressAccountType _formAccountType = AddressAccountType.individual;
+  String? _formCity;
+  String? _formDistrict;
 
   static const _iconOptions = <(IconData, String)>[
     (Icons.home_rounded, 'Ev'),
@@ -46,8 +64,9 @@ class _AddressesScreenState extends State<AddressesScreen> {
     AddressStore.instance.removeListener(_onStoreChanged);
     _titleController.dispose();
     _contactController.dispose();
-    _phoneController.dispose();
     _addressController.dispose();
+    _nationalIdController.dispose();
+    _taxOfficeController.dispose();
     super.dispose();
   }
 
@@ -64,10 +83,16 @@ class _AddressesScreenState extends State<AddressesScreen> {
       _formError = null;
       _titleController.clear();
       _contactController.clear();
-      _phoneController.clear();
       _addressController.clear();
+      _nationalIdController.clear();
+      _taxOfficeController.clear();
       _formIsDefault = _addresses.isEmpty;
+      _formIsDelivery = true;
+      _formIsInvoice = true;
       _formIcon = Icons.home_rounded;
+      _formAccountType = AddressAccountType.individual;
+      _formCity = null;
+      _formDistrict = null;
     });
   }
 
@@ -78,10 +103,23 @@ class _AddressesScreenState extends State<AddressesScreen> {
       _formError = null;
       _titleController.text = address.title;
       _contactController.text = address.contactName;
-      _phoneController.text = address.phone;
       _addressController.text = address.address;
+      _nationalIdController.text = address.taxId.isNotEmpty
+          ? address.taxId
+          : address.nationalId;
+      _taxOfficeController.text = address.taxOffice;
       _formIsDefault = address.isDefault;
+      _formIsDelivery = address.isDelivery;
+      _formIsInvoice = address.isInvoice;
       _formIcon = address.icon;
+      _formAccountType = address.accountType;
+      final inferred = TurkeyLocations.infer(
+        address: address.address,
+        city: address.city,
+        district: address.district,
+      );
+      _formCity = inferred.city.isEmpty ? null : inferred.city;
+      _formDistrict = inferred.district.isEmpty ? null : inferred.district;
     });
   }
 
@@ -102,7 +140,18 @@ class _AddressesScreenState extends State<AddressesScreen> {
     Navigator.of(context).maybePop();
   }
 
-  void _setDefault(String id) {
+  void _pickAddress(AddressData address) {
+    AddressStore.instance.setDefault(address.id);
+    if (!mounted) return;
+    Navigator.of(context).pop();
+  }
+
+  Future<void> _setDefault(String id) async {
+    final ok = await LoginGate.require(
+      context: context,
+      message: 'Adres kaydetmek için giriş yapmanız gerekir.',
+    );
+    if (!ok || !mounted) return;
     AddressStore.instance.setDefault(id);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -112,8 +161,10 @@ class _AddressesScreenState extends State<AddressesScreen> {
     );
   }
 
-  void _deleteAddress(String id) {
+  Future<void> _deleteAddress(String id) async {
     AddressStore.instance.remove(id);
+    await AddressStore.instance.persistNow();
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Adres silindi.'),
@@ -122,21 +173,74 @@ class _AddressesScreenState extends State<AddressesScreen> {
     );
   }
 
-  void _saveForm() {
+  Future<void> _saveForm() async {
     FocusScope.of(context).unfocus();
 
     final title = _titleController.text.trim();
     final contact = _contactController.text.trim();
-    final phone = _phoneController.text.trim();
     final address = _addressController.text.trim();
+    final idDigits = _nationalIdController.text.replaceAll(RegExp(r'\D'), '');
+    final taxOffice = _taxOfficeController.text.trim();
     final wasEditing = _isEditing;
+    final isCorporate = _formAccountType == AddressAccountType.corporate;
 
-    if (title.isEmpty || contact.isEmpty || phone.isEmpty || address.isEmpty) {
+    final city = _formCity?.trim() ?? '';
+    final district = _formDistrict?.trim() ?? '';
+
+    if (title.isEmpty || contact.isEmpty || address.isEmpty) {
       setState(() {
         _formError = 'Lütfen tüm alanları doldurun.';
       });
       return;
     }
+    if (city.isEmpty || district.isEmpty) {
+      setState(() {
+        _formError = 'Lütfen il ve ilçe seçin.';
+      });
+      return;
+    }
+    if (!_formIsDelivery && !_formIsInvoice) {
+      setState(() {
+        _formError = 'Teslimat veya fatura adresi seçin.';
+      });
+      return;
+    }
+
+    var nationalId = '';
+    var taxId = '';
+    if (isCorporate) {
+      if (idDigits.length == 10) {
+        taxId = idDigits;
+      } else if (idDigits.length == 11) {
+        nationalId = idDigits;
+      } else {
+        setState(() {
+          _formError =
+              'Kurumsal adres için 10 haneli vergi no veya 11 haneli T.C. kimlik no girin.';
+        });
+        return;
+      }
+      if (taxOffice.isEmpty) {
+        setState(() {
+          _formError = 'Kurumsal adres için vergi dairesi girin.';
+        });
+        return;
+      }
+    } else if (idDigits.isNotEmpty) {
+      if (idDigits.length != 11) {
+        setState(() {
+          _formError = 'T.C. kimlik no 11 haneli olmalıdır.';
+        });
+        return;
+      }
+      nationalId = idDigits;
+    }
+
+    final ok = await LoginGate.require(
+      context: context,
+      message: 'Adres kaydetmek için giriş yapmanız gerekir.',
+    );
+    if (!ok || !mounted) return;
 
     final data = AddressData(
       id: wasEditing
@@ -144,10 +248,18 @@ class _AddressesScreenState extends State<AddressesScreen> {
           : 'addr_${DateTime.now().millisecondsSinceEpoch}',
       title: title,
       contactName: contact,
-      phone: phone,
+      phone: AuthStore.instance.phone.trim(),
       address: address,
+      city: city,
+      district: district,
       icon: _formIcon,
       isDefault: _formIsDefault,
+      accountType: _formAccountType,
+      nationalId: nationalId,
+      taxId: taxId,
+      taxOffice: isCorporate ? taxOffice : '',
+      isDelivery: _formIsDelivery,
+      isInvoice: _formIsInvoice,
     );
 
     if (wasEditing) {
@@ -155,6 +267,8 @@ class _AddressesScreenState extends State<AddressesScreen> {
     } else {
       AddressStore.instance.add(data);
     }
+    await AddressStore.instance.persistNow();
+    if (!mounted) return;
 
     setState(() {
       _formError = null;
@@ -172,101 +286,89 @@ class _AddressesScreenState extends State<AddressesScreen> {
     );
   }
 
-  void _showAddressMenu(AddressData address) {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: false,
-      builder: (sheetContext) {
-        return Align(
-          alignment: Alignment.bottomCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: AppPageFrame.width),
-            child: Material(
-              color: AppColors.surface,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(28),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 36,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: AppColors.border,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    if (!address.isDefault)
-                      _buildMenuAction(
-                        icon: Icons.star_outline_rounded,
-                        label: 'Varsayılan yap',
-                        color: AppColors.primary,
-                        onTap: () {
-                          Navigator.pop(sheetContext);
-                          _setDefault(address.id);
-                        },
-                      ),
-                    _buildMenuAction(
-                      icon: Icons.edit_outlined,
-                      label: 'Düzenle',
-                      color: AppColors.primary,
-                      onTap: () {
-                        Navigator.pop(sheetContext);
-                        _openEditForm(address);
-                      },
-                    ),
-                    _buildMenuAction(
-                      icon: Icons.delete_outline_rounded,
-                      label: 'Sil',
-                      color: AppColors.error,
-                      onTap: () {
-                        Navigator.pop(sheetContext);
-                        _deleteAddress(address.id);
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ),
+  void _onAddressMenu(AddressData address, _AddressMenuAction action) {
+    switch (action) {
+      case _AddressMenuAction.makeDefault:
+        _setDefault(address.id);
+      case _AddressMenuAction.edit:
+        _openEditForm(address);
+      case _AddressMenuAction.delete:
+        _deleteAddress(address.id);
+    }
+  }
+
+  Widget _buildMoreButton(AddressData address) {
+    return PopupMenuButton<_AddressMenuAction>(
+      tooltip: 'Adres işlemleri',
+      padding: EdgeInsets.zero,
+      offset: const Offset(0, 8),
+      color: AppColors.surface,
+      elevation: 10,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: const BorderSide(color: AppColors.border),
+      ),
+      onSelected: (action) => _onAddressMenu(address, action),
+      itemBuilder: (context) => [
+        if (!address.isDefault)
+          _menuItem(
+            _AddressMenuAction.makeDefault,
+            Icons.star_outline_rounded,
+            'Varsayılan yap',
+            AppColors.primary,
           ),
-        );
-      },
+        _menuItem(
+          _AddressMenuAction.edit,
+          Icons.edit_outlined,
+          'Düzenle',
+          AppColors.primary,
+        ),
+        _menuItem(
+          _AddressMenuAction.delete,
+          Icons.delete_outline_rounded,
+          'Sil',
+          AppColors.error,
+        ),
+      ],
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: AppColors.selected,
+          shape: BoxShape.circle,
+          border: Border.all(color: AppColors.primaryLight),
+        ),
+        child: const Icon(
+          Icons.more_vert_rounded,
+          color: AppColors.primary,
+          size: 22,
+        ),
+      ),
     );
   }
 
-  Widget _buildMenuAction({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-          child: Row(
-            children: [
-              Icon(icon, color: color, size: 20),
-              const SizedBox(width: 10),
-              Text(
-                label,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
+  PopupMenuItem<_AddressMenuAction> _menuItem(
+    _AddressMenuAction value,
+    IconData icon,
+    String label,
+    Color color,
+  ) {
+    return PopupMenuItem<_AddressMenuAction>(
+      value: value,
+      enabled: true,
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 10),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -336,7 +438,9 @@ class _AddressesScreenState extends State<AddressesScreen> {
                 Text(
                   _showForm
                       ? (_isEditing ? 'Adres Düzenle' : 'Yeni Adres')
-                      : 'Adreslerim',
+                      : (widget.selectForDelivery
+                          ? 'Adres Seç'
+                          : 'Adreslerim'),
                   textAlign: TextAlign.center,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -345,7 +449,9 @@ class _AddressesScreenState extends State<AddressesScreen> {
                 Text(
                   _showForm
                       ? 'Adres bilgilerini girin ve kaydedin.'
-                      : 'Kayıtlı adreslerinizi görüntüleyin ve yönetin.',
+                      : (widget.selectForDelivery
+                          ? 'Teslimat adresine dokunun, siparişe dönülür.'
+                          : 'Kayıtlı adreslerinizi görüntüleyin ve yönetin.'),
                   textAlign: TextAlign.center,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -438,6 +544,85 @@ class _AddressesScreenState extends State<AddressesScreen> {
                 ],
               ),
               const SizedBox(height: 12),
+              const Text(
+                'Hesap Türü',
+                style: TextStyle(
+                  color: AppColors.text,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildSelectChip(
+                      selected:
+                          _formAccountType == AddressAccountType.individual,
+                      icon: Icons.person_outline_rounded,
+                      label: 'Bireysel',
+                      onTap: () => setState(
+                        () => _formAccountType = AddressAccountType.individual,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildSelectChip(
+                      selected:
+                          _formAccountType == AddressAccountType.corporate,
+                      icon: Icons.apartment_rounded,
+                      label: 'Kurumsal',
+                      onTap: () => setState(
+                        () => _formAccountType = AddressAccountType.corporate,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Adres Kullanımı',
+                style: TextStyle(
+                  color: AppColors.text,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildSelectChip(
+                      selected: _formIsDelivery,
+                      icon: Icons.local_shipping_outlined,
+                      label: 'Teslimat',
+                      onTap: () =>
+                          setState(() => _formIsDelivery = !_formIsDelivery),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildSelectChip(
+                      selected: _formIsInvoice,
+                      icon: Icons.receipt_long_outlined,
+                      label: 'Fatura',
+                      onTap: () =>
+                          setState(() => _formIsInvoice = !_formIsInvoice),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Teslimat ve fatura için aynı adresi birlikte seçebilirsiniz.',
+                style: TextStyle(
+                  color: AppColors.subText,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 12),
               _buildField(
                 label: 'Adres Başlığı',
                 controller: _titleController,
@@ -451,18 +636,90 @@ class _AddressesScreenState extends State<AddressesScreen> {
               ),
               const SizedBox(height: 10),
               _buildField(
-                label: 'Telefon',
-                controller: _phoneController,
-                hint: '+90 5xx xxx xx xx',
-                keyboardType: TextInputType.phone,
-              ),
-              const SizedBox(height: 10),
-              _buildField(
                 label: 'Adres',
                 controller: _addressController,
-                hint: 'Mahalle, cadde, no, ilçe / şehir',
+                hint: 'Mahalle, cadde, sokak, no',
                 maxLines: 3,
               ),
+              const SizedBox(height: 10),
+              _buildLocationField(
+                label: 'İl',
+                value: _formCity,
+                placeholder: 'İl seçin',
+                onTap: () => _openLocationPicker(
+                  title: 'İl seçin',
+                  options: TurkeyLocations.provinces,
+                  selected: _formCity,
+                  onSelect: (value) {
+                    setState(() {
+                      _formCity = value;
+                      _formDistrict = null;
+                      _formError = null;
+                    });
+                  },
+                ),
+              ),
+              const SizedBox(height: 10),
+              _buildLocationField(
+                label: 'İlçe',
+                value: _formDistrict,
+                placeholder: _formCity == null
+                    ? 'Önce il seçin'
+                    : 'İlçe seçin',
+                enabled: _formCity != null,
+                onTap: () {
+                  final city = _formCity;
+                  if (city == null) return;
+                  _openLocationPicker(
+                    title: 'İlçe seçin',
+                    options: TurkeyLocations.districtsOf(city),
+                    selected: _formDistrict,
+                    onSelect: (value) {
+                      setState(() {
+                        _formDistrict = value;
+                        _formError = null;
+                      });
+                    },
+                  );
+                },
+              ),
+              if (_formAccountType == AddressAccountType.individual) ...[
+                const SizedBox(height: 10),
+                _buildField(
+                  label: 'T.C. Kimlik No (opsiyonel)',
+                  controller: _nationalIdController,
+                  hint: '11 haneli kimlik numarası',
+                  keyboardType: TextInputType.number,
+                  maxLength: 11,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                ),
+              ] else ...[
+                const SizedBox(height: 10),
+                _buildField(
+                  label: 'Vergi / T.C. Kimlik No',
+                  controller: _nationalIdController,
+                  hint: '10 hane vergi no, 11 hane T.C.',
+                  keyboardType: TextInputType.number,
+                  maxLength: 11,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  onChanged: (_) => setState(() {}),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  _corporateIdHint,
+                  style: const TextStyle(
+                    color: AppColors.subText,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                _buildField(
+                  label: 'Vergi Dairesi',
+                  controller: _taxOfficeController,
+                  hint: 'Örn. Kadıköy Vergi Dairesi',
+                ),
+              ],
               const SizedBox(height: 10),
               Material(
                 color: Colors.transparent,
@@ -552,9 +809,22 @@ class _AddressesScreenState extends State<AddressesScreen> {
   }
 
   Widget _buildIconOption(IconData icon, String label) {
-    final selected = _formIcon == icon;
-    return GestureDetector(
+    return _buildSelectChip(
+      selected: _formIcon == icon,
+      icon: icon,
+      label: label,
       onTap: () => setState(() => _formIcon = icon),
+    );
+  }
+
+  Widget _buildSelectChip({
+    required bool selected,
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 140),
         height: 42,
@@ -576,12 +846,16 @@ class _AddressesScreenState extends State<AddressesScreen> {
               color: selected ? AppColors.primary : AppColors.subText,
             ),
             const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: selected ? AppColors.primary : AppColors.text,
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: selected ? AppColors.primary : AppColors.text,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
           ],
@@ -590,12 +864,26 @@ class _AddressesScreenState extends State<AddressesScreen> {
     );
   }
 
+  String get _corporateIdHint {
+    final length =
+        _nationalIdController.text.replaceAll(RegExp(r'\D'), '').length;
+    if (length == 10) return 'Vergi kimlik no olarak kaydedilecek.';
+    if (length == 11) return 'T.C. kimlik no olarak kaydedilecek.';
+    if (length == 0) {
+      return '10 hane vergi no, 11 hane T.C. kimlik no olarak kaydedilir.';
+    }
+    return '10 veya 11 hane girin.';
+  }
+
   Widget _buildField({
     required String label,
     required TextEditingController controller,
     required String hint,
     TextInputType? keyboardType,
     int maxLines = 1,
+    int? maxLength,
+    List<TextInputFormatter>? inputFormatters,
+    ValueChanged<String>? onChanged,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -623,6 +911,9 @@ class _AddressesScreenState extends State<AddressesScreen> {
             controller: controller,
             keyboardType: keyboardType,
             maxLines: maxLines,
+            maxLength: maxLength,
+            inputFormatters: inputFormatters,
+            onChanged: onChanged,
             style: const TextStyle(
               color: AppColors.text,
               fontSize: 12.5,
@@ -637,6 +928,7 @@ class _AddressesScreenState extends State<AddressesScreen> {
               ),
               border: InputBorder.none,
               isDense: true,
+              counterText: '',
               contentPadding: maxLines > 1
                   ? EdgeInsets.zero
                   : const EdgeInsets.symmetric(vertical: 12),
@@ -647,11 +939,228 @@ class _AddressesScreenState extends State<AddressesScreen> {
     );
   }
 
+  Widget _buildLocationField({
+    required String label,
+    required String? value,
+    required String placeholder,
+    required VoidCallback onTap,
+    bool enabled = true,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: AppColors.text,
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 6),
+        GestureDetector(
+          onTap: enabled ? onTap : null,
+          child: Container(
+            height: 42,
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            decoration: BoxDecoration(
+              color: enabled ? AppColors.background : AppColors.selected,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    value ?? placeholder,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: value == null
+                          ? AppColors.subText
+                          : AppColors.text,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: enabled ? AppColors.primary : AppColors.subText,
+                  size: 22,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _openLocationPicker({
+    required String title,
+    required List<String> options,
+    required String? selected,
+    required ValueChanged<String> onSelect,
+  }) async {
+    final query = TextEditingController();
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: AppColors.surface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        builder: (sheetContext) {
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.viewInsetsOf(sheetContext).bottom +
+                  MediaQuery.paddingOf(sheetContext).bottom,
+            ),
+            child: StatefulBuilder(
+              builder: (context, setSheetState) {
+                final needle = query.text.trim();
+                final filtered = needle.isEmpty
+                    ? options
+                    : options
+                        .where(
+                          (item) => TurkeyLocations.matchesQuery(item, needle),
+                        )
+                        .toList();
+                return SizedBox(
+                    height: 420,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                      child: Column(
+                        children: [
+                          Container(
+                            width: 36,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: AppColors.border,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              title,
+                              style: const TextStyle(
+                                color: AppColors.text,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Container(
+                            height: 42,
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            decoration: BoxDecoration(
+                              color: AppColors.background,
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: TextField(
+                              controller: query,
+                              onChanged: (_) => setSheetState(() {}),
+                              style: const TextStyle(
+                                color: AppColors.text,
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              decoration: const InputDecoration(
+                                hintText: 'Ara',
+                                hintStyle: TextStyle(
+                                  color: AppColors.subText,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                border: InputBorder.none,
+                                isDense: true,
+                                contentPadding:
+                                    EdgeInsets.symmetric(vertical: 10),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Expanded(
+                            child: filtered.isEmpty
+                                ? const Center(
+                                    child: Text(
+                                      'Sonuç bulunamadı.',
+                                      style: TextStyle(
+                                        color: AppColors.subText,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  )
+                                : ListView.separated(
+                                    itemCount: filtered.length,
+                                    separatorBuilder: (_, _) => const Divider(
+                                      height: 1,
+                                      thickness: 1,
+                                      color: AppColors.border,
+                                    ),
+                                    itemBuilder: (context, index) {
+                                      final option = filtered[index];
+                                      final isSelected = selected == option;
+                                      return ListTile(
+                                        dense: true,
+                                        contentPadding: EdgeInsets.zero,
+                                        title: Text(
+                                          option,
+                                          style: TextStyle(
+                                            color: AppColors.text,
+                                            fontSize: 13,
+                                            fontWeight: isSelected
+                                                ? FontWeight.w800
+                                                : FontWeight.w600,
+                                          ),
+                                        ),
+                                        trailing: isSelected
+                                            ? const Icon(
+                                                Icons.check_rounded,
+                                                color: AppColors.primary,
+                                                size: 18,
+                                              )
+                                            : null,
+                                        onTap: () {
+                                          onSelect(option);
+                                          Navigator.of(sheetContext).pop();
+                                        },
+                                      );
+                                    },
+                                  ),
+                          ),
+                        ],
+                      ),
+                    ),
+                );
+              },
+            ),
+          );
+        },
+      );
+    } finally {
+      query.dispose();
+    }
+  }
+
   Widget _buildSectionHeader() {
     return Row(
       children: [
-        const Expanded(
-          child: Text('Kayıtlı Adreslerim', style: AppTextStyles.sectionHeader),
+        Expanded(
+          child: Text(
+            widget.selectForDelivery
+                ? 'Teslimat adresi seçin'
+                : 'Kayıtlı Adreslerim',
+            style: AppTextStyles.sectionHeader,
+          ),
         ),
         AppPressableButton.primary(
           onTap: _openAddForm,
@@ -672,125 +1181,168 @@ class _AddressesScreenState extends State<AddressesScreen> {
   }
 
   Widget _buildAddressCard(AddressData address) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => _showAddressMenu(address),
+    final card = Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(24),
-        child: Ink(
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: address.isDefault ? AppColors.primary : AppColors.border,
-              width: address.isDefault ? 1.5 : 1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+        border: Border.all(
+          color: address.isDefault ? AppColors.primary : AppColors.border,
+          width: address.isDefault ? 1.5 : 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(10, 10, 8, 10),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildAddressIconBox(address),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              address.title,
-                              style: const TextStyle(
-                                color: AppColors.text,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ),
-                          if (address.isDefault)
-                            Container(
-                              margin: const EdgeInsets.only(right: 4),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 7,
-                                vertical: 3,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary,
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: const Text(
-                                'Varsayılan',
-                                style: TextStyle(
-                                  color: AppColors.surface,
-                                  fontSize: 8,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ),
-                          GestureDetector(
-                            onTap: () => _showAddressMenu(address),
-                            behavior: HitTestBehavior.opaque,
-                            child: Padding(
-                              padding: const EdgeInsets.all(4),
-                              child: Icon(
-                                Icons.more_vert_rounded,
-                                color: AppColors.subText.withValues(alpha: 0.8),
-                                size: 18,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      _buildInfoLine(
-                        Icons.person_outline_rounded,
-                        address.contactName,
-                      ),
-                      const SizedBox(height: 3),
-                      _buildInfoLine(Icons.phone_outlined, address.phone),
-                      const SizedBox(height: 3),
-                      Row(
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(10, 10, 8, 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: widget.selectForDelivery
+                  ? InkWell(
+                      onTap: () => _pickAddress(address),
+                      borderRadius: BorderRadius.circular(18),
+                      child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Padding(
-                            padding: EdgeInsets.only(top: 1),
-                            child: Icon(
-                              Icons.location_on_outlined,
-                              size: 13,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                          const SizedBox(width: 5),
-                          Expanded(
-                            child: Text(
-                              address.address,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: AppColors.subText,
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w600,
-                                height: 1.3,
-                              ),
-                            ),
-                          ),
+                          _buildAddressIconBox(address),
+                          const SizedBox(width: 10),
+                          Expanded(child: _buildAddressCardBody(address)),
                         ],
                       ),
-                    ],
+                    )
+                  : Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildAddressIconBox(address),
+                        const SizedBox(width: 10),
+                        Expanded(child: _buildAddressCardBody(address)),
+                      ],
+                    ),
+            ),
+            _buildMoreButton(address),
+          ],
+        ),
+      ),
+    );
+    return card;
+  }
+
+  Widget _buildAddressCardBody(AddressData address) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                address.title,
+                style: const TextStyle(
+                  color: AppColors.text,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+            if (address.isDefault)
+              Container(
+                margin: const EdgeInsets.only(right: 2),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 7,
+                  vertical: 3,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: const Text(
+                  'Varsayılan',
+                  style: TextStyle(
+                    color: AppColors.surface,
+                    fontSize: 8,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
-              ],
+              ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Wrap(
+          spacing: 4,
+          runSpacing: 4,
+          children: [
+            _buildTinyBadge(
+              address.isCorporate ? 'Kurumsal' : 'Bireysel',
             ),
+            if (address.isDelivery) _buildTinyBadge('Teslimat'),
+            if (address.isInvoice) _buildTinyBadge('Fatura'),
+          ],
+        ),
+        const SizedBox(height: 4),
+        _buildInfoLine(
+          Icons.person_outline_rounded,
+          address.contactName,
+        ),
+        const SizedBox(height: 3),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.only(top: 1),
+              child: Icon(
+                Icons.location_on_outlined,
+                size: 13,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(width: 5),
+            Expanded(
+              child: Text(
+                address.cityDistrictLabel.isEmpty
+                    ? address.address
+                    : '${address.address}\n${address.cityDistrictLabel}',
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.subText,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w600,
+                  height: 1.3,
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (address.isCorporate && address.taxOffice.trim().isNotEmpty) ...[
+          const SizedBox(height: 3),
+          _buildInfoLine(
+            Icons.account_balance_outlined,
+            address.taxOffice,
           ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildTinyBadge(String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppColors.selected,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: AppColors.primary,
+          fontSize: 8,
+          fontWeight: FontWeight.w800,
         ),
       ),
     );

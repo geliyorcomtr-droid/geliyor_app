@@ -3,12 +3,15 @@ import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/screens/order_confirm_screen.dart';
 import 'package:geliyor_app/screens/product_detail_screen.dart';
 import 'package:geliyor_app/state/cart_store.dart';
+import 'package:geliyor_app/state/coupon_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:geliyor_app/utils/courier_fee.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
 import 'package:geliyor_app/widgets/app_pressable_button.dart';
 import 'package:geliyor_app/widgets/cart_product_card.dart';
+import 'package:geliyor_app/widgets/coupon_sheet.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -18,6 +21,12 @@ class CartScreen extends StatefulWidget {
 }
 
 class _CartScreenState extends State<CartScreen> {
+  @override
+  void initState() {
+    super.initState();
+    CouponStore.instance.ensureLoaded();
+  }
+
   String _formatPrice(double price, {bool withDecimals = false}) {
     final fixed = withDecimals ? price.toStringAsFixed(2) : price.round().toString();
     final parts = fixed.split('.');
@@ -41,13 +50,18 @@ class _CartScreenState extends State<CartScreen> {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: CartStore.instance,
+      listenable: Listenable.merge([
+        CartStore.instance,
+        CouponStore.instance,
+      ]),
       builder: (context, _) {
         final cart = CartStore.instance;
         final cartItems = cart.items;
         final totalQuantity = cart.totalQuantity;
         final cartTotal = cart.cartTotal;
         final cartDiscount = cart.cartDiscount;
+        final courierFee = cart.courierFee;
+        final payableTotal = CouponStore.instance.payableTotal(cartTotal);
 
         return Scaffold(
           backgroundColor: AppColors.background,
@@ -87,9 +101,9 @@ class _CartScreenState extends State<CartScreen> {
                     if (i != cartItems.length - 1) const SizedBox(height: 8),
                   ],
                   const SizedBox(height: 10),
-                  _buildSummaryCard(cartTotal, cartDiscount),
+                  _buildSummaryCard(cartTotal, cartDiscount, courierFee, payableTotal),
                   const SizedBox(height: 10),
-                  _buildCheckoutBar(cartTotal, totalQuantity),
+                  _buildCheckoutBar(cartTotal, payableTotal, totalQuantity),
                 ],
               ),
             ),
@@ -226,8 +240,14 @@ class _CartScreenState extends State<CartScreen> {
     }
   }
 
-  Widget _buildSummaryCard(double cartTotal, double cartDiscount) {
+  Widget _buildSummaryCard(
+    double cartTotal,
+    double cartDiscount,
+    double courierFee,
+    double payableTotal,
+  ) {
     final cartOldTotal = cartTotal + cartDiscount;
+    final remainingForFree = CourierFee.remainingForFree(cartTotal);
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: _pillDecoration(),
@@ -240,40 +260,123 @@ class _CartScreenState extends State<CartScreen> {
             '-${_formatPrice(cartDiscount)} TL',
             valueColor: AppColors.primary,
           ),
+          const SizedBox(height: 6),
+          _summaryRow(
+            'Getirme ücreti',
+            courierFee > 0 ? '${_formatPrice(courierFee)} TL' : 'Ücretsiz',
+            valueColor: courierFee > 0 ? AppColors.text : AppColors.primary,
+          ),
+          const SizedBox(height: 10),
+          _couponRow(cartTotal),
+          if (CouponStore.instance.discountFor(cartTotal) > 0) ...[
+            const SizedBox(height: 10),
+            _summaryRow(
+              'Kupon',
+              '-${_formatPrice(CouponStore.instance.discountFor(cartTotal))} TL',
+              valueColor: AppColors.primary,
+            ),
+          ],
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 8),
             child: Divider(height: 1, color: AppColors.border),
           ),
           _summaryRow(
             'Ödenecek tutar',
-            '${_formatPrice(cartTotal)} TL',
+            '${_formatPrice(payableTotal)} TL',
             bold: true,
             valueColor: AppColors.primary,
           ),
           const SizedBox(height: 10),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-            decoration: BoxDecoration(
-              color: AppColors.selected,
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: AppColors.primary, width: 1.5),
+          if (cartDiscount > 0) ...[
+            _summaryBanner(
+              icon: Icons.local_offer_outlined,
+              text: '${_formatPrice(cartDiscount)} TL sepette indirim uygulandı',
             ),
-            child: Row(
-              children: [
-                const Icon(Icons.local_offer_outlined, color: AppColors.primary, size: 16),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    '${_formatPrice(cartDiscount)} TL sepette indirim uygulandı',
-                    style: const TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
+            const SizedBox(height: 8),
+          ],
+          _summaryBanner(
+            icon: Icons.delivery_dining_rounded,
+            text: remainingForFree > 0
+                ? 'Ücretsiz kurye için ${_formatPrice(remainingForFree)} TL daha ekleyin'
+                : '599 TL ve üzeri siparişlerde getirme ücreti yok',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _couponRow(double cartTotal) {
+    final selected = CouponStore.instance.selected;
+    return GestureDetector(
+      onTap: () {
+        CouponStore.instance.ensureLoaded();
+        CouponSheet.show(context, subtotal: cartTotal);
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected != null ? AppColors.selected : AppColors.background,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: selected != null ? AppColors.primaryLight : AppColors.border,
+          ),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.local_offer_outlined,
+              color: AppColors.primary,
+              size: 18,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                selected == null
+                    ? 'Kupon kullan'
+                    : '${selected.code} uygulandı',
+                style: const TextStyle(
+                  color: AppColors.text,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
                 ),
-              ],
+              ),
+            ),
+            Text(
+              selected == null ? 'Seç' : 'Değiştir',
+              style: const TextStyle(
+                color: AppColors.primary,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _summaryBanner({required IconData icon, required String text}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        color: AppColors.selected,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.primary, width: 1.5),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: AppColors.primary, size: 16),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: AppColors.primary,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
         ],
@@ -310,7 +413,11 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  Widget _buildCheckoutBar(double cartTotal, int totalQuantity) {
+  Widget _buildCheckoutBar(
+    double cartTotal,
+    double payableTotal,
+    int totalQuantity,
+  ) {
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
       decoration: _pillDecoration(),
@@ -330,7 +437,7 @@ class _CartScreenState extends State<CartScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${_formatPrice(cartTotal)} TL',
+                  '${_formatPrice(payableTotal)} TL',
                   style: const TextStyle(
                     color: AppColors.primary,
                     fontSize: 18,

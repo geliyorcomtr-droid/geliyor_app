@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:flutter/services.dart';
+import 'package:geliyor_app/data/bank_transfer_repository.dart';
 import 'package:geliyor_app/screens/gift_select_screen.dart';
 import 'package:geliyor_app/screens/home_screen.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:geliyor_app/utils/courier_fee.dart';
+import 'package:geliyor_app/utils/order_no.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
@@ -17,6 +20,9 @@ class OrderSuccessScreen extends StatelessWidget {
     this.deliverySlot = 'Sabah',
     this.deliveryTime = '09:00 - 12:00',
     this.paymentMethod = 'Kapıda Nakit',
+    this.couponTitle = '',
+    this.couponDiscount = 0,
+    this.orderId = '',
   });
 
   final double cartTotal;
@@ -24,15 +30,15 @@ class OrderSuccessScreen extends StatelessWidget {
   final String deliverySlot;
   final String deliveryTime;
   final String paymentMethod;
-
-  static const String ibanHolder = 'FATİH EROĞLU';
-  static const String ibanNumber = 'TR64 0006 2000 1234 5678 9012 34';
+  final String couponTitle;
+  final double couponDiscount;
+  final String orderId;
 
   bool get _isBankTransfer => paymentMethod == 'Havale / EFT';
 
   String get _orderNo {
-    final stamp = DateTime.now().millisecondsSinceEpoch % 10000000;
-    return '#GLR$stamp';
+    if (orderId.trim().isEmpty) return '—';
+    return OrderNo.labeled(orderId);
   }
 
   String get _orderDate {
@@ -81,7 +87,9 @@ class OrderSuccessScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final totalText = _formatPrice(cartTotal);
+    final payableTotal =
+        CourierFee.payableTotal(cartTotal) - couponDiscount;
+    final totalText = _formatPrice(payableTotal < 0 ? 0 : payableTotal);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -101,7 +109,13 @@ class OrderSuccessScreen extends StatelessWidget {
               _buildDeliveryCard(),
               const SizedBox(height: 12),
               if (_isBankTransfer) ...[
-                _buildIbanCard(context),
+                StreamBuilder<BankTransferInfo>(
+                  stream: BankTransferRepository.instance.watch(),
+                  builder: (context, snapshot) {
+                    final info = snapshot.data ?? BankTransferInfo.defaults;
+                    return _buildIbanCard(context, info);
+                  },
+                ),
                 const SizedBox(height: 12),
               ],
               _buildOrderDetails(context, totalText),
@@ -413,7 +427,7 @@ class OrderSuccessScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildIbanCard(BuildContext context) {
+  Widget _buildIbanCard(BuildContext context, BankTransferInfo info) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -460,13 +474,13 @@ class OrderSuccessScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              _ibanInfoRow(label: 'Alıcı', value: ibanHolder),
+              _ibanInfoRow(label: 'Alıcı', value: info.holder),
               const SizedBox(height: 10),
               _ibanInfoRow(
                 label: 'IBAN',
-                value: ibanNumber,
+                value: info.formattedIban,
                 copyable: true,
-                onCopy: () => _copyIban(context),
+                onCopy: () => _copyIban(context, info),
               ),
             ],
           ),
@@ -528,8 +542,8 @@ class OrderSuccessScreen extends StatelessWidget {
     );
   }
 
-  void _copyIban(BuildContext context) {
-    Clipboard.setData(ClipboardData(text: ibanNumber.replaceAll(' ', '')));
+  void _copyIban(BuildContext context, BankTransferInfo info) {
+    Clipboard.setData(ClipboardData(text: info.compactIban));
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('IBAN kopyalandı'),
@@ -539,6 +553,7 @@ class OrderSuccessScreen extends StatelessWidget {
   }
 
   Widget _buildOrderDetails(BuildContext context, String totalText) {
+    final courierFee = CourierFee.forSubtotal(cartTotal);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -580,11 +595,20 @@ class OrderSuccessScreen extends StatelessWidget {
                 ),
               ),
               _detailRow(
-                icon: Icons.local_shipping_outlined,
-                label: 'Teslimat',
-                value: 'Ücretsiz',
+                icon: Icons.delivery_dining_rounded,
+                label: 'Getirme ücreti',
+                value: courierFee > 0 ? _formatPrice(courierFee) : 'Ücretsiz',
                 valueColor: AppColors.primary,
               ),
+              if (couponDiscount > 0) ...[
+                const SizedBox(height: 10),
+                _detailRow(
+                  icon: Icons.local_offer_outlined,
+                  label: couponTitle.isEmpty ? 'Kupon' : couponTitle,
+                  value: '-${_formatPrice(couponDiscount)}',
+                  valueColor: AppColors.primary,
+                ),
+              ],
               const SizedBox(height: 10),
               _detailRow(
                 icon: Icons.payments_outlined,
@@ -676,7 +700,10 @@ class OrderSuccessScreen extends StatelessWidget {
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => GiftSelectScreen(orderTotal: cartTotal),
+            builder: (_) => GiftSelectScreen(
+              orderTotal: cartTotal,
+              orderId: orderId,
+            ),
           ),
         );
       },

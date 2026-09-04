@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geliyor_app/admin/admin_models.dart';
 import 'package:geliyor_app/data/firestore_collections.dart';
 import 'package:geliyor_app/data/pet_market_catalog.dart';
+import 'package:geliyor_app/data/product_advantage_repository.dart';
 import 'package:geliyor_app/utils/product_skt.dart';
 import 'package:geliyor_app/widgets/market_product_card.dart';
 
@@ -48,7 +49,12 @@ class ProductRepository {
 
       final q = searchQuery?.trim().toLowerCase() ?? '';
       if (q.isNotEmpty) {
+        final tagIds = ProductAdvantageRepository.matchingIds(q);
         list = list.where((p) {
+          if (tagIds.isNotEmpty &&
+              p.productAdvantageIds.any(tagIds.contains)) {
+            return true;
+          }
           final haystack =
               '${p.title} ${p.subtitle} ${p.brand} ${p.dietTag} ${p.petTag}'
                   .toLowerCase();
@@ -61,14 +67,23 @@ class ProductRepository {
   }
 
   static bool _matchesSubCategory(AdminProduct product, String subLower) {
-    final category = product.category.trim().toLowerCase();
-    if (category.isEmpty) return true;
     if (subLower == 'akıllı pet' || subLower == 'akilli pet') {
       return true;
     }
-    return category == subLower ||
-        category.contains(subLower) ||
-        subLower.contains(category);
+
+    bool matches(String raw) {
+      final category = raw.trim().toLowerCase();
+      if (category.isEmpty) return false;
+      return category == subLower ||
+          category.contains(subLower) ||
+          subLower.contains(category);
+    }
+
+    if (product.category.trim().isEmpty && product.extraCategories.isEmpty) {
+      return true;
+    }
+    if (matches(product.category)) return true;
+    return product.extraCategories.any(matches);
   }
 
   static MarketProductData toMarketProduct(AdminProduct product) {
@@ -128,6 +143,7 @@ class ProductRepository {
       proteinValue: product.proteinValue,
       preferredRank: product.preferredRank,
       repurchaseRate: product.repurchaseRate,
+      barcode: product.barcode.trim(),
     );
   }
 }

@@ -3,9 +3,11 @@ import 'package:geliyor_app/data/banner_repository.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/data/cat_feeding_guide.dart';
 import 'package:geliyor_app/data/dog_feeding_guide.dart';
+import 'package:geliyor_app/services/food_remaining_estimator.dart';
 import 'package:geliyor_app/state/food_tracking_store.dart';
 import 'package:geliyor_app/state/pet_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:geliyor_app/utils/login_gate.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
 import 'package:geliyor_app/widgets/app_banner_slider.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
@@ -69,6 +71,38 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
     super.dispose();
   }
 
+  Future<void> _startTracking() async {
+    final bagKg = _bagKg;
+    if (bagKg <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Lütfen mama kilosunu girin.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+    final ok = await LoginGate.require(
+      context: context,
+      message: 'Mama takibini kaydetmek için giriş yapmanız gerekir.',
+    );
+    if (!ok || !mounted) return;
+    FoodTrackingStore.instance.start(
+      foodName: _foodController.text,
+      bagKg: bagKg,
+      purchaseDate: _purchaseDate,
+      petName: _guidePet?.name,
+      petSpecies: _guidePet?.species,
+    );
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Mama takibi başlatıldı. Manuel kg esas alındı.'),
+        backgroundColor: _accent,
+      ),
+    );
+    Navigator.of(context).maybePop();
+  }
+
   PetData? get _guidePet {
     final pets = PetStore.instance.pets;
     final selectedName = _selectedPetName;
@@ -102,17 +136,9 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
   int get _profileDailyGrams {
     final pet = _guidePet;
     if (pet == null) return 0;
-    if (pet.dailyFoodGrams != null && pet.dailyFoodGrams! > 0) {
-      return pet.dailyFoodGrams!;
-    }
-    if (_isDog) {
-      return _dogFeedingRow?.gramsFor(pet.activityLevel) ?? 0;
-    }
-    return _feedingRow?.gramsFor(
-          bodyType: pet.bodyType,
-          activityLevel: pet.activityLevel,
-        ) ??
-        0;
+    return FoodRemainingEstimator.sharedDailyGrams(
+      FoodRemainingEstimator.sharingPetsFor(pet),
+    );
   }
 
   int get _estimatedDays {
@@ -225,32 +251,7 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
                   const SizedBox(height: 12),
                   AppPressableButton(
                     onTap: () {
-                      final bagKg = _bagKg;
-                      if (bagKg <= 0) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Lütfen mama kilosunu girin.'),
-                            backgroundColor: AppColors.error,
-                          ),
-                        );
-                        return;
-                      }
-                      FoodTrackingStore.instance.start(
-                        foodName: _foodController.text,
-                        bagKg: bagKg,
-                        purchaseDate: _purchaseDate,
-                        petName: _guidePet?.name,
-                        petSpecies: _guidePet?.species,
-                      );
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Mama takibi başlatıldı. Manuel kg esas alındı.',
-                          ),
-                          backgroundColor: _accent,
-                        ),
-                      );
-                      Navigator.of(context).maybePop();
+                      _startTracking();
                     },
                     width: double.infinity,
                     height: 48,
@@ -383,11 +384,21 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Takip edilecek dost',
+          'Mama türü',
           style: TextStyle(
             color: _accent,
             fontSize: 13,
             fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'Aynı türdeki tüm dostlar bu paketi paylaşır. Günlük tüketimler toplanır.',
+          style: TextStyle(
+            color: AppColors.subText,
+            fontSize: 11.5,
+            fontWeight: FontWeight.w600,
+            height: 1.3,
           ),
         ),
         const SizedBox(height: 8),
@@ -787,8 +798,16 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
     final monthlyKg = (daily * 30 / 1000)
         .toStringAsFixed(2)
         .replaceAll('.', ',');
+    final sharing = pet == null
+        ? const <PetData>[]
+        : FoodRemainingEstimator.sharingPetsFor(pet);
+    final shareLabel = FoodRemainingEstimator.shareLabelFor(sharing);
     final hint = pet != null && daily > 0
-        ? _isDog && dogRow != null
+        ? sharing.length > 1
+              ? '$shareLabel bu paketi paylaşıyor. Günlük toplam $daily g, '
+                    '30 günde $monthlyKg kg. '
+                    '${_bagKg.toStringAsFixed(0)} kg mama yaklaşık $_estimatedDays gün yeter.'
+              : _isDog && dogRow != null
               ? '${pet.name} (${dogRow.size}, ${DogFeedingGuide.normalizeActivity(pet.activityLevel)} aktivite) '
                     'için tablo aralığı ${dogRow.rangeFor(pet.activityLevel)}, tahmini günlük $daily g ve 30 günde $monthlyKg kg. '
                     '${_bagKg.toStringAsFixed(0)} kg mama yaklaşık $_estimatedDays gün yeter.'

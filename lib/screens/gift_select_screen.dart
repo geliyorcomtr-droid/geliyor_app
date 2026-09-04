@@ -1,15 +1,26 @@
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
+import 'package:geliyor_app/admin/admin_models.dart';
+import 'package:geliyor_app/data/order_repository.dart';
+import 'package:geliyor_app/data/product_repository.dart';
+import 'package:geliyor_app/state/order_store.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:geliyor_app/utils/product_image.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
 import 'package:geliyor_app/widgets/app_pressable_button.dart';
 
 class GiftSelectScreen extends StatefulWidget {
-  const GiftSelectScreen({super.key, this.orderTotal = 4250});
+  const GiftSelectScreen({
+    super.key,
+    this.orderTotal = 4250,
+    this.orderId = '',
+  });
 
   final double orderTotal;
+  final String orderId;
 
   @override
   State<GiftSelectScreen> createState() => _GiftSelectScreenState();
@@ -17,7 +28,8 @@ class GiftSelectScreen extends StatefulWidget {
 
 class _GiftSelectScreenState extends State<GiftSelectScreen> {
   late int selectedTier;
-  final Set<String> selectedGiftIds = {};
+  final Map<String, _GiftItem> selectedGifts = {};
+  bool _saving = false;
 
   final List<_GiftTier> tiers = const [
     _GiftTier(id: 0, label: '₺1.000–1.999', subtitle: '1 Hediye', maxSelect: 1),
@@ -70,36 +82,42 @@ class _GiftSelectScreenState extends State<GiftSelectScreen> {
       title: 'Akıllı Mama Kabı',
       points: '1.800 Puan',
       imagePath: 'assets/images/market_akilli_pet.png',
+      premium: true,
     ),
     _GiftItem(
       id: 'p2',
       title: 'Premium Mama 2kg',
       points: '1.500 Puan',
       imagePath: 'assets/images/app_ikonlar/mama_kabi.png',
+      premium: true,
     ),
     _GiftItem(
       id: 'p3',
       title: 'Taşıma Çantası',
       points: '1.600 Puan',
       imagePath: 'assets/images/market_kedi.png',
+      premium: true,
     ),
     _GiftItem(
       id: 'p4',
       title: 'Tüy Bakım Seti',
       points: '1.400 Puan',
       imagePath: 'assets/images/app_ikonlar/tuy_deri.png',
+      premium: true,
     ),
     _GiftItem(
       id: 'p5',
       title: 'Omega Destek',
       points: '1.350 Puan',
       imagePath: 'assets/images/icons/omega.png',
+      premium: true,
     ),
     _GiftItem(
       id: 'p6',
       title: 'Sokaktakiler Paket',
       points: '1.700 Puan',
       imagePath: 'assets/images/app_ikonlar/sokak.png',
+      premium: true,
     ),
   ];
 
@@ -119,8 +137,6 @@ class _GiftSelectScreenState extends State<GiftSelectScreen> {
   int get maxSelect => tiers[selectedTier].maxSelect;
 
   bool get canSelectPremium => selectedTier == 2;
-
-  bool _isPremiumGift(String id) => id.startsWith('p');
 
   String get _statusMessage {
     if (selectedTier == 0) {
@@ -143,16 +159,44 @@ class _GiftSelectScreenState extends State<GiftSelectScreen> {
     return '${buffer.toString()} TL';
   }
 
-  void _toggleGift(String id) {
+  void _toggleGift(_GiftItem gift, {required bool fromPremium}) {
     setState(() {
-      if (selectedGiftIds.contains(id)) {
-        selectedGiftIds.remove(id);
+      if (selectedGifts.containsKey(gift.id)) {
+        selectedGifts.remove(gift.id);
         return;
       }
-      if (_isPremiumGift(id) && !canSelectPremium) return;
-      if (selectedGiftIds.length >= maxSelect) return;
-      selectedGiftIds.add(id);
+      if (fromPremium && !canSelectPremium) return;
+      if (selectedGifts.length >= maxSelect) return;
+      selectedGifts[gift.id] = gift.copyWith(premium: fromPremium);
     });
+  }
+
+  _GiftItem _giftFromProduct(AdminProduct product, {required bool premium}) {
+    final title = product.title.trim().isEmpty
+        ? 'Hediye'
+        : product.title.trim();
+    final points = product.unitPrice > 0
+        ? '${product.unitPrice.round()} TL'
+        : product.weight.trim();
+    return _GiftItem(
+      id: product.id,
+      title: title,
+      points: points,
+      imagePath: product.imageUrl.trim(),
+      premium: premium,
+    );
+  }
+
+  List<_GiftItem> _resolveGifts(
+    List<AdminProduct> products, {
+    required bool premium,
+  }) {
+    final tagged = products
+        .where((p) => premium ? p.showAsPremiumGift : p.showAsGift)
+        .map((product) => _giftFromProduct(product, premium: premium))
+        .toList();
+    if (tagged.isEmpty) return premium ? premiumGifts : normalGifts;
+    return tagged;
   }
 
   @override
@@ -174,24 +218,37 @@ class _GiftSelectScreenState extends State<GiftSelectScreen> {
               const SizedBox(height: 12),
               _buildTierSection(),
               const SizedBox(height: 12),
-              _buildGiftSection(
-                number: '3',
-                title: 'Hediye Seçenekleri',
-                subtitle: selectedTier == 2
-                    ? 'Normal hediyelerden de seçebilirsin'
-                    : 'Bu kademede sadece buradan seçim yap',
-                items: normalGifts,
-                enabled: true,
-              ),
-              const SizedBox(height: 12),
-              _buildGiftSection(
-                number: '4',
-                title: 'Premium Hediyeler',
-                subtitle: canSelectPremium
-                    ? 'Premium listedenden de seçebilirsin'
-                    : 'Bu kademede premium hediye seçilemez',
-                items: premiumGifts,
-                enabled: canSelectPremium,
+              StreamBuilder<List<AdminProduct>>(
+                stream: ProductRepository.instance.watchAll(activeOnly: true),
+                builder: (context, snapshot) {
+                  final products = snapshot.data ?? const <AdminProduct>[];
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildGiftSection(
+                        number: '3',
+                        title: 'Hediye Seçenekleri',
+                        subtitle: selectedTier == 2
+                            ? 'Normal hediyelerden de seçebilirsin'
+                            : 'Bu kademede sadece buradan seçim yap',
+                        items: _resolveGifts(products, premium: false),
+                        enabled: true,
+                        fromPremium: false,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildGiftSection(
+                        number: '4',
+                        title: 'Premium Hediyeler',
+                        subtitle: canSelectPremium
+                            ? 'Premium listedenden de seçebilirsin'
+                            : 'Bu kademede premium hediye seçilemez',
+                        items: _resolveGifts(products, premium: true),
+                        enabled: canSelectPremium,
+                        fromPremium: true,
+                      ),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 12),
               _buildInfoBanner(),
@@ -235,7 +292,7 @@ class _GiftSelectScreenState extends State<GiftSelectScreen> {
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  '${selectedGiftIds.length}/$maxSelect',
+                  '${selectedGifts.length}/$maxSelect',
                   style: const TextStyle(
                     color: AppColors.primary,
                     fontSize: 10,
@@ -427,7 +484,7 @@ class _GiftSelectScreenState extends State<GiftSelectScreen> {
       onTap: () {
         setState(() {
           selectedTier = tier.id;
-          selectedGiftIds.clear();
+          selectedGifts.clear();
         });
       },
       child: AnimatedContainer(
@@ -474,6 +531,7 @@ class _GiftSelectScreenState extends State<GiftSelectScreen> {
     required String subtitle,
     required List<_GiftItem> items,
     required bool enabled,
+    required bool fromPremium,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -489,32 +547,53 @@ class _GiftSelectScreenState extends State<GiftSelectScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        SizedBox(
-          height: 158,
-          child: Opacity(
-            opacity: enabled ? 1 : 0.45,
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                const gap = 10.0;
-                const visibleCount = 2.4;
-                final cardWidth = (constraints.maxWidth - gap) / visibleCount;
+        if (items.isEmpty)
+          Container(
+            height: 80,
+            alignment: Alignment.centerLeft,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: const Text(
+              'Bu liste için henüz ürün işaretlenmedi.',
+              style: TextStyle(
+                color: AppColors.subText,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          )
+        else
+          SizedBox(
+            height: 158,
+            child: Opacity(
+              opacity: enabled ? 1 : 0.45,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  const gap = 10.0;
+                  const visibleCount = 2.4;
+                  final cardWidth = (constraints.maxWidth - gap) / visibleCount;
 
-                return ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  physics: const BouncingScrollPhysics(),
-                  itemCount: items.length,
-                  separatorBuilder: (context, index) =>
-                      const SizedBox(width: gap),
-                  itemBuilder: (context, index) => _buildGiftCard(
-                    items[index],
-                    enabled: enabled,
-                    width: cardWidth,
-                  ),
-                );
-              },
+                  return ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: items.length,
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(width: gap),
+                    itemBuilder: (context, index) => _buildGiftCard(
+                      items[index],
+                      enabled: enabled,
+                      fromPremium: fromPremium,
+                      width: cardWidth,
+                    ),
+                  );
+                },
+              ),
             ),
           ),
-        ),
       ],
     );
   }
@@ -522,14 +601,17 @@ class _GiftSelectScreenState extends State<GiftSelectScreen> {
   Widget _buildGiftCard(
     _GiftItem gift, {
     required bool enabled,
+    required bool fromPremium,
     required double width,
   }) {
-    final isSelected = selectedGiftIds.contains(gift.id);
+    final isSelected = selectedGifts.containsKey(gift.id);
     final canSelect =
-        enabled && (isSelected || selectedGiftIds.length < maxSelect);
+        enabled && (isSelected || selectedGifts.length < maxSelect);
 
     return GestureDetector(
-      onTap: canSelect ? () => _toggleGift(gift.id) : null,
+      onTap: canSelect
+          ? () => _toggleGift(gift, fromPremium: fromPremium)
+          : null,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
         width: width,
@@ -575,16 +657,14 @@ class _GiftSelectScreenState extends State<GiftSelectScreen> {
             ),
             Expanded(
               child: Center(
-                child: Image.asset(
+                child: buildProductImage(
                   gift.imagePath,
                   fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) {
-                    return const Icon(
-                      Icons.card_giftcard_rounded,
-                      color: AppColors.primary,
-                      size: 32,
-                    );
-                  },
+                  errorWidget: const Icon(
+                    Icons.card_giftcard_rounded,
+                    color: AppColors.primary,
+                    size: 32,
+                  ),
                 ),
               ),
             ),
@@ -645,30 +725,80 @@ class _GiftSelectScreenState extends State<GiftSelectScreen> {
   }
 
   Widget _buildConfirmButton() {
-    final ready = selectedGiftIds.length == maxSelect;
+    final ready = selectedGifts.length == maxSelect && !_saving;
 
     return AppPressableButton.primary(
-      onTap: ready
-          ? () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    '${selectedGiftIds.length} hediye seçimin onaylandı.',
-                  ),
-                  backgroundColor: AppColors.primary,
-                ),
-              );
-              Navigator.of(context).maybePop();
-            }
-          : null,
+      onTap: ready ? _confirmSelection : null,
       enabled: ready,
       height: 48,
       width: double.infinity,
       child: Text(
-        'Seçimlerini Onayla (${selectedGiftIds.length}/$maxSelect)',
+        _saving
+            ? 'Kaydediliyor…'
+            : 'Seçimlerini Onayla (${selectedGifts.length}/$maxSelect)',
         style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900),
       ),
     );
+  }
+
+  Future<void> _confirmSelection() async {
+    if (_saving || selectedGifts.length != maxSelect) return;
+    setState(() => _saving = true);
+    try {
+      final orderId = await _resolveOrderId();
+      if (orderId.isEmpty) {
+        throw StateError('Sipariş bulunamadı.');
+      }
+      await OrderRepository.instance.saveGifts(
+        orderId: orderId,
+        gifts: [
+          for (final gift in selectedGifts.values)
+            {
+              'productId': gift.id,
+              'title': gift.title,
+              'imageUrl': gift.imagePath,
+              'premium': gift.premium,
+            },
+        ],
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${selectedGifts.length} hediye seçimin onaylandı.',
+          ),
+          backgroundColor: AppColors.primary,
+        ),
+      );
+      Navigator.of(context).maybePop();
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_giftSaveError(error)),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<String> _resolveOrderId() async {
+    final fromWidget = widget.orderId.trim();
+    if (fromWidget.isNotEmpty) return fromWidget;
+    final lastId = OrderStore.instance.lastOrderId.trim();
+    if (lastId.isNotEmpty && !lastId.toUpperCase().startsWith('GL-')) {
+      return lastId;
+    }
+    return OrderRepository.instance.latestOrderId();
+  }
+
+  String _giftSaveError(Object error) {
+    if (error is FirebaseFunctionsException) {
+      final message = error.message?.trim() ?? '';
+      if (message.isNotEmpty) return message;
+    }
+    return 'Hediye kaydedilemedi. Lütfen tekrar deneyin.';
   }
 
   Widget _sectionHeader(String number, String title) {
@@ -733,10 +863,22 @@ class _GiftItem {
     required this.title,
     required this.points,
     required this.imagePath,
+    this.premium = false,
   });
 
   final String id;
   final String title;
   final String points;
   final String imagePath;
+  final bool premium;
+
+  _GiftItem copyWith({bool? premium}) {
+    return _GiftItem(
+      id: id,
+      title: title,
+      points: points,
+      imagePath: imagePath,
+      premium: premium ?? this.premium,
+    );
+  }
 }

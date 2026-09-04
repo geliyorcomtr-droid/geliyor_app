@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:geliyor_app/data/brand_repository.dart';
+import 'package:geliyor_app/data/product_advantage_repository.dart';
 import 'package:geliyor_app/data/product_repository.dart';
+import 'package:geliyor_app/data/trust_badge_repository.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
 import 'package:geliyor_app/screens/cart_screen.dart';
 import 'package:geliyor_app/screens/product_detail_screen.dart';
@@ -30,16 +32,23 @@ class PetMarketProductsScreen extends StatefulWidget {
     this.initialMainCategory = 'cat',
     this.initialSubCategory,
     this.initialFeature,
+    this.initialAdvantageId,
     this.initialBrand,
     this.initialSearchQuery,
+    this.initialSortBy,
+    this.initialCatalogFilter,
     this.openFeatureSheet = false,
   });
 
   final String initialMainCategory;
   final String? initialSubCategory;
   final String? initialFeature;
+  final String? initialAdvantageId;
   final String? initialBrand;
   final String? initialSearchQuery;
+  final String? initialSortBy;
+  /// `bestSellers` | `topRated` | `affordable` | `repurchase`
+  final String? initialCatalogFilter;
   final bool openFeatureSheet;
 
   static const double productCardGap = MarketCompactProductCard.cardGap;
@@ -57,6 +66,8 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
   String? _selectedWeight;
   String? _selectedAgeGroup;
   String? _selectedFeature;
+  String? _selectedAdvantageId;
+  String? _catalogFilter;
   final _searchController = TextEditingController();
   String _searchQuery = '';
 
@@ -83,13 +94,6 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
     'Yeni Favoriler',
   };
 
-  static const _ageGroupOptions = [
-    'Yavru (0-1)',
-    'Genç (1-3)',
-    'Yetişkin (3-7)',
-    'Yaşlı (7-+)',
-  ];
-
   List<String> _brandOptions = const [];
 
   List<String> get _brandFilterOptions {
@@ -100,26 +104,22 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
     return [selected, ..._brandOptions];
   }
 
-  static const _weightOptions = [
-    '1.5 kg',
-    '2 kg',
-    '3 kg',
-    '5 kg',
-    '7 kg',
-    '10 kg',
-  ];
-
-  static const _featureOptions = [
-    'Kısır',
-    'Böbrek',
-    'Sindirim',
-    'Deri & Tüy',
-    'Doğal İçerik',
-    'Somon',
-    'Protein',
-    'Tahılsız',
-    'Hassas',
-    'Omega-3',
+  static const _healthFilters = <_HealthFilter>[
+    _HealthFilter(id: 'sindirim', title: 'Sindirim', iconPath: ''),
+    _HealthFilter(id: 'bobrek', title: 'Böbrek', iconPath: ''),
+    _HealthFilter(id: 'tuy', title: 'Tüy', iconPath: ''),
+    _HealthFilter(id: 'kilo', title: 'Kilo', iconPath: ''),
+    _HealthFilter(id: 'bagisiklik', title: 'Bağışıklık', iconPath: ''),
+    _HealthFilter(id: 'mide', title: 'Mide', iconPath: ''),
+    _HealthFilter(id: 'idrar', title: 'İdrar', iconPath: ''),
+    _HealthFilter(id: 'kalp', title: 'Kalp', iconPath: ''),
+    _HealthFilter(id: 'dis', title: 'Diş', iconPath: ''),
+    _HealthFilter(id: 'eklem', title: 'Eklem', iconPath: ''),
+    _HealthFilter(id: 'diyabet', title: 'Diyabet', iconPath: ''),
+    _HealthFilter(id: 'karaciger', title: 'Karaciğer', iconPath: ''),
+    _HealthFilter(id: 'hipo', title: 'Hipo', iconPath: ''),
+    _HealthFilter(id: 'kisir', title: 'Kısır', iconPath: ''),
+    _HealthFilter(id: 'tahilsiz', title: 'Tahılsız', iconPath: ''),
   ];
 
   static const _categories = [
@@ -191,6 +191,35 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
     return 'Sıra';
   }
 
+  List<String> get _visibleSortOptions {
+    const main = [
+      'Önerilen',
+      'Fiyat: Düşükten Yükseğe',
+      'Fiyat: Yüksekten Düşüğe',
+      'En Çok Değerlendirilen',
+      'En Yüksek İndirim',
+    ];
+    if (main.contains(_sortBy)) return main;
+    return [_sortBy, ...main];
+  }
+
+  String get _filterChipLabel {
+    final id = _selectedAdvantageId?.trim() ?? '';
+    if (id.isNotEmpty) {
+      for (final item in _healthFilters) {
+        if (item.id == id) return item.title;
+      }
+    }
+    if (_selectedFeature != null && _selectedFeature!.trim().isNotEmpty) {
+      return _selectedFeature!;
+    }
+    return 'Filtre';
+  }
+
+  bool get _filterActive =>
+      _selectedFeature != null ||
+      (_selectedAdvantageId != null && _selectedAdvantageId!.trim().isNotEmpty);
+
   @override
   void initState() {
     super.initState();
@@ -198,6 +227,12 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
     _subCategory =
         widget.initialSubCategory ?? _defaultSubCategoryFor(_mainCategory);
     _selectedFeature = widget.initialFeature;
+    _selectedAdvantageId = widget.initialAdvantageId;
+    _catalogFilter = widget.initialCatalogFilter;
+    final initialSort = widget.initialSortBy?.trim() ?? '';
+    if (initialSort.isNotEmpty) {
+      _sortBy = initialSort;
+    }
     _selectedBrand = widget.initialBrand;
     _loadBrandOptions();
     final initialQuery = widget.initialSearchQuery?.trim() ?? '';
@@ -208,14 +243,7 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
     if (widget.openFeatureSheet) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        _openOptionSheet(
-          title: 'Özellik',
-          options: _featureOptions,
-          selected: _selectedFeature,
-          allowClear: true,
-          onSelect: (value) => setState(() => _selectedFeature = value),
-          onClear: () => setState(() => _selectedFeature = null),
-        );
+        _openFilterSheet();
       });
     }
   }
@@ -241,6 +269,13 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
   void _applySearch([String? value]) {
     final query = (value ?? _searchController.text).trim();
     setState(() => _searchQuery = query.toLowerCase());
+  }
+
+  void _setFeature(String? value, {String? advantageId}) {
+    setState(() {
+      _selectedFeature = value;
+      _selectedAdvantageId = advantageId;
+    });
   }
 
   List<MarketProductData> _filteredProducts(List<MarketProductData> remote) {
@@ -281,26 +316,30 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
       }
     }
 
-    if (_selectedFeature != null) {
-      final keys = switch (_selectedFeature) {
-        'Kısır' => ['kısır', 'steril', 'indoor', 'iç mekan'],
-        'Böbrek' => ['böbrek', 'renal', 'idrar', 'urinary'],
-        'Sindirim' => ['sindirim', 'hassas', 'sensitive', 'digest'],
-        'Deri & Tüy' => ['deri', 'tüy', 'skin', 'coat', 'omega'],
-        'Doğal İçerik' => ['doğal', 'natural'],
-        'Somon' => ['somon', 'balık', 'salmon'],
-        'Protein' => ['protein'],
-        'Tahılsız' => ['tahılsız'],
-        'Hassas' => ['hassas', 'sensitive'],
-        'Omega-3' => ['omega'],
-        _ => [_selectedFeature!.toLowerCase()],
-      };
-      items = items.where((p) {
-        final haystack =
-            '${p.dietTag} ${p.subtitle} ${p.title} ${p.petTag} ${p.brand}'
-                .toLowerCase();
-        return keys.any(haystack.contains);
-      }).toList();
+    if (_selectedAdvantageId != null &&
+        _selectedAdvantageId!.trim().isNotEmpty) {
+      items = items
+          .where(
+            (p) => ProductAdvantageRepository.productMatchesTags(
+              productAdvantageIds: p.productAdvantageIds,
+              tags: [_selectedAdvantageId!],
+            ),
+          )
+          .toList();
+    } else if (_selectedFeature != null) {
+      items = items
+          .where(
+            (p) => ProductAdvantageRepository.productMatchesTags(
+              productAdvantageIds: p.productAdvantageIds,
+              tags: [_selectedFeature!],
+            ),
+          )
+          .toList();
+    }
+
+    if (_catalogFilter != null) {
+      items = _applyCatalogFilter(items);
+      return items;
     }
 
     switch (_sortBy) {
@@ -309,6 +348,11 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
       case 'Fiyat: Yüksekten Düşüğe':
         items.sort((a, b) => b.prices.first.compareTo(a.prices.first));
       case 'En Çok Değerlendirilen':
+        items.sort((a, b) {
+          final rating = b.rating.compareTo(a.rating);
+          if (rating != 0) return rating;
+          return b.reviewCount.compareTo(a.reviewCount);
+        });
       case 'En Çok Satan Kedi Ürünleri':
       case 'En Çok Satan Köpek Ürünleri':
       case 'Popüler Mamalar':
@@ -325,12 +369,68 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
     return items;
   }
 
+  List<MarketProductData> _applyCatalogFilter(List<MarketProductData> items) {
+    switch (_catalogFilter) {
+      case 'affordable':
+        final tagged = items
+            .where(
+              (p) =>
+                  p.trustBadgeIds.contains(
+                    TrustBadgeRepository.affordableBadgeId,
+                  ) ||
+                  p.discount >= 8,
+            )
+            .toList();
+        if (tagged.isNotEmpty) items = tagged;
+        items.sort((a, b) {
+          final disc = b.discount.compareTo(a.discount);
+          if (disc != 0) return disc;
+          return a.prices.first.compareTo(b.prices.first);
+        });
+      case 'bestSellers':
+        items.sort((a, b) {
+          final aRanked = a.preferredRank.trim().isEmpty ? 1 : 0;
+          final bRanked = b.preferredRank.trim().isEmpty ? 1 : 0;
+          if (aRanked != bRanked) return aRanked.compareTo(bRanked);
+          return b.reviewCount.compareTo(a.reviewCount);
+        });
+      case 'topRated':
+        items.sort((a, b) {
+          final rating = b.rating.compareTo(a.rating);
+          if (rating != 0) return rating;
+          return b.reviewCount.compareTo(a.reviewCount);
+        });
+      case 'repurchase':
+        items.sort((a, b) {
+          final rates = _repurchaseValue(b).compareTo(_repurchaseValue(a));
+          if (rates != 0) return rates;
+          return b.reviewCount.compareTo(a.reviewCount);
+        });
+      default:
+        break;
+    }
+    return items;
+  }
+
+  int _repurchaseValue(MarketProductData product) {
+    final raw = product.repurchaseRate.replaceAll('%', '').trim();
+    return int.tryParse(raw) ?? 0;
+  }
+
+  bool get _relaxCategoryFilter {
+    return _searchQuery.isNotEmpty ||
+        _selectedFeature != null ||
+        (_selectedAdvantageId != null &&
+            _selectedAdvantageId!.trim().isNotEmpty) ||
+        _catalogFilter != null;
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<MarketProductData>>(
       stream: ProductRepository.instance.watchMarketProducts(
-        mainCategory: _searchQuery.isEmpty ? _mainCategory : null,
-        subCategory: _searchQuery.isEmpty ? _subCategory : null,
+        mainCategory: _relaxCategoryFilter ? null : _mainCategory,
+        subCategory: _relaxCategoryFilter ? null : _subCategory,
         searchQuery: _searchQuery.isEmpty ? null : _searchQuery,
       ),
       builder: (context, snapshot) {
@@ -536,14 +636,7 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
         const SizedBox(width: 8),
         GestureDetector(
           onTap: () {
-            _openOptionSheet(
-              title: 'Özellik',
-              options: _featureOptions,
-              selected: _selectedFeature,
-              allowClear: true,
-              onSelect: (value) => setState(() => _selectedFeature = value),
-              onClear: () => setState(() => _selectedFeature = null),
-            );
+            _openFilterSheet();
           },
           child: Container(
             width: 36,
@@ -585,6 +678,8 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
           _selectedWeight = null;
           _selectedAgeGroup = null;
           _selectedFeature = null;
+          _selectedAdvantageId = null;
+          _catalogFilter = null;
           _sortBy = 'Önerilen';
         });
       },
@@ -642,17 +737,6 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
   Widget _buildFilterRow() {
     final sortActive = _sortBy != 'Önerilen';
     final brandActive = _selectedBrand != null;
-    final weightActive = _selectedWeight != null;
-    final ageActive = _selectedAgeGroup != null;
-    final featureActive = _selectedFeature != null;
-    final ageLabel = switch (_selectedAgeGroup) {
-      'Yavru (0-1)' => 'Yavru',
-      'Genç (1-3)' => 'Genç',
-      'Yetişkin (3-7)' => 'Yetişkin',
-      'Yaşlı (7-+)' => 'Yaşlı',
-      _ => 'Yetişkin',
-    };
-    final featureLabel = _selectedFeature ?? 'Özellik';
 
     return Row(
       children: [
@@ -663,30 +747,14 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
             showArrow: true,
             onTap: () => _openOptionSheet(
               title: 'Sıralama',
-              options: _sortOptions,
+              options: _visibleSortOptions,
               selected: _sortBy,
-              maxHeight: 360,
+              maxHeight: 320,
               onSelect: (value) => setState(() => _applySortSelection(value)),
             ),
           ),
         ),
-        const SizedBox(width: 4),
-        Expanded(
-          child: _filterChip(
-            label: ageLabel,
-            selected: ageActive,
-            showArrow: true,
-            onTap: () => _openOptionSheet(
-              title: 'Yaş Grubu',
-              options: _ageGroupOptions,
-              selected: _selectedAgeGroup,
-              allowClear: true,
-              onSelect: (value) => setState(() => _selectedAgeGroup = value),
-              onClear: () => setState(() => _selectedAgeGroup = null),
-            ),
-          ),
-        ),
-        const SizedBox(width: 4),
+        const SizedBox(width: 8),
         Expanded(
           child: _filterChip(
             label: brandActive ? _selectedBrand! : 'Marka',
@@ -702,36 +770,13 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
             ),
           ),
         ),
-        const SizedBox(width: 4),
+        const SizedBox(width: 8),
         Expanded(
           child: _filterChip(
-            label: weightActive ? _selectedWeight! : 'Ağırlık',
-            selected: weightActive,
+            label: _filterChipLabel,
+            selected: _filterActive,
             showArrow: true,
-            onTap: () => _openOptionSheet(
-              title: 'Ağırlık',
-              options: _weightOptions,
-              selected: _selectedWeight,
-              allowClear: true,
-              onSelect: (value) => setState(() => _selectedWeight = value),
-              onClear: () => setState(() => _selectedWeight = null),
-            ),
-          ),
-        ),
-        const SizedBox(width: 4),
-        Expanded(
-          child: _filterChip(
-            label: featureLabel,
-            selected: featureActive,
-            showArrow: true,
-            onTap: () => _openOptionSheet(
-              title: 'Özellik',
-              options: _featureOptions,
-              selected: _selectedFeature,
-              allowClear: true,
-              onSelect: (value) => setState(() => _selectedFeature = value),
-              onClear: () => setState(() => _selectedFeature = null),
-            ),
+            onTap: _openFilterSheet,
           ),
         ),
       ],
@@ -758,7 +803,7 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
         height: 28,
-        padding: const EdgeInsets.symmetric(horizontal: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: bg,
@@ -777,7 +822,7 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: fg,
-                  fontSize: 8.5,
+                  fontSize: 11,
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -793,6 +838,21 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _openFilterSheet() async {
+    await _openOptionSheet(
+      title: 'Filtre',
+      options: [for (final item in _healthFilters) item.title],
+      selected: _filterActive ? _filterChipLabel : null,
+      allowClear: true,
+      maxHeight: 360,
+      onSelect: (value) {
+        final item = _healthFilters.firstWhere((e) => e.title == value);
+        _setFeature(item.title, advantageId: item.id);
+      },
+      onClear: () => _setFeature(null),
     );
   }
 
@@ -947,6 +1007,7 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
         weight: weight,
         brand: product.brand,
         skt: product.skt,
+        barcode: product.barcode,
       );
     }
     _showAddedToCartDialog(product.title);
@@ -1055,4 +1116,16 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
       },
     );
   }
+}
+
+class _HealthFilter {
+  const _HealthFilter({
+    required this.id,
+    required this.title,
+    required this.iconPath,
+  });
+
+  final String id;
+  final String title;
+  final String iconPath;
 }

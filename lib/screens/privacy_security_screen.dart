@@ -592,9 +592,8 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
           const _MenuRowData(
             icon: Icons.lock_outline_rounded,
             title: 'Şifre Değiştir',
-            subtitle: 'Hesap şifrenizi güvenli şekilde güncelleyin',
+            subtitle: 'Giriş telefon ve SMS kodu ile yapılır. Şifre kullanılmaz.',
           ),
-          onTap: () => _openTopic(_PrivacyTopic.changePassword),
         ),
         _buildDivider(),
         _buildNavRow(
@@ -982,13 +981,18 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
     Widget? trailing,
     VoidCallback? onTap,
   }) {
-    final color = item.isDestructive ? AppColors.error : AppColors.text;
-    final iconColor = item.isDestructive ? AppColors.error : AppColors.primary;
+    final enabled = onTap != null;
+    final color = !enabled
+        ? AppColors.subText
+        : (item.isDestructive ? AppColors.error : AppColors.text);
+    final iconColor = !enabled
+        ? AppColors.subText
+        : (item.isDestructive ? AppColors.error : AppColors.primary);
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onTap ?? () {},
+        onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 11, 10, 11),
           child: Row(
@@ -999,7 +1003,9 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
                 decoration: BoxDecoration(
                   color: item.isDestructive
                       ? AppColors.error.withValues(alpha: 0.08)
-                      : AppColors.selected,
+                      : enabled
+                          ? AppColors.selected
+                          : AppColors.background,
                   borderRadius: BorderRadius.circular(18),
                 ),
                 child: Icon(item.icon, color: iconColor, size: 17),
@@ -1031,11 +1037,30 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
                 ),
               ),
               ?trailing,
-              Icon(
-                Icons.chevron_right_rounded,
-                color: AppColors.subText.withValues(alpha: 0.7),
-                size: 20,
-              ),
+              if (enabled)
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppColors.subText.withValues(alpha: 0.7),
+                  size: 20,
+                )
+              else
+                Container(
+                  margin: const EdgeInsets.only(right: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.background,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: const Text(
+                    'Kullanılmaz',
+                    style: TextStyle(
+                      color: AppColors.subText,
+                      fontSize: 8,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
             ],
           ),
         ),

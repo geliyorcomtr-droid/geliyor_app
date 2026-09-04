@@ -3,6 +3,7 @@ import 'package:geliyor_app/data/product_advantage_repository.dart';
 import 'package:geliyor_app/data/product_repository.dart';
 import 'package:geliyor_app/data/trust_badge_repository.dart';
 import 'package:geliyor_app/screens/cart_screen.dart';
+import 'package:geliyor_app/screens/favorites_screen.dart';
 import 'package:geliyor_app/screens/pet_market_products_screen.dart';
 import 'package:geliyor_app/state/cart_store.dart';
 import 'package:geliyor_app/state/favorite_store.dart';
@@ -13,7 +14,9 @@ import 'package:geliyor_app/utils/product_price.dart';
 import 'package:geliyor_app/utils/product_skt.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
 import 'package:geliyor_app/widgets/app_pressable_button.dart';
+import 'package:geliyor_app/widgets/info_guide_sheet.dart';
 import 'package:geliyor_app/widgets/market_product_card.dart';
+import 'package:geliyor_app/widgets/product_advantage_guide_sheet.dart';
 import 'package:geliyor_app/widgets/preferred_rank_medal.dart';
 import 'package:geliyor_app/widgets/product_favorite_corner.dart';
 
@@ -167,7 +170,7 @@ class ProductDetailScreen extends StatelessWidget {
   }
 
   static const double _sideColumnWidth = 54;
-  static const int _sideSlotCount = 5;
+  static const int _sideSlotCount = ProductAdvantageRepository.heroSlotCount;
   static const double _sideCardGap = 8;
   static const double _sideIconSize = 28;
   static const double _cardGap = 8;
@@ -219,6 +222,15 @@ class ProductDetailScreen extends StatelessWidget {
     );
   }
 
+  String get _marketMainCategory {
+    final tag = (product?.petTag ?? '').trim().toLowerCase();
+    if (tag.contains('köpek') || tag.contains('kopek')) return 'dog';
+    if (tag.contains('kuş') || tag.contains('kus')) return 'bird';
+    if (tag.contains('kemirgen')) return 'rodent';
+    if (tag.contains('akıllı') || tag.contains('akilli')) return 'smart';
+    return 'cat';
+  }
+
   void _openFeatureProducts(
     BuildContext context, {
     String? feature,
@@ -227,12 +239,81 @@ class ProductDetailScreen extends StatelessWidget {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => PetMarketProductsScreen(
-          initialMainCategory: 'cat',
+          initialMainCategory: _marketMainCategory,
           initialFeature: feature,
           openFeatureSheet: openFeatureSheet,
         ),
       ),
     );
+  }
+
+  void _openAdvantageGuide(BuildContext context, AppProductAdvantage item) {
+    ProductAdvantageGuideSheet.show(
+      context,
+      item: item,
+      mainCategory: _marketMainCategory,
+    );
+  }
+
+  void _openTrustGuide(BuildContext context, _SideBadge badge) {
+    final filter = badge.catalogFilter;
+    if (filter == null) return;
+    InfoGuideSheet.show(
+      context,
+      title: badge.label.replaceAll('\n', ' '),
+      subtitle: 'Bu bilgi ne anlama gelir?',
+      guide: _trustGuideFor(filter),
+      iconPath: badge.iconPath,
+      imageUrl: badge.imageUrl ?? '',
+      fallbackIcon: badge.isRating
+          ? Icons.star_rounded
+          : Icons.workspace_premium_rounded,
+      fallbackIconColor: badge.isRating ? AppColors.warning : AppColors.primary,
+      buttonLabel: _trustButtonLabel(filter),
+      onSeeProducts: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => PetMarketProductsScreen(
+              initialMainCategory: _marketMainCategory,
+              initialCatalogFilter: filter,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  static String _trustButtonLabel(String filter) {
+    return switch (filter) {
+      'bestSellers' => 'En çok satan ürünleri gör',
+      'topRated' => 'En çok puan alan ürünleri gör',
+      'affordable' => 'Uygun fiyatlı ürünleri gör',
+      'repurchase' => 'Tekrar alınan ürünleri gör',
+      _ => 'Ürünleri gör',
+    };
+  }
+
+  static String _trustGuideFor(String filter) {
+    return switch (filter) {
+      'bestSellers' =>
+          'Çok satan ürün, müşterilerin en sık tercih ettiği mamaları ve pet ürünlerini gösterir. Sıralama, satış ve tercih yoğunluğuna göre yapılır.\n\n'
+          'Bu rozet, ürünün kendi kategorisinde öne çıktığını anlatır. “En çok satan 2. ürün” gibi bir sıra, o ürünün listedeki yerini özetler.\n\n'
+          'Aynı listedeki diğer çok satanlara bakarak benzer, güvenilir alternatifleri görebilirsiniz.',
+      'topRated' =>
+          'Puan, ürünü alan müşterilerin memnuniyetini özetler. Yüksek puan; lezzet, tazelik ve tekrar alma isteğinin güçlü olduğunu gösterir.\n\n'
+          'Tek bir puan her dost için aynı sonucu garanti etmez. Yine de en çok puan alan ürünler, kalabalık bir deneyim havuzuna dayanır.\n\n'
+          'Puanın yanında yorumları da okuyun; özellikle kendi petinizin yaşı ve ihtiyacıyla eşleşen deneyimleri arayın.',
+      'affordable' =>
+          'Uygun fiyat, kaliteden vazgeçmeden bütçeyi koruyan ürünleri işaret eder. İndirim, gramaj avantajı veya kampanya bu rozetin parçası olabilir.\n\n'
+          'En ucuz mama her zaman en doğru mama değildir. Protein kaynağı, petinizin ihtiyacı ve veteriner önerisi asıl ölçüttür.\n\n'
+          'Uygun fiyatlı listedeki ürünler, aynı ihtiyacı daha ekonomik karşılamanız için bir araya getirilir.',
+      'repurchase' =>
+          'Tekrar alım, müşterilerin aynı ürünü yeniden sipariş etme oranını gösterir. Yüksek oran, lezzet ve memnuniyetin sürdüğüne işaret eder.\n\n'
+          'Petiniz mamayı kabul ettiyse tekrar alım oranı yüksek ürünler, stok bitmeden aynı formülü sürdürmenize yardımcı olur.\n\n'
+          'Ani mama değişimi sindirimi bozabilir; alışılan üründe kalmak çoğu zaman daha iyidir.',
+      _ =>
+          'Bu rozet, ürünün öne çıkan bir güven veya tercih bilgisini gösterir. Aynı gruptaki diğer ürünlere göz atabilirsiniz.',
+    };
   }
 
   @override
@@ -301,9 +382,9 @@ class ProductDetailScreen extends StatelessWidget {
               const SizedBox(height: _sectionGap),
               _buildFeatureExplanations(context),
               const SizedBox(height: _sectionGap),
-              const _ProductReviewsSection(),
-              const SizedBox(height: _sectionGap),
               _buildDescriptionBox(),
+              const SizedBox(height: _sectionGap),
+              const _ProductReviewsSection(),
               const SizedBox(height: _sectionGap),
               _buildTogetherBox(context),
               const SizedBox(height: _sectionGap),
@@ -396,6 +477,15 @@ class ProductDetailScreen extends StatelessWidget {
               preferredRank: _isPreferredBadge(badge)
                   ? _preferredRankLabel
                   : null,
+              catalogFilter: _isPreferredBadge(badge)
+                  ? 'bestSellers'
+                  : _isRatingBadge(badge)
+                  ? 'topRated'
+                  : _isAffordableBadge(badge)
+                  ? 'affordable'
+                  : _isRepurchaseBadge(badge)
+                  ? 'repurchase'
+                  : null,
               statValue: _isRepurchaseBadge(badge)
                   ? _repurchaseDisplayValue
                   : _isProteinTrustBadge(badge)
@@ -413,15 +503,10 @@ class ProductDetailScreen extends StatelessWidget {
       builder: (context, snapshot) {
         final selectedIds = product?.productAdvantageIds;
         final catalog = snapshot.data ?? const <AppProductAdvantage>[];
-        final items =
-            (selectedIds == null
-                    ? catalog
-                    : [
-                        for (final id in selectedIds)
-                          ...catalog.where((item) => item.id == id),
-                      ])
-                .take(_sideSlotCount)
-                .toList();
+        final items = ProductAdvantageRepository.orderedForProduct(
+          selectedIds: selectedIds,
+          catalog: catalog,
+        ).take(_sideSlotCount).toList();
         if (items.isEmpty) {
           return const SizedBox(width: _sideColumnWidth);
         }
@@ -437,6 +522,7 @@ class ProductDetailScreen extends StatelessWidget {
                   : item.assetPath,
               imageUrl: _showsAsStat(item) ? '' : item.imageUrl,
               feature: item.name,
+              advantage: item,
               isStat: _showsAsStat(item),
               statValue: _advantageStatValue(item),
             ),
@@ -489,6 +575,22 @@ class ProductDetailScreen extends StatelessWidget {
       ),
       child: _sideCardBody(badge),
     );
+
+    if (badge.advantage != null) {
+      return GestureDetector(
+        onTap: () => _openAdvantageGuide(context, badge.advantage!),
+        behavior: HitTestBehavior.opaque,
+        child: card,
+      );
+    }
+
+    if (badge.catalogFilter != null) {
+      return GestureDetector(
+        onTap: () => _openTrustGuide(context, badge),
+        behavior: HitTestBehavior.opaque,
+        child: card,
+      );
+    }
 
     if (badge.feature == null) return card;
 
@@ -782,6 +884,11 @@ class ProductDetailScreen extends StatelessWidget {
 
         return GestureDetector(
           onTap: () => _toggleFavorite(context),
+          onLongPress: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const FavoritesScreen()),
+            );
+          },
           behavior: HitTestBehavior.opaque,
           child: Container(
             width: double.infinity,
@@ -1097,6 +1204,7 @@ class ProductDetailScreen extends StatelessWidget {
                   weight: _productWeight,
                   brand: _productBrand,
                   skt: product?.skt ?? '',
+                  barcode: product?.barcode ?? '',
                 );
                 _showAddedToCartDialog(context, _productTitle);
               },
@@ -1145,15 +1253,10 @@ class ProductDetailScreen extends StatelessWidget {
       builder: (context, snapshot) {
         final selectedIds = product?.productAdvantageIds;
         final catalog = snapshot.data ?? const <AppProductAdvantage>[];
-        final items =
-            (selectedIds == null
-                    ? catalog
-                    : [
-                        for (final id in selectedIds)
-                          ...catalog.where((item) => item.id == id),
-                      ])
-                .take(5)
-                .toList();
+        final items = ProductAdvantageRepository.orderedForProduct(
+          selectedIds: selectedIds,
+          catalog: catalog,
+        );
         if (items.isEmpty) return const SizedBox.shrink();
         return Container(
           width: double.infinity,
@@ -1163,7 +1266,7 @@ class ProductDetailScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Ürün Avantajları',
+                'Ürün Özellikleri',
                 style: TextStyle(
                   color: AppColors.text,
                   fontSize: 14,
@@ -1187,7 +1290,7 @@ class ProductDetailScreen extends StatelessWidget {
     final isStat = _showsAsStat(item);
     final explanation = ProductAdvantageRepository.explanationFor(item);
     return GestureDetector(
-      onTap: () => _openFeatureProducts(context, feature: item.name),
+      onTap: () => _openAdvantageGuide(context, item),
       behavior: HitTestBehavior.opaque,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -1646,6 +1749,7 @@ class ProductDetailScreen extends StatelessWidget {
       weight: product.weight,
       brand: product.brand,
       skt: product.source?.skt ?? '',
+      barcode: product.source?.barcode ?? '',
     );
     _showAddedToCartDialog(context, product.title);
   }
@@ -1860,8 +1964,6 @@ class _ProductReviewsSectionState extends State<_ProductReviewsSection> {
             ],
           ),
           const SizedBox(height: 10),
-          _buildRatingSummary(),
-          const SizedBox(height: 12),
           AnimatedSize(
             duration: const Duration(milliseconds: 240),
             curve: Curves.easeOut,
@@ -1874,54 +1976,6 @@ class _ProductReviewsSectionState extends State<_ProductReviewsSection> {
                 ],
               ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRatingSummary() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppColors.selected,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          const Text(
-            '4.8',
-            style: TextStyle(
-              color: AppColors.text,
-              fontSize: 24,
-              fontWeight: FontWeight.w900,
-              height: 1,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildStars(5, size: 16),
-                const SizedBox(height: 3),
-                const Text(
-                  '256 müşteri değerlendirmesi',
-                  style: TextStyle(
-                    color: AppColors.subText,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Icon(
-            Icons.verified_rounded,
-            color: AppColors.primary,
-            size: 21,
           ),
         ],
       ),
@@ -2057,6 +2111,7 @@ class _SideBadge {
     required this.iconPath,
     this.imageUrl,
     this.feature,
+    this.advantage,
     this.isFavoriteAction = false,
     this.isStat = false,
     this.isRating = false,
@@ -2064,6 +2119,7 @@ class _SideBadge {
     this.statValue,
     this.ratingValue,
     this.preferredRank,
+    this.catalogFilter,
   });
 
   final String id;
@@ -2071,6 +2127,7 @@ class _SideBadge {
   final String iconPath;
   final String? imageUrl;
   final String? feature;
+  final AppProductAdvantage? advantage;
   final bool isFavoriteAction;
   final bool isStat;
   final bool isRating;
@@ -2078,6 +2135,7 @@ class _SideBadge {
   final String? statValue;
   final String? ratingValue;
   final String? preferredRank;
+  final String? catalogFilter;
 }
 
 class _RelatedProduct {

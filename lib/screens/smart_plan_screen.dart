@@ -24,7 +24,6 @@ class SmartPlanScreen extends StatefulWidget {
 }
 
 class _SmartPlanScreenState extends State<SmartPlanScreen> {
-  bool _autoOrderEnabled = true;
 
   /// Ana sayfa servis kartlarıyla aynı tonlar.
   static const _easyOrderColor = Color(0xFF22C55E); // Kolay Sipariş
@@ -164,7 +163,10 @@ class _SmartPlanScreenState extends State<SmartPlanScreen> {
             children: [
               _buildTopBanner(),
               const SizedBox(height: 12),
-              _buildAutoOrderBanner(),
+              ListenableBuilder(
+                listenable: NotificationSettingsStore.instance,
+                builder: (context, _) => _buildAutoOrderBanner(),
+              ),
               const SizedBox(height: 12),
               ListenableBuilder(
                 listenable: NotificationSettingsStore.instance,
@@ -221,6 +223,7 @@ class _SmartPlanScreenState extends State<SmartPlanScreen> {
 
   Widget _buildAutoOrderBanner() {
     const color = _easyOrderColor;
+    final enabled = NotificationSettingsStore.instance.autoOrderNotifications;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
@@ -242,8 +245,9 @@ class _SmartPlanScreenState extends State<SmartPlanScreen> {
               SizedBox(
                 height: 24,
                 child: Switch(
-                  value: _autoOrderEnabled,
-                  onChanged: (v) => setState(() => _autoOrderEnabled = v),
+                  value: enabled,
+                  onChanged: (v) => NotificationSettingsStore.instance
+                      .setAutoOrderNotifications(v),
                   activeThumbColor: AppColors.surface,
                   activeTrackColor: color,
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -253,7 +257,7 @@ class _SmartPlanScreenState extends State<SmartPlanScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Mama bitmeden siparişinizin otomatik oluşturulmasını sağlayın.',
+            'Mama bitmeden sipariş zamanı bildirimi alın.',
             style: _bodyText(color),
           ),
           const SizedBox(height: 10),
@@ -268,7 +272,7 @@ class _SmartPlanScreenState extends State<SmartPlanScreen> {
             child: Row(
               children: [
                 Icon(
-                  _autoOrderEnabled
+                  enabled
                       ? Icons.check_circle_outline_rounded
                       : Icons.pause_circle_outline_rounded,
                   color: color,
@@ -277,7 +281,7 @@ class _SmartPlanScreenState extends State<SmartPlanScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    _autoOrderEnabled
+                    enabled
                         ? 'Otomatik sipariş özelliği açık.'
                         : 'Otomatik sipariş özelliği kapalı.',
                     style: _accentText(color),
@@ -559,7 +563,7 @@ class _SmartPlanScreenState extends State<SmartPlanScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      '${_formatBagKg(estimate.bagKg)} paket  ·  ${estimate.pet.name}',
+                      '${_formatBagKg(estimate.bagKg)} paket  ·  ${estimate.shareLabel}',
                       style: const TextStyle(
                         color: AppColors.text,
                         fontSize: 12,

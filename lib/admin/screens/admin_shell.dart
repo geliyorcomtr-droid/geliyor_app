@@ -3,11 +3,13 @@ import 'package:geliyor_app/admin/admin_auth.dart';
 import 'package:geliyor_app/admin/admin_models.dart';
 import 'package:geliyor_app/admin/admin_nav.dart';
 import 'package:geliyor_app/admin/admin_theme.dart';
+import 'package:geliyor_app/admin/screens/admin_bank_transfer_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_banners_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_brands_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_broadcasts_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_campaigns_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_categories_screen.dart';
+import 'package:geliyor_app/admin/screens/admin_coupons_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_dashboard_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_members_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_orders_screen.dart';
@@ -30,7 +32,11 @@ class _AdminShellState extends State<AdminShell> {
   String? _orderStatus;
   bool _productFormOpen = false;
   AdminProduct? _editingProduct;
-  final Set<AdminPage> _expanded = {AdminPage.orders, AdminPage.products};
+  final Set<AdminPage> _expanded = {
+    AdminPage.orders,
+    AdminPage.products,
+    AdminPage.campaigns,
+  };
 
   void _go(
     AdminPage page, {
@@ -98,9 +104,11 @@ class _AdminShellState extends State<AdminShell> {
       AdminPage.advantages => const AdminProductAdvantagesScreen(),
       AdminPage.members => const AdminMembersScreen(),
       AdminPage.campaigns => const AdminCampaignsScreen(),
+      AdminPage.coupons => const AdminCouponsScreen(),
       AdminPage.broadcasts => const AdminBroadcastsScreen(),
       AdminPage.banners => const AdminBannersScreen(),
       AdminPage.support => const AdminSupportScreen(),
+      AdminPage.bankTransfer => const AdminBankTransferScreen(),
     };
   }
 

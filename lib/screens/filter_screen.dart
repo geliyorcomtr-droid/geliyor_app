@@ -11,6 +11,7 @@ import 'package:geliyor_app/screens/health_screen.dart';
 import 'package:geliyor_app/screens/pet_market_products_screen.dart';
 import 'package:geliyor_app/screens/rodent_category_screen.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:geliyor_app/utils/advantage_search.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
@@ -122,12 +123,15 @@ class _FilterScreenState extends State<FilterScreen> {
   }
 
   void _submitSearch([String? value]) {
-    final query = (value ?? _searchController.text).trim().toLowerCase();
+    final query = (value ?? _searchController.text).trim();
     if (query.isEmpty) return;
 
     FocusScope.of(context).unfocus();
 
-    if (_healthKeywords.any(query.contains)) {
+    if (AdvantageSearch.openProductsIfMatched(context, query)) return;
+
+    final folded = query.toLowerCase();
+    if (_healthKeywords.any(folded.contains)) {
       Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => const HealthScreen()),
       );
@@ -135,8 +139,8 @@ class _FilterScreenState extends State<FilterScreen> {
     }
 
     final matches = _categories.where((item) {
-      return item.title.toLowerCase().contains(query) ||
-          item.subtitle.toLowerCase().contains(query);
+      return item.title.toLowerCase().contains(folded) ||
+          item.subtitle.toLowerCase().contains(folded);
     }).toList();
 
     if (matches.length == 1) {
@@ -145,7 +149,7 @@ class _FilterScreenState extends State<FilterScreen> {
     }
 
     final exact = _categories.where(
-      (item) => item.title.toLowerCase() == query,
+      (item) => item.title.toLowerCase() == folded,
     );
     if (exact.isNotEmpty) {
       _onCategoryTap(context, exact.first.route);
@@ -153,7 +157,9 @@ class _FilterScreenState extends State<FilterScreen> {
     }
 
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const PetMarketProductsScreen()),
+      MaterialPageRoute(
+        builder: (_) => PetMarketProductsScreen(initialSearchQuery: query),
+      ),
     );
   }
 

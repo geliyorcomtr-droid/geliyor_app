@@ -67,7 +67,11 @@ service cloud.firestore {
         || (signedIn()
           && resource.data.userId == request.auth.uid
           && request.resource.data.userId == resource.data.userId
-          && request.resource.data.status == resource.data.status);
+          && request.resource.data.status == resource.data.status)
+        || (signedIn()
+          && resource.data.userId == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['gifts', 'updatedAt']));
       allow delete: if isAdmin();
     }
 
@@ -115,17 +119,36 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    match /coupons/{couponId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /food_coupon_queue/{jobId} {
+      allow read, write: if isAdmin();
+    }
+
     match /broadcasts/{broadcastId} {
       allow read: if isAdmin();
       allow write: if false;
     }
 
     match /settings/{docId} {
-      allow read, write: if isAdmin();
+      allow read: if isAdmin() || docId == 'bank_transfer';
+      allow write: if isAdmin();
     }
 
     match /otp_codes/{phone} {
       allow read, write: if false;
+    }
+
+    match /referral_invite_quota/{uid} {
+      allow read, write: if false;
+    }
+
+    match /referral_invites/{inviteId} {
+      allow read: if isAdmin();
+      allow write: if false;
     }
 
     match /support_tickets/{ticketId} {

@@ -2,8 +2,12 @@
 import 'package:geliyor_app/data/banner_repository.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:flutter/services.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:geliyor_app/screens/smart_plan_screen.dart';
+import 'package:geliyor_app/state/coupon_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:geliyor_app/utils/login_gate.dart';
+import 'package:geliyor_app/widgets/coupon_sheet.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
 import 'package:geliyor_app/widgets/app_banner_slider.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
@@ -23,6 +27,7 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
 
   bool _inviteOpen = false;
   bool _inviteSuccess = false;
+  bool _inviteSending = false;
   _InviteChannel _inviteChannel = _InviteChannel.phone;
   final TextEditingController _inviteController = TextEditingController();
   String? _inviteError;
@@ -91,10 +96,38 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
     ).push(MaterialPageRoute(builder: (_) => const SmartPlanScreen()));
   }
 
-  void _openInviteForm() {
+  Future<void> _earnCampaignCoupon(BuildContext context) async {
+    final ok = await LoginGate.require(
+      context: context,
+      message: 'Kupon kazanmak için giriş yapmanız gerekir.',
+    );
+    if (!ok || !context.mounted) return;
+    await CouponStore.instance.ensureLoaded();
+    final granted = await CouponStore.instance.earnReward();
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          granted
+              ? 'DOST25 kuponu hesabınıza eklendi.'
+              : 'Bu kupon zaten hesabınızda.',
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+    await CouponSheet.show(context, subtotal: 0);
+  }
+
+  Future<void> _openInviteForm() async {
+    final ok = await LoginGate.require(
+      context: context,
+      message: 'Arkadaşını davet etmek için giriş yapmanız gerekir.',
+    );
+    if (!ok || !mounted) return;
     setState(() {
       _inviteOpen = true;
       _inviteSuccess = false;
+      _inviteSending = false;
       _inviteError = null;
       _inviteController.clear();
       _inviteChannel = _InviteChannel.phone;
@@ -102,15 +135,18 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
   }
 
   void _closeInviteForm() {
+    if (_inviteSending) return;
     setState(() {
       _inviteOpen = false;
       _inviteSuccess = false;
+      _inviteSending = false;
       _inviteError = null;
       _inviteController.clear();
     });
   }
 
-  void _submitInvite() {
+  Future<void> _submitInvite() async {
+    if (_inviteSending) return;
     final value = _inviteController.text.trim();
     if (value.isEmpty) {
       setState(() {
@@ -135,10 +171,46 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
       }
     }
 
+    final loggedIn = await LoginGate.require(
+      context: context,
+      message: 'Arkadaşını davet etmek için giriş yapmanız gerekir.',
+    );
+    if (!loggedIn || !mounted) return;
+
     setState(() {
       _inviteError = null;
-      _inviteSuccess = true;
+      _inviteSending = true;
     });
+
+    try {
+      await FirebaseFunctions.instanceFor(region: 'europe-west1')
+          .httpsCallable('sendReferralInvite')
+          .call(<String, dynamic>{
+            'channel': _inviteChannel == _InviteChannel.email
+                ? 'email'
+                : 'phone',
+            'to': value,
+          });
+      if (!mounted) return;
+      setState(() {
+        _inviteSending = false;
+        _inviteSuccess = true;
+      });
+    } on FirebaseFunctionsException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _inviteSending = false;
+        _inviteError = error.message?.trim().isNotEmpty == true
+            ? error.message
+            : 'Davet gönderilemedi. Tekrar deneyin.';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _inviteSending = false;
+        _inviteError = 'Davet gönderilemedi. Tekrar deneyin.';
+      });
+    }
   }
 
   @override
@@ -267,7 +339,7 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
                     'assets/images/son_ikonlar/kampanya_indirim_kupon.png',
                 title: 'İndirim Kuponu',
                 subtitle: 'Sana özel indirim kuponu kazan!',
-                onTap: () {},
+                onTap: () => _earnCampaignCoupon(context),
               ),
             ),
             const SizedBox(width: 8),
@@ -336,22 +408,39 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
   }
 
   Widget _buildReferralCard(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Text('Arkadaşını Davet Et', style: AppTextStyles.sectionHeader),
+            SizedBox(width: 4),
+            Icon(
+              Icons.person_add_alt_1_rounded,
+              size: 15,
+              color: AppColors.primary,
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: AppColors.border),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: _inviteOpen ? _buildInvitePanel() : _buildReferralContent(),
+          child: _inviteOpen ? _buildInvitePanel() : _buildReferralContent(),
+        ),
+      ],
     );
   }
 
@@ -359,6 +448,7 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
     return Column(
       children: [
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
               width: 64,
@@ -387,13 +477,18 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Arkadaşını Getir,\nDost Puan Kazan!',
-                    style: TextStyle(
-                      color: AppColors.text,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w900,
-                      height: 1.2,
+                  const FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Arkadaşını Getir, Dost Puan Kazan!',
+                      maxLines: 1,
+                      style: TextStyle(
+                        color: AppColors.text,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                        height: 1.2,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 3),
@@ -406,17 +501,18 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
                       height: 1.25,
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  AppPressableButton.soft(
+                    onTap: _openInviteForm,
+                    height: 28,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: const Text(
+                      'Davet Et',
+                      maxLines: 1,
+                      style: TextStyle(fontSize: 11.5),
+                    ),
+                  ),
                 ],
-              ),
-            ),
-            const SizedBox(width: 6),
-            AppPressableButton.primary(
-              onTap: _openInviteForm,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              child: const Text(
-                'Arkadaşını\nDavet Et',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 8, fontWeight: FontWeight.w800),
               ),
             ),
           ],
@@ -582,13 +678,15 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
                 label: 'Telefon',
                 icon: Icons.phone_rounded,
                 selected: _inviteChannel == _InviteChannel.phone,
-                onTap: () {
-                  setState(() {
-                    _inviteChannel = _InviteChannel.phone;
-                    _inviteError = null;
-                    _inviteController.clear();
-                  });
-                },
+                onTap: _inviteSending
+                    ? () {}
+                    : () {
+                        setState(() {
+                          _inviteChannel = _InviteChannel.phone;
+                          _inviteError = null;
+                          _inviteController.clear();
+                        });
+                      },
               ),
             ),
             const SizedBox(width: 10),
@@ -597,13 +695,15 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
                 label: 'E-posta',
                 icon: Icons.mail_outline_rounded,
                 selected: _inviteChannel == _InviteChannel.email,
-                onTap: () {
-                  setState(() {
-                    _inviteChannel = _InviteChannel.email;
-                    _inviteError = null;
-                    _inviteController.clear();
-                  });
-                },
+                onTap: _inviteSending
+                    ? () {}
+                    : () {
+                        setState(() {
+                          _inviteChannel = _InviteChannel.email;
+                          _inviteError = null;
+                          _inviteController.clear();
+                        });
+                      },
               ),
             ),
           ],
@@ -613,6 +713,7 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
           height: 44,
           child: TextField(
             controller: _inviteController,
+            enabled: !_inviteSending,
             keyboardType: _inviteChannel == _InviteChannel.phone
                 ? TextInputType.phone
                 : TextInputType.emailAddress,
@@ -672,13 +773,14 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
         ],
         const SizedBox(height: 12),
         AppPressableButton.primary(
-          onTap: _submitInvite,
+          onTap: _inviteSending ? null : _submitInvite,
+          enabled: !_inviteSending,
           width: double.infinity,
           height: 44,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: const Text(
-            'Tamam',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+          child: Text(
+            _inviteSending ? 'Gönderiliyor...' : 'Tamam',
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
           ),
         ),
       ],

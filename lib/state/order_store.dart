@@ -1,4 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
+import 'package:geliyor_app/data/firestore_collections.dart';
+import 'package:geliyor_app/data/user_doc_persist.dart';
 import 'package:geliyor_app/state/cart_store.dart';
 
 class LastOrderItem {
@@ -21,6 +25,30 @@ class LastOrderItem {
   final double oldPrice;
   final String imagePath;
   final int quantity;
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'title': title,
+        'subtitle': subtitle,
+        'weight': weight,
+        'price': price,
+        'oldPrice': oldPrice,
+        'imagePath': imagePath,
+        'quantity': quantity,
+      };
+
+  factory LastOrderItem.fromMap(Map<String, dynamic> data) {
+    return LastOrderItem(
+      id: (data['id'] as String?) ?? '',
+      title: (data['title'] as String?) ?? '',
+      subtitle: (data['subtitle'] as String?) ?? '',
+      weight: (data['weight'] as String?) ?? '',
+      price: (data['price'] as num?)?.toDouble() ?? 0,
+      oldPrice: (data['oldPrice'] as num?)?.toDouble() ?? 0,
+      imagePath: (data['imagePath'] as String?) ?? '',
+      quantity: (data['quantity'] as num?)?.toInt() ?? 1,
+    );
+  }
 }
 
 class OrderStore extends ChangeNotifier {
@@ -28,11 +56,12 @@ class OrderStore extends ChangeNotifier {
 
   static final OrderStore instance = OrderStore._();
 
-  String _lastOrderId = 'GL-10428';
-  DateTime _lastOrderAt = DateTime(2026, 7, 16);
+  String _lastOrderId = '';
+  DateTime _lastOrderAt = DateTime.now();
 
   /// Müşterinin en son verdiği sipariş içeriği.
   List<LastOrderItem> _lastOrderItems = const [];
+  bool _suppressPersist = false;
 
   String get lastOrderId => _lastOrderId;
   DateTime get lastOrderAt => _lastOrderAt;
@@ -63,6 +92,29 @@ class OrderStore extends ChangeNotifier {
         'GL-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
     _lastOrderAt = _parseOrderDate(orderDate) ?? now;
     _lastOrderItems = List.unmodifiable(items);
+    notifyListeners();
+    _persist();
+  }
+
+  void clearLocal() {
+    _suppressPersist = true;
+    _lastOrderId = '';
+    _lastOrderAt = DateTime.now();
+    _lastOrderItems = const [];
+    _suppressPersist = false;
+    notifyListeners();
+  }
+
+  void applyRemote({
+    required String orderId,
+    required DateTime orderedAt,
+    required List<LastOrderItem> items,
+  }) {
+    _suppressPersist = true;
+    _lastOrderId = orderId;
+    _lastOrderAt = orderedAt;
+    _lastOrderItems = List.unmodifiable(items);
+    _suppressPersist = false;
     notifyListeners();
   }
 
@@ -134,5 +186,28 @@ class OrderStore extends ChangeNotifier {
     final year = int.tryParse(parts[2]);
     if (day == null || month == null || year == null) return null;
     return DateTime(year, month, day);
+  }
+
+  void _persist() {
+    if (_suppressPersist) return;
+    unawaited(_write());
+  }
+
+  Future<void> persistNow() async {
+    if (_lastOrderItems.isEmpty) return;
+    await _write();
+  }
+
+  Future<void> _write() async {
+    await UserDocPersist.merge({
+      UserFields.lastOrder: {
+        'id': _lastOrderId,
+        'orderedAt':
+            '${_lastOrderAt.year.toString().padLeft(4, '0')}-'
+            '${_lastOrderAt.month.toString().padLeft(2, '0')}-'
+            '${_lastOrderAt.day.toString().padLeft(2, '0')}',
+        'items': _lastOrderItems.map((item) => item.toMap()).toList(),
+      },
+    });
   }
 }

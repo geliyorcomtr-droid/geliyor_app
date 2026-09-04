@@ -38,6 +38,7 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
   late final TextEditingController _weight;
   late final TextEditingController _barcode;
   late final TextEditingController _skt;
+  late int _vatRate;
   late final TextEditingController _unitPrice;
   late final TextEditingController _oldPrice;
   late final TextEditingController _discount;
@@ -55,6 +56,9 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
   late List<String> _selectedAdvantageIds;
   late List<String> _selectedTrustBadgeIds;
   late List<String> _gallery;
+  late Set<String> _extraCategories;
+  late bool _showAsGift;
+  late bool _showAsPremiumGift;
   late bool _active;
   Uint8List? _mainImagePreviewBytes;
   bool _saving = false;
@@ -81,6 +85,8 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
     _brand = TextEditingController(text: p?.brand ?? '');
     _weight = TextEditingController(text: p?.weight ?? '');
     _barcode = TextEditingController(text: p?.barcode ?? '');
+    final parsedVat = ProductFields.vatRateFrom(p?.vatRate);
+    _vatRate = ProductFields.vatRates.contains(parsedVat) ? parsedVat : 20;
     _skt = TextEditingController(
       text: ProductSkt.display(p?.skt ?? ''),
     );
@@ -122,7 +128,10 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
     if (!_selectedAdvantageIds.contains(
       ProductAdvantageRepository.proteinAdvantageId,
     )) {
-      _selectedAdvantageIds.add(ProductAdvantageRepository.proteinAdvantageId);
+      _selectedAdvantageIds.insert(
+        0,
+        ProductAdvantageRepository.proteinAdvantageId,
+      );
     }
     _selectedTrustBadgeIds = [
       for (final id in [...?p?.trustBadgeIds])
@@ -139,6 +148,9 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
       _selectedTrustBadgeIds.add(TrustBadgeRepository.affordableBadgeId);
     }
     _gallery = [...?p?.gallery];
+    _extraCategories = {...?p?.extraCategories};
+    _showAsGift = p?.showAsGift ?? false;
+    _showAsPremiumGift = p?.showAsPremiumGift ?? false;
     _active = p?.active ?? true;
     _title.addListener(_onTick);
     _unitPrice.addListener(_onTick);
@@ -227,8 +239,8 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
             badge,
       ];
       final selectedAdvantages = [
-        for (final item in advantages)
-          if (_selectedAdvantageIds.contains(item.id)) item,
+        for (final id in _selectedAdvantageIds)
+          ...advantages.where((item) => item.id == id),
       ];
       final proteinRaw = _proteinValue.text.trim();
       final proteinDisplay =
@@ -245,12 +257,23 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
         brand: _brand.text,
         weight: _weight.text,
         barcode: _barcode.text,
+        vatRate: ProductFields.vatRateFrom(_vatRate),
         skt: ProductSkt.display(_skt.text),
         unitPrice: double.tryParse(_unitPrice.text.replaceAll(',', '.')) ?? 0,
         oldPrice: double.tryParse(_oldPrice.text.replaceAll(',', '.')) ?? 0,
         discountPercent: int.tryParse(_discount.text) ?? 0,
         imageUrl: _imageUrl.text,
         category: _category.text,
+        extraCategories: [
+          for (final title in _extraCategories)
+            if (title.trim().isNotEmpty &&
+                title.trim() != _category.text.trim())
+              title.trim(),
+        ],
+        placements: [
+          if (_showAsGift) ProductPlacements.gift,
+          if (_showAsPremiumGift) ProductPlacements.giftPremium,
+        ],
         mainCategory: _mainCategory,
         description: _description.text,
         active: _active,
@@ -342,10 +365,10 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
 
   static const _steps = <(String, String, IconData)>[
     ('Bilgi', 'Ad, fiyat, stok', Icons.edit_note_rounded),
-    ('Kategori', 'Kedi / köpek', Icons.sell_outlined),
+    ('Kategori', 'Vitrin ve hediye', Icons.sell_outlined),
     ('Marka', 'Ürün markası', Icons.copyright_rounded),
     ('Görseller', 'Ana fotoğraf', Icons.photo_library_outlined),
-    ('Avantajlar', 'Sağ sütun', Icons.auto_awesome_outlined),
+    ('Özellikler', 'Sağ sütun', Icons.auto_awesome_outlined),
     ('Rozetler', 'Sol sütun', Icons.verified_outlined),
     ('SEO', 'İsteğe bağlı', Icons.search_rounded),
   ];
@@ -675,16 +698,18 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
         final items = snapshot.data!;
         if (items.isEmpty) {
           return _panel(
-            title: 'Ürün Avantajları',
+            title: 'Ürün Özellikleri',
             subtitle:
-                'Önce Ürün Yönetimi → Ürün Avantajları ekranından ekleyin.',
-            child: const Text('Ürün avantajı bulunamadı.'),
+                'Önce Ürün Yönetimi → Ürün Özellikleri ekranından ekleyin.',
+            child: const Text('Ürün özelliği bulunamadı.'),
           );
         }
         return _panel(
-          title: 'Ürün Avantajları',
+          title: 'Ürün Özellikleri',
           subtitle:
-              'Ürün detayında görselin sağında gösterilecek avantajları seçin. '
+              'İlk 5 seçim ürün görselinin sağında kalır. Sonraki seçimler '
+              'yalnızca altta Ürün Özellikleri listesinde görünür. En fazla '
+              '${ProductAdvantageRepository.maxPerProduct} özellik seçilebilir. '
               'Protein her üründe zorunludur; değeri Ürün Bilgileri adımından girilir.',
           child: Wrap(
             spacing: 10,
@@ -694,6 +719,9 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
                 _AdvantageChoiceTile(
                   item: item,
                   selected: _selectedAdvantageIds.contains(item.id),
+                  order: _selectedAdvantageIds.contains(item.id)
+                      ? _selectedAdvantageIds.indexOf(item.id) + 1
+                      : null,
                   onTap: () {
                     if (item.id ==
                         ProductAdvantageRepository.proteinAdvantageId) {
@@ -702,7 +730,8 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
                     setState(() {
                       if (_selectedAdvantageIds.contains(item.id)) {
                         _selectedAdvantageIds.remove(item.id);
-                      } else {
+                      } else if (_selectedAdvantageIds.length <
+                          ProductAdvantageRepository.maxPerProduct) {
                         _selectedAdvantageIds.add(item.id);
                       }
                     });
@@ -819,7 +848,7 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
         return _panel(
           title: 'Kategori Seçimi',
           subtitle:
-              'Önce ana kategoriyi (Kedi / Köpek / Akıllı Pet), sonra alt kategoriyi seçin.',
+              'Ana kategoriyi ve alt kategoriyi seçin. İsterseniz ürünü başka vitrinlerde ve hediye sayfasında da gösterebilirsiniz.',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -843,6 +872,14 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
                           _category.text = main.subcategories.isNotEmpty
                               ? main.subcategories.first.title
                               : '';
+                          final allowed = {
+                            for (final sub in main.subcategories) sub.title,
+                          };
+                          _extraCategories.removeWhere(
+                            (title) =>
+                                !allowed.contains(title) ||
+                                title == _category.text,
+                          );
                         });
                       },
                     ),
@@ -871,7 +908,10 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
                         selectedColor: AppColors.selected,
                         checkmarkColor: AppColors.primary,
                         onSelected: (_) {
-                          setState(() => _category.text = sub.title);
+                          setState(() {
+                            _category.text = sub.title;
+                            _extraCategories.remove(sub.title);
+                          });
                         },
                       ),
                   ],
@@ -896,6 +936,75 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
                   fontWeight: FontWeight.w800,
                 ),
               ),
+              if (subs.where((s) => s.title != currentSub).isNotEmpty) ...[
+                const SizedBox(height: 22),
+                const Text(
+                  'Ayrıca şu alt kategorilerde de göster',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Ürün ana kategorisinde kalır; seçilen vitrinlerde de listelenir. Aynı üründen kopya açılmaz.',
+                  style: TextStyle(
+                    color: AppColors.subText,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    for (final sub in subs)
+                      if (sub.title != currentSub)
+                        FilterChip(
+                          label: Text(sub.title),
+                          selected: _extraCategories.contains(sub.title),
+                          selectedColor: AppColors.selected,
+                          checkmarkColor: AppColors.primary,
+                          onSelected: (selected) {
+                            setState(() {
+                              if (selected) {
+                                _extraCategories.add(sub.title);
+                              } else {
+                                _extraCategories.remove(sub.title);
+                              }
+                            });
+                          },
+                        ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 22),
+              const Text(
+                'Hediye sayfasında göster',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Yaş mama, ödül veya başka bir ürünü Hediye Seç ekranına da koyabilirsiniz.',
+                style: TextStyle(
+                  color: AppColors.subText,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 10),
+              _placementSwitch(
+                title: 'Hediye Seçenekleri',
+                subtitle: 'Sipariş hediyesi listesinde görünsün.',
+                value: _showAsGift,
+                onChanged: (value) => setState(() => _showAsGift = value),
+              ),
+              const SizedBox(height: 8),
+              _placementSwitch(
+                title: 'Premium Hediyeler',
+                subtitle: '₺4.000+ kademesindeki premium listede görünsün.',
+                value: _showAsPremiumGift,
+                onChanged: (value) =>
+                    setState(() => _showAsPremiumGift = value),
+              ),
             ],
           ),
         );
@@ -915,7 +1024,12 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
               const SizedBox(width: 12),
               Expanded(child: _field(_weight, 'Ağırlık (ör. 2 Kg)')),
               const SizedBox(width: 12),
-              Expanded(child: _field(_barcode, 'Barkod')),
+              Expanded(
+                child: _field(
+                  _barcode,
+                  'Barkod / Stok kodu',
+                ),
+              ),
               const SizedBox(width: 12),
               Expanded(child: _field(_stock, 'Ana Stok')),
             ],
@@ -946,11 +1060,28 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 ),
               ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: _ReadOnlyField(label: 'Para Birimi', value: 'TL'),
-              ),
             ],
+          ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 280),
+              child: _vatRateField(),
+            ),
+          ),
+          const Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: EdgeInsets.only(bottom: 8),
+              child: Text(
+                'Barkod ve stok kodu aynı numaradır. Satış fiyatı KDV dahildir.',
+                style: TextStyle(
+                  color: AppColors.subText,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
           ),
           const SizedBox(height: 12),
           const Align(
@@ -1436,6 +1567,51 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
     );
   }
 
+  Widget _placementSwitch({
+    required String title,
+    required String subtitle,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+      decoration: BoxDecoration(
+        color: value ? AppColors.selected : AppColors.background,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    color: AppColors.subText,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: value,
+            activeThumbColor: AppColors.primary,
+            onChanged: onChanged,
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _panel({
     required String title,
     required Widget child,
@@ -1668,10 +1844,10 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
             return AlertDialog(
               title: Text(
                 index == null
-                    ? (technical ? 'Güven Rozeti Ekle' : 'Ürün Avantajı Ekle')
+                    ? (technical ? 'Güven Rozeti Ekle' : 'Ürün Özelliği Ekle')
                     : (technical
                           ? 'Güven Rozetini Düzenle'
-                          : 'Ürün Avantajını Düzenle'),
+                          : 'Ürün Özelliğini Düzenle'),
               ),
               content: SizedBox(
                 width: 560,
@@ -1682,7 +1858,7 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
                       Text(
                         technical
                             ? 'Güven rozeti — ürün görselinin sol yanında gösterilir.'
-                            : 'Ürün avantajı — ürün görselinin sağ yanında gösterilir.',
+                            : 'Ürün özelliği — ilk 5 ürün görselinin sağında, fazlası alt listede gösterilir.',
                         style: const TextStyle(color: AppColors.subText),
                       ),
                       const SizedBox(height: 14),
@@ -1943,6 +2119,36 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
     );
   }
 
+  Widget _vatRateField() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: 'KDV oranı',
+          hintText: 'Satış fiyatı KDV dahil',
+          border: const OutlineInputBorder(),
+          filled: true,
+          fillColor: AppColors.selected,
+        ),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<int>(
+            value: _vatRate,
+            isExpanded: true,
+            isDense: true,
+            items: [
+              for (final rate in ProductFields.vatRates)
+                DropdownMenuItem(value: rate, child: Text('%$rate')),
+            ],
+            onChanged: (value) {
+              if (value == null) return;
+              setState(() => _vatRate = value);
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _field(
     TextEditingController c,
     String label, {
@@ -2087,11 +2293,13 @@ class _AdvantageChoiceTile extends StatelessWidget {
     required this.item,
     required this.selected,
     required this.onTap,
+    this.order,
   });
 
   final AppProductAdvantage item;
   final bool selected;
   final VoidCallback onTap;
+  final int? order;
 
   @override
   Widget build(BuildContext context) {
@@ -2116,6 +2324,8 @@ class _AdvantageChoiceTile extends StatelessWidget {
             errorWidget: fallback,
           )
         : fallback;
+    final isHeroSlot =
+        order != null && order! <= ProductAdvantageRepository.heroSlotCount;
     return Material(
       color: selected ? AppColors.selected : AppColors.background,
       borderRadius: BorderRadius.circular(18),
@@ -2135,7 +2345,36 @@ class _AdvantageChoiceTile extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              SizedBox(height: 56, child: image),
+              SizedBox(
+                height: 56,
+                child: Stack(
+                  children: [
+                    Positioned.fill(child: image),
+                    if (order != null)
+                      Positioned(
+                        left: 0,
+                        top: 0,
+                        child: Container(
+                          width: 22,
+                          height: 22,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            '$order',
+                            style: const TextStyle(
+                              color: AppColors.surface,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 10),
               Text(
                 item.name,
@@ -2148,6 +2387,18 @@ class _AdvantageChoiceTile extends StatelessWidget {
                   fontWeight: FontWeight.w800,
                 ),
               ),
+              if (order != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  isHeroSlot ? 'Sağ sütun' : 'Alt alan',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: selected ? AppColors.primary : AppColors.subText,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
               const SizedBox(height: 6),
               Icon(
                 selected

@@ -7,6 +7,7 @@ import 'package:geliyor_app/screens/product_detail_screen.dart';
 import 'package:geliyor_app/state/order_store.dart';
 import 'package:geliyor_app/state/cart_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:geliyor_app/utils/courier_fee.dart';
 import 'package:geliyor_app/utils/product_price.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
 import 'package:geliyor_app/widgets/app_banner_slider.dart';
@@ -46,6 +47,10 @@ class _EasyOrderScreenState extends State<EasyOrderScreen> {
 
   double get _subtotal =>
       _items.fold(0, (sum, item) => sum + item.price * item.quantity);
+
+  double get _courierFee => CourierFee.forSubtotal(_subtotal);
+
+  double get _payableTotal => CourierFee.payableTotal(_subtotal);
 
   String _formatPrice(double price) {
     final whole = price.round().toString();
@@ -264,9 +269,11 @@ class _EasyOrderScreenState extends State<EasyOrderScreen> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              const Text(
-                'Ara Toplam',
-                style: TextStyle(
+              Text(
+                _courierFee > 0
+                    ? '${CourierFee.amount.round()} TL getirme ücreti'
+                    : 'Kurye ücretsiz',
+                style: const TextStyle(
                   color: AppColors.subText,
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
@@ -274,7 +281,7 @@ class _EasyOrderScreenState extends State<EasyOrderScreen> {
               ),
               const SizedBox(height: 2),
               Text(
-                _formatPrice(_subtotal),
+                _formatPrice(_payableTotal),
                 style: const TextStyle(
                   color: AppColors.primary,
                   fontSize: 16,
@@ -343,7 +350,7 @@ class _EasyOrderScreenState extends State<EasyOrderScreen> {
           ),
           const SizedBox(height: 1),
           Text(
-            _formatPrice(_subtotal),
+            _formatPrice(_payableTotal),
             style: const TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w700,

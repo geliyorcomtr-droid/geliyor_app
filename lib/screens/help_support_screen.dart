@@ -35,7 +35,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
   static const _faqs = [
     (
       'Siparişim ne zaman teslim edilir?',
-      'Siparişler genellikle 1–3 iş günü içinde kargoya verilir. Teslimat süresi adresinize göre değişebilir.',
+      'Siparişler kurye ile kısa süre içinde, genellikle aynı gün kapınıza teslim edilir.',
     ),
     (
       'Ürün iadesi nasıl yapılır?',
@@ -46,8 +46,8 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
       'Havale/EFT, kapıda nakit ve kapıda POS ile ödeme yapabilirsiniz. Online kart ödemesi yakında eklenecektir.',
     ),
     (
-      'Kargo ücretleri ne kadar?',
-      'Belirli tutarın üzerindeki siparişlerde kargo ücretsizdir. Detaylar ödeme adımında gösterilir.',
+      'Getirme ücreti ne kadar?',
+      '599 TL altındaki siparişlerde 99 TL getirme ücreti alınır. 599 TL ve üzeri siparişlerde kurye ücretsizdir.',
     ),
   ];
 
@@ -87,6 +87,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
             SupportTicketFields.message: message,
             SupportTicketFields.userId: AuthStore.instance.uid ?? '',
             SupportTicketFields.status: SupportTicketStatuses.open,
+            SupportTicketFields.kind: SupportTicketKinds.support,
             SupportTicketFields.reply: '',
             SupportTicketFields.createdAt: FieldValue.serverTimestamp(),
             SupportTicketFields.updatedAt: FieldValue.serverTimestamp(),

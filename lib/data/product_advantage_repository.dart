@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geliyor_app/data/firestore_collections.dart';
+import 'package:geliyor_app/data/product_advantage_guides.dart';
 
 class AppProductAdvantage {
   const AppProductAdvantage({
@@ -402,6 +403,255 @@ class ProductAdvantageRepository {
 
   static final instance = ProductAdvantageRepository._();
 
+  /// Ürün görselinin sağındaki sabit slot sayısı.
+  static const int heroSlotCount = 5;
+
+  /// Bir ürüne seçilebilecek özellik üst sınırı.
+  /// İlk 5 sağ ikonlarda, fazlası yalnızca alt listedeki Ürün Özellikleri'nde.
+  static const int maxPerProduct = 24;
+
+  static List<AppProductAdvantage> orderedForProduct({
+    required List<String>? selectedIds,
+    required List<AppProductAdvantage> catalog,
+  }) {
+    if (selectedIds == null) return catalog;
+    return [
+      for (final id in selectedIds)
+        ...catalog.where((item) => item.id == id),
+    ];
+  }
+
+  static String foldSearch(String raw) {
+    return raw
+        .toLowerCase()
+        .replaceAll('ı', 'i')
+        .replaceAll('İ', 'i')
+        .replaceAll('ğ', 'g')
+        .replaceAll('ü', 'u')
+        .replaceAll('ş', 's')
+        .replaceAll('ö', 'o')
+        .replaceAll('ç', 'c')
+        .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
+        .trim()
+        .replaceAll(RegExp(r'\s+'), ' ');
+  }
+
+  static const _genericSearchQueries = {
+    'saglik',
+    'health',
+    'kedi',
+    'kopek',
+    'kus',
+    'kemirgen',
+    'mama',
+    'urun',
+    'pet',
+    'formul',
+    'destek',
+    'icin',
+    'urunler',
+  };
+
+  static const _searchAliases = <String, List<String>>{
+    'kisir': ['kisir_kedi', 'kisir_kopek'],
+    'kisirlastirma': ['kisir_kedi', 'kisir_kopek'],
+    'kisirlastirilmis': ['kisir_kedi', 'kisir_kopek'],
+    'steril': ['kisir_kedi', 'kisir_kopek'],
+    'indoor': ['kisir_kedi'],
+    'ic mekan': ['kisir_kedi'],
+    'kilo': ['kilo_kontrol'],
+    'kilo kontrol': ['kilo_kontrol'],
+    'kilo kontrolu': ['kilo_kontrol'],
+    'diyet': ['kilo_kontrol'],
+    'obez': ['kilo_kontrol'],
+    'obezite': ['kilo_kontrol'],
+    'bobrek': ['bobrek'],
+    'renal': ['bobrek'],
+    'sindirim': ['sindirim'],
+    'hassas': ['sindirim', 'hypoallergenic'],
+    'sensitive': ['sindirim'],
+    'digest': ['sindirim'],
+    'deri': ['tuy_deri', 'tuy_yumusak'],
+    'tuy': ['tuy_deri', 'tuy_yumusak'],
+    'deri tuy': ['tuy_deri'],
+    'skin': ['tuy_deri'],
+    'coat': ['tuy_deri'],
+    'omega': ['tuy_deri'],
+    'omega 3': ['tuy_deri'],
+    'dogal': ['dogal_icerik'],
+    'dogal icerik': ['dogal_icerik'],
+    'natural': ['dogal_icerik'],
+    'somon': ['somon'],
+    'salmon': ['somon'],
+    'protein': ['protein'],
+    'tahilsiz': ['tahilsiz'],
+    'idrar': ['idrar'],
+    'urinary': ['idrar'],
+    'sistit': ['idrar'],
+    'eklem': ['eklem'],
+    'kalp': ['kalp'],
+    'diyabet': ['diyabet'],
+    'seker': ['diyabet'],
+    'karaciger': ['karaciger'],
+    'alerji': ['hypoallergenic'],
+    'hipoalerjenik': ['hypoallergenic'],
+    'hipo': ['hypoallergenic'],
+    'mide': ['sindirim'],
+    'bobre': ['bobrek'],
+    'bagisiklik': ['bagisiklik'],
+    'dis': ['dis'],
+    'tavuk': ['tavuk'],
+    'kuzu': ['kuzu'],
+    'hindi': ['hindi'],
+    'ordek': ['ordek'],
+    'tavsan': ['tavsan'],
+    'ton': ['ton_baligi'],
+    'ton baligi': ['ton_baligi'],
+    'sigir': ['inek'],
+    'parazit': ['parazit'],
+    'asi': ['asi_takvimi'],
+    'yavru kopek': ['yavru_kopek'],
+  };
+
+  static List<AppProductAdvantage> _mergedCatalog(
+    List<AppProductAdvantage>? catalog,
+  ) {
+    if (catalog == null || catalog.isEmpty) return defaultProductAdvantages;
+    final ids = {for (final item in catalog) item.id};
+    return [
+      ...catalog,
+      for (final item in defaultProductAdvantages)
+        if (!ids.contains(item.id)) item,
+    ];
+  }
+
+  static AppProductAdvantage? byId(
+    String id, {
+    List<AppProductAdvantage>? catalog,
+  }) {
+    final needle = id.trim();
+    if (needle.isEmpty) return null;
+    for (final item in _mergedCatalog(catalog)) {
+      if (item.id == needle) return item;
+    }
+    return null;
+  }
+
+  /// Arama veya filtre metninin karşılık geldiği özellik kimlikleri.
+  static Set<String> matchingIds(
+    String query, {
+    List<AppProductAdvantage>? catalog,
+  }) {
+    final q = foldSearch(query);
+    if (q.isEmpty || _genericSearchQueries.contains(q)) return {};
+
+    final items = _mergedCatalog(catalog);
+    final ids = <String>{};
+
+    final aliasIds = _searchAliases[q];
+    if (aliasIds != null) ids.addAll(aliasIds);
+
+    for (final item in items) {
+      final name = foldSearch(item.name);
+      final idText = foldSearch(item.id.replaceAll('_', ' '));
+      if (name == q || item.id == query.trim() || idText == q) {
+        ids.add(item.id);
+        continue;
+      }
+      if (q.length >= 4 && (name.contains(q) || idText.contains(q))) {
+        ids.add(item.id);
+      }
+    }
+    return ids;
+  }
+
+  /// Ekrandaki ihtiyaç/sağlık etiketinin karşılık geldiği ürün özellikleri.
+  static const tagAdvantageIds = <String, List<String>>{
+    'diyabet': ['diyabet'],
+    'bobrek': ['bobrek'],
+    'bobre': ['bobrek'],
+    'tuy': ['tuy_deri', 'tuy_yumusak'],
+    'eklem': ['eklem'],
+    'sindirim': ['sindirim'],
+    'mide': ['sindirim'],
+    'bagisiklik': ['bagisiklik'],
+    'idrar': ['idrar'],
+    'kalp': ['kalp'],
+    'dis': ['dis'],
+    'karaciger': ['karaciger'],
+    'hipo': ['hypoallergenic'],
+    'kilo': ['kilo_kontrol'],
+    'kisir': ['kisir_kedi', 'kisir_kopek'],
+    'tahilsiz': ['tahilsiz'],
+  };
+
+  /// Seçilen etiket için ürünlerde aranacak özellik kimlikleri.
+  static Set<String> idsForTag(String tag, {String? title}) {
+    final raw = tag.trim();
+    if (raw.isEmpty) return {};
+    final ids = <String>{
+      ...?tagAdvantageIds[raw],
+      ...matchingIds(raw),
+      if (title != null && title.trim().isNotEmpty) ...matchingIds(title),
+    };
+    if (ids.isEmpty) ids.add(raw);
+    return ids;
+  }
+
+  /// Ürün, seçilen etiketlerin özelliklerine sahip mi?
+  /// [matchAll] true ise her etiket için en az bir özellik gerekir.
+  static bool productMatchesTags({
+    required List<String> productAdvantageIds,
+    required Iterable<String> tags,
+    bool matchAll = true,
+    String? title,
+  }) {
+    final tagList = [
+      for (final tag in tags)
+        if (tag.trim().isNotEmpty) tag.trim(),
+    ];
+    if (tagList.isEmpty || productAdvantageIds.isEmpty) return false;
+
+    bool matchesOne(String tag) {
+      final ids = idsForTag(tag, title: title);
+      return productAdvantageIds.any(ids.contains);
+    }
+
+    if (matchAll) return tagList.every(matchesOne);
+    return tagList.any(matchesOne);
+  }
+
+  static bool productMatchesFeature({
+    required List<String> productAdvantageIds,
+    required String haystack,
+    required String feature,
+    List<AppProductAdvantage>? catalog,
+  }) {
+    final ids = matchingIds(feature, catalog: catalog);
+    if (ids.isNotEmpty && productAdvantageIds.any(ids.contains)) {
+      return true;
+    }
+    if (productAdvantageIds.contains(feature.trim())) return true;
+    final q = foldSearch(feature);
+    if (q.isEmpty || q.length < 3) return false;
+    return foldSearch(haystack).contains(q);
+  }
+
+  static String guideFor(AppProductAdvantage item) {
+    final fromMap = productAdvantageGuides[item.id]?.trim() ?? '';
+    if (fromMap.isNotEmpty) return fromMap;
+    final summary = explanationFor(item).trim();
+    if (summary.isNotEmpty) {
+      return '$summary\n\n'
+          'Bu etiket, ürünün bu ihtiyaca göre seçildiğini gösterir. '
+          'Dostunuzun yaşı, kilosu ve yaşam tarzıyla birlikte değerlendirin. '
+          'Özel bir sağlık durumunuz varsa mama değişimini veterinerinizle planlayın.';
+    }
+    return 'Bu özellik, ürünün belirli bir beslenme veya bakım ihtiyacına göre '
+        'etiketlendiğini belirtir. Aynı etikete sahip diğer ürünlere göz atarak '
+        'ihtiyacınıza uygun alternatifleri görebilirsiniz.';
+  }
+
   final CollectionReference<Map<String, dynamic>> _collection =
       FirebaseFirestore.instance.collection(
         FirestoreCollections.productAdvantages,
@@ -459,10 +709,10 @@ class ProductAdvantageRepository {
       final proteinDoc = existingById['protein'];
       if (proteinDoc != null) {
         final data = proteinDoc.data();
-        final assetPath = (data?[ProductAdvantageFields.assetPath] as String?) ?? '';
+        final assetPath = (data[ProductAdvantageFields.assetPath] as String?) ?? '';
         final needsIcon =
             assetPath.isEmpty || !assetPath.endsWith('/protein.png');
-        if (needsIcon || data?[ProductAdvantageFields.isStat] != true) {
+        if (needsIcon || data[ProductAdvantageFields.isStat] != true) {
           batch.set(_collection.doc('protein'), {
             ProductAdvantageFields.name: 'Protein İçerir',
             ProductAdvantageFields.isStat: true,

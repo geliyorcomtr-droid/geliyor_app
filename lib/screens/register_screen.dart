@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geliyor_app/screens/account_screen.dart';
 import 'package:geliyor_app/screens/login_screen.dart';
+import 'package:geliyor_app/services/user_profile_sync.dart';
 import 'package:geliyor_app/state/auth_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
@@ -81,6 +82,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() => _busy = true);
     try {
       await AuthStore.instance.verifyCode(smsCode: smsCode, fullName: name);
+      await UserProfileSync.sync(force: true);
       if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(

@@ -30,7 +30,7 @@ class AdminUi {
 
   static String orderStatusLabel(String status) => switch (status) {
     OrderStatuses.preparing => 'Hazırlanıyor',
-    OrderStatuses.shipping => 'Kargoda',
+    OrderStatuses.shipping => 'Kuryede',
     OrderStatuses.delivered => 'Teslim edildi',
     OrderStatuses.cancelled => 'İptal',
     _ => status,
@@ -46,7 +46,7 @@ class AdminUi {
 
   static String orderStatusMessage(String status) => switch (status) {
     OrderStatuses.preparing => 'Siparişiniz hazırlanıyor.',
-    OrderStatuses.shipping => 'Siparişiniz kargoya verildi.',
+    OrderStatuses.shipping => 'Siparişiniz kuryeye verildi.',
     OrderStatuses.delivered => 'Siparişiniz teslim edildi.',
     OrderStatuses.cancelled => 'Siparişiniz iptal edildi.',
     _ => '',

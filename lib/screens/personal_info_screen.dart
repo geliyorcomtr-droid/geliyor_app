@@ -1,4 +1,7 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:geliyor_app/state/auth_store.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
@@ -21,11 +24,11 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   _SecuritySection _securitySection = _SecuritySection.none;
   String? _formError;
 
-  final _nameController = TextEditingController(text: 'Can Dostu');
-  final _emailController = TextEditingController(text: 'candostu@gmail.com');
-  final _phoneController = TextEditingController(text: '+90 555 123 45 67');
-  final _birthController = TextEditingController(text: '15.05.1995');
-  String _gender = 'Erkek';
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _birthController = TextEditingController();
+  String _gender = 'Belirtmek istemiyorum';
 
   final _currentPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
@@ -37,12 +40,54 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   bool _obscureCurrent = true;
   bool _obscureNew = true;
   bool _obscureConfirm = true;
-  bool _phoneVerified = true;
-  bool _emailVerified = true;
   bool _otpSent = false;
+
+  bool get _phoneVerified => AuthStore.instance.isPhoneVerified;
+  bool get _emailVerified => AuthStore.instance.isEmailVerified;
+
+  @override
+  void initState() {
+    super.initState();
+    _fillFromAuth();
+    AuthStore.instance.addListener(_onAuthChanged);
+  }
+
+  void _onAuthChanged() {
+    if (_editing) return;
+    _fillFromAuth();
+    if (mounted) setState(() {});
+  }
+
+  void _fillFromAuth() {
+    final auth = AuthStore.instance;
+    final name = auth.fullName.trim();
+    _nameController.text = name.isEmpty || name.toLowerCase() == 'üye'
+        ? ''
+        : name;
+    _emailController.text = auth.email.trim();
+    _phoneController.text = _formatPhone(auth.phone);
+    _birthController.text = auth.birthDate.trim();
+    final gender = auth.gender.trim();
+    _gender = switch (gender) {
+      'Erkek' || 'Kadın' || 'Belirtmek istemiyorum' => gender,
+      _ => 'Belirtmek istemiyorum',
+    };
+  }
+
+  String _formatPhone(String raw) {
+    final digits = raw.replaceAll(RegExp(r'\D'), '');
+    if (digits.length == 12 && digits.startsWith('90')) {
+      return '+90 ${digits.substring(2, 5)} ${digits.substring(5, 8)} ${digits.substring(8, 10)} ${digits.substring(10)}';
+    }
+    if (digits.length == 10) {
+      return '+90 ${digits.substring(0, 3)} ${digits.substring(3, 6)} ${digits.substring(6, 8)} ${digits.substring(8)}';
+    }
+    return raw.trim();
+  }
 
   @override
   void dispose() {
+    AuthStore.instance.removeListener(_onAuthChanged);
     _nameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
@@ -58,16 +103,26 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
 
   bool get _inSecurityFlow => _securitySection != _SecuritySection.none;
 
-  void _toggleEdit() {
-    setState(() => _editing = !_editing);
-    if (!_editing) {
+  Future<void> _toggleEdit() async {
+    if (_editing) {
+      FocusScope.of(context).unfocus();
+      await AuthStore.instance.updateProfile(
+        fullName: _nameController.text.trim(),
+        email: _emailController.text.trim(),
+        birthDate: _birthController.text.trim(),
+        gender: _gender,
+      );
+      if (!mounted) return;
+      setState(() => _editing = false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Bilgilerin güncellendi.'),
           behavior: SnackBarBehavior.floating,
         ),
       );
+      return;
     }
+    setState(() => _editing = true);
   }
 
   void _openSecurity(_SecuritySection section) {
@@ -133,7 +188,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     );
   }
 
-  void _sendOtp({required bool forPhone}) {
+  Future<void> _sendOtp({required bool forPhone}) async {
     FocusScope.of(context).unfocus();
     final value = forPhone
         ? _securityPhoneController.text.trim()
@@ -147,9 +202,21 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
       });
       return;
     }
-    if (!forPhone && !value.contains('@')) {
+    if (!forPhone &&
+        !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(value)) {
       setState(() => _formError = 'Geçerli bir e-posta girin.');
       return;
+    }
+
+    if (!forPhone) {
+      try {
+        await AuthStore.instance.sendEmailCode(value);
+      } catch (error) {
+        if (!mounted) return;
+        setState(() => _formError = AuthStore.friendlyError(error));
+        return;
+      }
+      if (!mounted) return;
     }
 
     setState(() {
@@ -157,19 +224,20 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
       _otpSent = true;
       _otpController.clear();
     });
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
           forPhone
               ? 'Doğrulama kodu telefonuna gönderildi.'
-              : 'Doğrulama kodu e-postana gönderildi.',
+              : 'Doğrulama kodu e-posta adresine gönderildi.',
         ),
         behavior: SnackBarBehavior.floating,
       ),
     );
   }
 
-  void _verifyOtp({required bool forPhone}) {
+  Future<void> _verifyOtp({required bool forPhone}) async {
     FocusScope.of(context).unfocus();
     final code = _otpController.text.trim();
     if (code.length < 4) {
@@ -177,14 +245,26 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
       return;
     }
 
+    if (!forPhone) {
+      try {
+        await AuthStore.instance.verifyEmailCode(
+          email: _securityEmailController.text.trim(),
+          code: code,
+        );
+      } catch (error) {
+        if (!mounted) return;
+        setState(() => _formError = AuthStore.friendlyError(error));
+        return;
+      }
+      if (!mounted) return;
+    }
+
     setState(() {
       _formError = null;
       if (forPhone) {
         _phoneController.text = _securityPhoneController.text.trim();
-        _phoneVerified = true;
       } else {
         _emailController.text = _securityEmailController.text.trim();
-        _emailVerified = true;
       }
       _securitySection = _SecuritySection.none;
       _otpSent = false;
@@ -675,8 +755,8 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
           _buildSecurityRow(
             icon: Icons.lock_outline_rounded,
             title: 'Şifre',
-            subtitle: 'Şifreni güncelle ve hesabını koru.',
-            onTap: () => _openSecurity(_SecuritySection.password),
+            subtitle: 'Giriş telefon ve SMS kodu ile yapılır. Şifre kullanılmaz.',
+            enabled: false,
           ),
           _buildSecurityRow(
             icon: Icons.phone_android_outlined,
@@ -692,7 +772,9 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             title: 'E-posta Doğrulama',
             subtitle: _emailVerified
                 ? 'E-posta adresin doğrulanmış.'
-                : 'E-posta adresini doğrula.',
+                : _emailController.text.trim().isEmpty
+                    ? 'E-posta adresini ekle ve doğrula.'
+                    : 'E-posta adresin henüz doğrulanmadı.',
             verified: _emailVerified,
             onTap: () => _openSecurity(_SecuritySection.email),
           ),
@@ -705,13 +787,15 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     required IconData icon,
     required String title,
     required String subtitle,
-    required VoidCallback onTap,
+    VoidCallback? onTap,
     bool verified = false,
+    bool enabled = true,
   }) {
+    final canTap = enabled && onTap != null;
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
+        onTap: canTap ? onTap : null,
         borderRadius: BorderRadius.circular(18),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 10),
@@ -721,10 +805,14 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                 width: 34,
                 height: 34,
                 decoration: BoxDecoration(
-                  color: AppColors.selected,
+                  color: enabled ? AppColors.selected : AppColors.background,
                   borderRadius: BorderRadius.circular(999),
                 ),
-                child: Icon(icon, color: AppColors.primary, size: 17),
+                child: Icon(
+                  icon,
+                  color: enabled ? AppColors.primary : AppColors.subText,
+                  size: 17,
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -733,8 +821,8 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
-                        color: AppColors.text,
+                      style: TextStyle(
+                        color: enabled ? AppColors.text : AppColors.subText,
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
                       ),
@@ -751,11 +839,14 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                 ),
               ),
               if (verified) _verifiedBadge('Doğrulandı'),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: AppColors.subText.withValues(alpha: 0.7),
-                size: 20,
-              ),
+              if (!enabled)
+                _statusBadge('Kullanılmaz')
+              else
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppColors.subText.withValues(alpha: 0.7),
+                  size: 20,
+                ),
             ],
           ),
         ),
@@ -832,6 +923,18 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             keyboardType: TextInputType.number,
             icon: Icons.pin_outlined,
           ),
+          if (!forPhone) ...[
+            const SizedBox(height: 8),
+            const Text(
+              '6 haneli kod yazdığın e-posta adresine gider. Gelen kutunu ve spam klasörünü kontrol et.',
+              style: TextStyle(
+                color: AppColors.subText,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                height: 1.35,
+              ),
+            ),
+          ],
         ],
         if (_formError != null) ...[
           const SizedBox(height: 10),
@@ -865,7 +968,11 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   }
 
   Widget _buildSecurityActions() {
-    return Row(
+    return ListenableBuilder(
+      listenable: AuthStore.instance,
+      builder: (context, _) {
+        final busy = AuthStore.instance.isBusy;
+        return Row(
       children: [
         Expanded(
           child: AppPressableButton(
@@ -890,40 +997,48 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
         Expanded(
           flex: 2,
           child: AppPressableButton.primary(
-            onTap: () {
-              switch (_securitySection) {
-                case _SecuritySection.password:
-                  _savePassword();
-                case _SecuritySection.phone:
-                  if (_otpSent) {
-                    _verifyOtp(forPhone: true);
-                  } else {
-                    _sendOtp(forPhone: true);
-                  }
-                case _SecuritySection.email:
-                  if (_otpSent) {
-                    _verifyOtp(forPhone: false);
-                  } else {
-                    _sendOtp(forPhone: false);
-                  }
-                case _SecuritySection.none:
-                  break;
-              }
-            },
+            enabled: !busy,
+            onTap: busy
+                ? null
+                : () {
+                    switch (_securitySection) {
+                      case _SecuritySection.password:
+                        _savePassword();
+                      case _SecuritySection.phone:
+                        if (_otpSent) {
+                          unawaited(_verifyOtp(forPhone: true));
+                        } else {
+                          unawaited(_sendOtp(forPhone: true));
+                        }
+                      case _SecuritySection.email:
+                        if (_otpSent) {
+                          unawaited(_verifyOtp(forPhone: false));
+                        } else {
+                          unawaited(_sendOtp(forPhone: false));
+                        }
+                      case _SecuritySection.none:
+                        break;
+                    }
+                  },
             height: 42,
             padding: EdgeInsets.zero,
             child: Text(
-              switch (_securitySection) {
-                _SecuritySection.password => 'Şifreyi Güncelle',
-                _SecuritySection.phone ||
-                _SecuritySection.email => _otpSent ? 'Doğrula' : 'Kod Gönder',
-                _SecuritySection.none => 'Kaydet',
-              },
+              busy
+                  ? 'Gönderiliyor...'
+                  : switch (_securitySection) {
+                      _SecuritySection.password => 'Şifreyi Güncelle',
+                      _SecuritySection.phone ||
+                      _SecuritySection.email =>
+                        _otpSent ? 'Doğrula' : 'Kod Gönder',
+                      _SecuritySection.none => 'Kaydet',
+                    },
               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
             ),
           ),
         ),
       ],
+    );
+      },
     );
   }
 
@@ -1048,27 +1163,37 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   }
 
   Widget _verifiedBadge(String label) {
+    return _statusBadge(
+      label,
+      icon: Icons.check_circle_rounded,
+      color: AppColors.primary,
+    );
+  }
+
+  Widget _statusBadge(
+    String label, {
+    IconData? icon,
+    Color color = AppColors.subText,
+  }) {
     return Container(
       margin: const EdgeInsets.only(right: 4),
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
-        color: AppColors.selected,
+        color: AppColors.background,
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: AppColors.border),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
-            Icons.check_circle_rounded,
-            size: 10,
-            color: AppColors.primary,
-          ),
-          const SizedBox(width: 3),
+          if (icon != null) ...[
+            Icon(icon, size: 10, color: color),
+            const SizedBox(width: 3),
+          ],
           Text(
             label,
-            style: const TextStyle(
-              color: AppColors.primary,
+            style: TextStyle(
+              color: color,
               fontSize: 8,
               fontWeight: FontWeight.w800,
             ),

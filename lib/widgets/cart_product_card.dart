@@ -103,7 +103,7 @@ class _CartProductCardState extends State<CartProductCard> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    Icons.local_shipping_outlined,
+                    Icons.delivery_dining_rounded,
                     color: AppColors.success,
                     size: 12,
                   ),

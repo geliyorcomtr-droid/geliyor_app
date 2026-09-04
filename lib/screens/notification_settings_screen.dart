@@ -185,7 +185,7 @@ class NotificationSettingsScreen extends StatelessWidget {
         id: 'orders',
         icon: Icons.shopping_bag_outlined,
         title: 'Sipariş Bildirimleri',
-        subtitle: 'Siparişinizin durumu, kargo ve teslimat bildirimleri.',
+        subtitle: 'Siparişinizin durumu, kurye ve teslimat bildirimleri.',
       ),
       const _SettingItem(
         id: 'campaigns',

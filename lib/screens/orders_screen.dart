@@ -1,7 +1,13 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:geliyor_app/data/firestore_collections.dart';
+import 'package:geliyor_app/data/order_repository.dart';
 import 'package:geliyor_app/screens/cart_screen.dart';
+import 'package:geliyor_app/screens/gift_select_screen.dart';
+import 'package:geliyor_app/state/auth_store.dart';
 import 'package:geliyor_app/state/cart_store.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
+import 'package:geliyor_app/utils/order_no.dart';
+import 'package:geliyor_app/utils/product_image.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
@@ -25,7 +31,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
   int _currentPage = 1;
   static const int _pageSize = 4;
 
-  static const List<_OrderItem> _allOrders = [];
+  List<_OrderItem> _allOrders = const [];
 
   @override
   void dispose() {
@@ -41,8 +47,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
       final matchesSearch =
           query.isEmpty ||
           order.id.contains(query) ||
+          OrderNo.fromId(order.id).toLowerCase().contains(query) ||
           order.dateLabel.toLowerCase().contains(query) ||
-          order.total.toLowerCase().contains(query);
+          order.total.toLowerCase().contains(query) ||
+          order.lines.any((line) => line.title.toLowerCase().contains(query));
       return matchesFilter && matchesSearch;
     }).toList();
   }
@@ -79,8 +87,101 @@ class _OrdersScreenState extends State<OrdersScreen> {
     });
   }
 
+  _OrderItem _fromPlacedOrder(PlacedOrder order) {
+    final status = switch (order.status) {
+      OrderStatuses.shipping => _OrderStatus.shipping,
+      OrderStatuses.delivered => _OrderStatus.delivered,
+      OrderStatuses.cancelled => _OrderStatus.cancelled,
+      _ => _OrderStatus.preparing,
+    };
+    return _OrderItem(
+      id: order.id,
+      dateLabel: _dateLabel(order.createdAt),
+      total: '${_formatPrice(order.total)} TL',
+      status: status,
+      statusMessage: order.statusMessage.trim().isNotEmpty
+          ? order.statusMessage
+          : switch (status) {
+              _OrderStatus.preparing => 'Siparişiniz hazırlanıyor.',
+              _OrderStatus.shipping => 'Siparişiniz kuryede.',
+              _OrderStatus.delivered => 'Siparişiniz teslim edildi.',
+              _OrderStatus.cancelled => 'Sipariş iptal edildi.',
+            },
+      actionLabel: status == _OrderStatus.delivered ||
+              status == _OrderStatus.cancelled
+          ? 'Tekrarla'
+          : 'Detay',
+      totalValue: order.total,
+      gifts: order.gifts,
+      lines: [
+        for (final item in order.items)
+          _OrderLine(
+            id: item.id,
+            title: item.title,
+            weight: item.weight,
+            unitPrice: item.unitPrice,
+            oldPrice: item.unitPrice,
+            imagePath: item.imageUrl,
+            quantity: item.quantity,
+          ),
+      ],
+    );
+  }
+
+  String _shortOrderId(String id) => OrderNo.fromId(id);
+
+  String _dateLabel(DateTime? value) {
+    if (value == null) return '';
+    const months = [
+      'Oca',
+      'Şub',
+      'Mar',
+      'Nis',
+      'May',
+      'Haz',
+      'Tem',
+      'Ağu',
+      'Eyl',
+      'Eki',
+      'Kas',
+      'Ara',
+    ];
+    final hour = value.hour.toString().padLeft(2, '0');
+    final minute = value.minute.toString().padLeft(2, '0');
+    return '${value.day} ${months[value.month - 1]} ${value.year} · $hour:$minute';
+  }
+
+  String _formatPrice(double price) {
+    final whole = price.round().toString();
+    final buffer = StringBuffer();
+    for (int i = 0; i < whole.length; i++) {
+      final remaining = whole.length - i;
+      buffer.write(whole[i]);
+      if (remaining > 1 && remaining % 3 == 1) buffer.write('.');
+    }
+    return buffer.toString();
+  }
+
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: AuthStore.instance,
+      builder: (context, _) {
+        return StreamBuilder<List<PlacedOrder>>(
+          stream: OrderRepository.instance.watchMine(),
+          builder: (context, snapshot) {
+            _allOrders = [
+              for (final order in snapshot.data ?? const <PlacedOrder>[])
+                _fromPlacedOrder(order),
+            ];
+            return _buildScaffold(context);
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context) {
     final pageOrders = _pageOrders;
 
     return Scaffold(
@@ -137,7 +238,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
           Expanded(
             child: IgnorePointer(
               child: Text(
-                'SipariÅŸlerim',
+                'Siparişlerim',
                 textAlign: TextAlign.center,
                 style: AppTextStyles.pageHeader,
               ),
@@ -174,7 +275,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
               decoration: const InputDecoration(
                 isDense: true,
                 border: InputBorder.none,
-                hintText: 'SipariÅŸ, Ã¼rÃ¼n veya teslimat numarasÄ± ile ara',
+                hintText: 'Sipariş, ürün veya teslimat numarası ile ara',
                 hintStyle: TextStyle(
                   color: AppColors.subText,
                   fontSize: 11,
@@ -202,11 +303,11 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   Widget _buildTabs() {
     const tabs = <(String, _OrderStatus?)>[
-      ('TÃ¼mÃ¼', null),
-      ('HazÄ±rlanÄ±yor', _OrderStatus.preparing),
-      ('Kargoda', _OrderStatus.shipping),
+      ('Tümü', null),
+      ('Hazırlanıyor', _OrderStatus.preparing),
+      ('Kuryede', _OrderStatus.shipping),
       ('Teslim Edildi', _OrderStatus.delivered),
-      ('Ä°ptal Edildi', _OrderStatus.cancelled),
+      ('İptal Edildi', _OrderStatus.cancelled),
     ];
 
     return SizedBox(
@@ -253,6 +354,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
   }
 
   Widget _buildEmptyState() {
+    final noneAtAll = _allOrders.isEmpty;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -274,20 +376,24 @@ class _OrdersScreenState extends State<OrdersScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            const Text(
-              'Bu filtrede sipariÅŸ bulunamadÄ±',
+            Text(
+              noneAtAll
+                  ? 'Henüz siparişiniz yok'
+                  : 'Bu filtrede sipariş bulunamadı',
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 color: AppColors.text,
                 fontSize: 14,
                 fontWeight: FontWeight.w800,
               ),
             ),
             const SizedBox(height: 6),
-            const Text(
-              'FarklÄ± bir durum seÃ§ebilir veya aramayÄ± temizleyebilirsin.',
+            Text(
+              noneAtAll
+                  ? 'Onayladığınız siparişler burada görünür.'
+                  : 'Farklı bir durum seçebilir veya aramayı temizleyebilirsin.',
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 color: AppColors.subText,
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
@@ -356,7 +462,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'SipariÅŸ No #${order.id}',
+                              'Sipariş No #${_shortOrderId(order.id)}',
                               style: const TextStyle(
                                 color: AppColors.text,
                                 fontSize: 12,
@@ -501,10 +607,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
         children: [
           Row(
             children: [
-              const Text('SipariÅŸ DetayÄ±', style: AppTextStyles.sectionHeader),
+              const Text('Sipariş Detayı', style: AppTextStyles.sectionHeader),
               const Spacer(),
               Text(
-                '${order.lines.length} Ã¼rÃ¼n',
+                '${order.lines.length} ürün',
                 style: const TextStyle(
                   color: AppColors.subText,
                   fontSize: 11,
@@ -515,23 +621,42 @@ class _OrdersScreenState extends State<OrdersScreen> {
           ),
           const SizedBox(height: 10),
           ...order.lines.map(_buildOrderLineDetail),
+          if (order.gifts.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _buildDetailInfoTile(
+              icon: Icons.card_giftcard_rounded,
+              title: 'Hediyeler',
+              value: order.gifts.join(', '),
+            ),
+          ] else if (order.status != _OrderStatus.cancelled) ...[
+            const SizedBox(height: 10),
+            AppPressableButton.outline(
+              onTap: () => _pickGifts(order),
+              height: 40,
+              width: double.infinity,
+              child: const Text(
+                'Hediye seç',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+              ),
+            ),
+          ],
           const SizedBox(height: 10),
           _buildDetailInfoTile(
             icon: Icons.location_on_outlined,
             title: 'Teslimat Adresi',
-            value: 'Ev Adresim â€¢ Ä°stanbul',
+            value: 'Ev Adresim • İstanbul',
           ),
           const SizedBox(height: 8),
           _buildDetailInfoTile(
             icon: Icons.credit_card_rounded,
-            title: 'Ã–deme',
-            value: 'Banka / Kredi KartÄ± â€¢â€¢â€¢â€¢ 4242',
+            title: 'Ödeme',
+            value: 'Banka / Kredi Kartı •••• 4242',
           ),
           const SizedBox(height: 8),
           _buildDetailInfoTile(
             icon: style.badgeIcon,
             iconColor: style.color,
-            title: 'SipariÅŸ Durumu',
+            title: 'Sipariş Durumu',
             value: order.statusMessage,
           ),
           const SizedBox(height: 12),
@@ -545,7 +670,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
             child: Row(
               children: [
                 const Text(
-                  'Ã–denen Toplam',
+                  'Ödenen Toplam',
                   style: TextStyle(
                     color: AppColors.text,
                     fontSize: 12,
@@ -589,11 +714,13 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 color: AppColors.surface,
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: Image.asset(
+              child: buildProductImage(
                 line.imagePath,
                 fit: BoxFit.contain,
-                errorBuilder: (_, _, _) =>
-                    const Icon(Icons.pets_rounded, color: AppColors.primary),
+                errorWidget: const Icon(
+                  Icons.pets_rounded,
+                  color: AppColors.primary,
+                ),
               ),
             ),
             const SizedBox(width: 10),
@@ -614,7 +741,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${line.weight} â€¢ ${line.quantity} adet',
+                    '${line.weight} • ${line.quantity} adet',
                     style: const TextStyle(
                       color: AppColors.subText,
                       fontSize: 10,
@@ -721,12 +848,15 @@ class _OrdersScreenState extends State<OrdersScreen> {
         border: Border.all(color: AppColors.border),
       ),
       padding: const EdgeInsets.all(4),
-      child: Image.asset(
-        imagePath,
-        fit: BoxFit.contain,
-        errorBuilder: (context, error, stackTrace) =>
-            const Icon(Icons.pets_rounded, color: AppColors.primary, size: 20),
-      ),
+              child: buildProductImage(
+                imagePath,
+                fit: BoxFit.contain,
+                errorWidget: const Icon(
+                  Icons.pets_rounded,
+                  color: AppColors.primary,
+                  size: 20,
+                ),
+              ),
     );
   }
 
@@ -819,6 +949,17 @@ class _OrdersScreenState extends State<OrdersScreen> {
     _toggleOrderDetails(order);
   }
 
+  Future<void> _pickGifts(_OrderItem order) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => GiftSelectScreen(
+          orderId: order.id,
+          orderTotal: order.totalValue,
+        ),
+      ),
+    );
+  }
+
   void _repeatOrder(_OrderItem order) {
     if (order.lines.isEmpty) return;
 
@@ -837,7 +978,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
     final subtitle = order.lines.length == 1
         ? order.lines.first.title
-        : 'SipariÅŸ #${order.id} â€¢ ${order.lines.length} Ã¼rÃ¼n';
+        : 'Sipariş ${OrderNo.labeled(order.id)} • ${order.lines.length} ürün';
     _showAddedToCartDialog(subtitle);
   }
 
@@ -885,7 +1026,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   ),
                   const SizedBox(height: 10),
                   const Text(
-                    'ÃœrÃ¼n sepete eklenmiÅŸtir',
+                    'Ürün sepete eklenmiştir',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: AppColors.text,
@@ -929,7 +1070,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     width: double.infinity,
                     height: 40,
                     child: const Text(
-                      'AlÄ±ÅŸveriÅŸe Devam Et',
+                      'Alışverişe Devam Et',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
@@ -956,15 +1097,15 @@ class _OrdersScreenState extends State<OrdersScreen> {
         bannerIcon: Icons.check_circle_outline_rounded,
       ),
       _OrderStatus.shipping => const _StatusStyle(
-        label: 'Kargoda',
+        label: 'Kuryede',
         color: AppColors.primary,
         badgeBackground: AppColors.selected,
         bannerColor: Color(0xFFF2F8FF),
-        badgeIcon: Icons.local_shipping_outlined,
+        badgeIcon: Icons.delivery_dining_rounded,
         bannerIcon: Icons.info_outline_rounded,
       ),
       _OrderStatus.preparing => const _StatusStyle(
-        label: 'HazÄ±rlanÄ±yor',
+        label: 'Hazırlanıyor',
         color: AppColors.warning,
         badgeBackground: Color(0xFFFFF7E8),
         bannerColor: Color(0xFFFFFAF0),
@@ -972,7 +1113,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
         bannerIcon: Icons.schedule_rounded,
       ),
       _OrderStatus.cancelled => const _StatusStyle(
-        label: 'Ä°ptal Edildi',
+        label: 'İptal Edildi',
         color: AppColors.subText,
         badgeBackground: Color(0xFFF3F4F6),
         bannerColor: Color(0xFFF8FAFC),
@@ -992,15 +1133,19 @@ class _OrderItem {
     required this.statusMessage,
     required this.actionLabel,
     required this.lines,
+    this.totalValue = 0,
+    this.gifts = const [],
   });
 
   final String id;
   final String dateLabel;
   final String total;
+  final double totalValue;
   final _OrderStatus status;
   final String statusMessage;
   final String actionLabel;
   final List<_OrderLine> lines;
+  final List<String> gifts;
 
   List<String> get images => lines.map((line) => line.imagePath).toList();
 }

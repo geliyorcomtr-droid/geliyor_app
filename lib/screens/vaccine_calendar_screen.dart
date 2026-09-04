@@ -1,5 +1,8 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:async';
+
+import 'package:flutter/material.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
+import 'package:geliyor_app/state/health_calendar_store.dart';
 import 'package:geliyor_app/state/notification_settings_store.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
@@ -11,7 +14,12 @@ import 'package:geliyor_app/widgets/app_pressable_button.dart';
 enum _ItemCategory { vaccine, parasite, checkup, info }
 
 class VaccineCalendarScreen extends StatefulWidget {
-  const VaccineCalendarScreen({super.key});
+  const VaccineCalendarScreen({
+    super.key,
+    this.openReminder = false,
+  });
+
+  final bool openReminder;
 
   @override
   State<VaccineCalendarScreen> createState() => _VaccineCalendarScreenState();
@@ -191,6 +199,30 @@ class _VaccineCalendarScreenState extends State<VaccineCalendarScreen> {
     for (final item in _allItems) {
       item.recalculateNextDue();
     }
+    _applySavedDates();
+    _reminderOpen = widget.openReminder;
+    HealthCalendarStore.instance.addListener(_onCalendarChanged);
+  }
+
+  void _onCalendarChanged() {
+    if (!mounted) return;
+    setState(_applySavedDates);
+  }
+
+  void _applySavedDates() {
+    HealthCalendarStore.instance.overlayLastDone((title, lastDone) {
+      for (final item in _allItems) {
+        if (item.title == title) {
+          item.applyDoneDate(lastDone);
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    HealthCalendarStore.instance.removeListener(_onCalendarChanged);
+    super.dispose();
   }
 
   static DateTime _addMonths(DateTime date, int months) {
@@ -283,6 +315,15 @@ class _VaccineCalendarScreenState extends State<VaccineCalendarScreen> {
       p.applyDoneDate(doneDate);
       _reminderOpen = false;
     });
+    unawaited(
+      HealthCalendarStore.instance.recordDone(
+        title: p.title,
+        category: p.category.name,
+        frequency: p.frequency,
+        intervalMonths: p.intervalMonths,
+        doneDate: doneDate,
+      ),
+    );
 
     final notificationLine = store.healthNotificationLine(next);
 

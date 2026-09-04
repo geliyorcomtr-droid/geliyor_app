@@ -11,10 +11,12 @@ import 'package:geliyor_app/screens/pet_market_products_screen.dart';
 import 'package:geliyor_app/screens/pet_market_screen.dart';
 import 'package:geliyor_app/screens/smart_plan_screen.dart';
 import 'package:geliyor_app/services/food_remaining_estimator.dart';
+import 'package:geliyor_app/state/auth_store.dart';
 import 'package:geliyor_app/state/food_tracking_store.dart';
 import 'package:geliyor_app/state/order_store.dart';
 import 'package:geliyor_app/state/pet_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:geliyor_app/utils/advantage_search.dart';
 import 'package:geliyor_app/widgets/app_banner_slider.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
@@ -63,22 +65,26 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _submitSearch([String? value]) {
-    final query = (value ?? _searchController.text).trim().toLowerCase();
+    final query = (value ?? _searchController.text).trim();
     if (query.isEmpty) return;
 
-    final isHealth = _healthKeywords.any(query.contains);
     FocusScope.of(context).unfocus();
 
-    if (isHealth) {
+    if (AdvantageSearch.openProductsIfMatched(context, query)) return;
+
+    final folded = query.toLowerCase();
+    if (_healthKeywords.any(folded.contains)) {
       Navigator.of(
         context,
       ).push(MaterialPageRoute(builder: (_) => const HealthScreen()));
       return;
     }
 
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const PetMarketProductsScreen()));
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PetMarketProductsScreen(initialSearchQuery: query),
+      ),
+    );
   }
 
   @override
@@ -492,7 +498,7 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               _serviceCard(
                 title: 'Kolay\nSipariş',
-                icon: Icons.local_shipping_rounded,
+                icon: Icons.delivery_dining_rounded,
                 color: const Color(0xFF22C55E),
                 onTap: () {
                   Navigator.of(context).push(
@@ -604,10 +610,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildPetProfileBar() {
     return ListenableBuilder(
-      listenable: PetStore.instance,
+      listenable: Listenable.merge([
+        PetStore.instance,
+        AuthStore.instance,
+      ]),
       builder: (context, _) {
         final pets = PetStore.instance.pets;
         final pet = pets.isEmpty ? null : pets.first;
+        final loggedIn = AuthStore.instance.isLoggedIn;
+        final name = pet?.name ?? (loggedIn ? 'Dostun yok' : 'Misafir');
+        final nameLabel = loggedIn || pet == null ? name : '$name (örnek)';
 
         return Container(
           height: 48,
@@ -646,38 +658,48 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
               ),
               const SizedBox(width: 6),
-              Text(
-                pet?.name ?? 'Dostun yok',
-                style: const TextStyle(
-                  color: AppColors.primary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w900,
+              Flexible(
+                child: Text(
+                  nameLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
-              const SizedBox(width: 6),
-              Container(width: 1, height: 20, color: AppColors.border),
-              const SizedBox(width: 6),
-              Expanded(
-                child: pet == null
-                    ? const SizedBox.shrink()
-                    : Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          _PetMeta(
-                            icon: Icons.calendar_month_rounded,
-                            label: pet.shortAge,
-                          ),
-                          _PetMeta(
-                            icon: Icons.pets_rounded,
-                            label: pet.species,
-                          ),
-                          _PetMeta(
-                            icon: Icons.monitor_weight_outlined,
-                            label: pet.weight ?? '-',
-                          ),
-                        ],
-                      ),
-              ),
+              if (pet != null) ...[
+                const SizedBox(width: 6),
+                Container(width: 1, height: 20, color: AppColors.border),
+                const SizedBox(width: 6),
+                Expanded(
+                  flex: 3,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Row(
+                      children: [
+                        _PetMeta(
+                          icon: Icons.calendar_month_rounded,
+                          label: pet.shortAge,
+                        ),
+                        const SizedBox(width: 8),
+                        _PetMeta(
+                          icon: Icons.pets_rounded,
+                          label: pet.species,
+                        ),
+                        const SizedBox(width: 8),
+                        _PetMeta(
+                          icon: Icons.monitor_weight_outlined,
+                          label: pet.weight ?? '-',
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(width: 6),
               AppPressableButton.soft(
                 onTap: () {
@@ -685,10 +707,13 @@ class _HomeScreenState extends State<HomeScreen> {
                     MaterialPageRoute(builder: (_) => const MeetPetScreen()),
                   );
                 },
-                width: 92,
-                height: 26,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: const Text('Dost Ekle', style: TextStyle(fontSize: 11)),
+                width: 72,
+                height: 24,
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: const Text(
+                  'Dost Ekle',
+                  style: TextStyle(fontSize: 10),
+                ),
               ),
             ],
           ),

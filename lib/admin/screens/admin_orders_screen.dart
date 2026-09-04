@@ -1,9 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:geliyor_app/admin/admin_models.dart';
 import 'package:geliyor_app/admin/admin_ui.dart';
 import 'package:geliyor_app/data/firestore_collections.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:geliyor_app/utils/order_no.dart';
 import 'package:geliyor_app/utils/product_image.dart';
 
 class AdminOrdersScreen extends StatefulWidget {
@@ -19,6 +23,10 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
   final _search = TextEditingController();
   String? _status;
   String? _selectedId;
+  String? _deletingId;
+
+  FirebaseFunctions get _functions =>
+      FirebaseFunctions.instanceFor(region: 'europe-west1');
 
   static const _statuses = [
     OrderStatuses.preparing,
@@ -47,6 +55,95 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     super.dispose();
   }
 
+  Future<void> _copyText(String value, String message) async {
+    await Clipboard.setData(ClipboardData(text: value));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _showBirfaturaSetup() async {
+    Map<String, dynamic>? config;
+    String? error;
+    try {
+      final result = await _functions.httpsCallable('getBirfaturaConfig').call();
+      final data = result.data;
+      if (data is Map) {
+        config = Map<String, dynamic>.from(data);
+      }
+    } on FirebaseFunctionsException catch (e) {
+      error = e.message?.trim().isNotEmpty == true
+          ? e.message
+          : 'BirFatura ayarı alınamadı.';
+    } catch (_) {
+      error = 'BirFatura ayarı alınamadı.';
+    }
+    if (!mounted) return;
+    if (config == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error ?? 'BirFatura ayarı alınamadı.')),
+      );
+      return;
+    }
+    final siteUrl = '${config['siteUrl'] ?? 'https://geliyortrapp.web.app'}';
+    final apiBase = '${config['apiBase'] ?? '$siteUrl/api'}';
+    final token = '${config['token'] ?? ''}';
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('BirFatura bağlantısı'),
+        content: SizedBox(
+          width: 460,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'BirFatura paneline kendi şifrenizle girin. '
+                'Ayarlar → Mağaza → Özel Entegrasyon → Yeni Mağaza.',
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Web sitesi adresi',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+              ),
+              SelectableText(siteUrl),
+              TextButton(
+                onPressed: () => _copyText(siteUrl, 'Site adresi kopyalandı.'),
+                child: const Text('Kopyala'),
+              ),
+              const Text(
+                'API şifresi (panel giriş şifresi değil)',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+              ),
+              SelectableText(token),
+              TextButton(
+                onPressed: () => _copyText(token, 'API şifresi kopyalandı.'),
+                child: const Text('Kopyala'),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Altyapı: Kendi Alt Yapımız. BirFatura bu adrese POST /api/orderStatus, '
+                '/api/paymentMethods ve /api/orders çağrıları atar.\n'
+                'API: $apiBase',
+                style: const TextStyle(
+                  color: AppColors.subText,
+                  fontWeight: FontWeight.w600,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Tamam'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _setStatus(AdminOrder order, String status) async {
     await FirebaseFirestore.instance
         .collection(FirestoreCollections.orders)
@@ -56,6 +153,70 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
           OrderFields.statusMessage: AdminUi.orderStatusMessage(status),
           OrderFields.updatedAt: FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
+    await _dispatchNotice(order.id);
+  }
+
+  Future<void> _dispatchNotice(String orderId, {bool force = false}) async {
+    try {
+      final result = await _functions
+          .httpsCallable('dispatchOrderNotice')
+          .call(<String, dynamic>{
+            'orderId': orderId,
+            if (force) 'force': true,
+          });
+      final data = result.data;
+      if (data is Map && data['smsOk'] == false) {
+        debugPrint('dispatchOrderNotice sms failed: ${data['smsError']}');
+      }
+    } on FirebaseFunctionsException catch (error) {
+      debugPrint('dispatchOrderNotice: ${error.code} ${error.message}');
+    } catch (error) {
+      debugPrint('dispatchOrderNotice: $error');
+    }
+  }
+
+  Future<void> _confirmStatusChange(AdminOrder order, String status) async {
+    if (status == order.status) return;
+    if (status == OrderStatuses.delivered) {
+      await _confirmDelivered(order);
+      return;
+    }
+
+    final sendsNotice = status == OrderStatuses.shipping ||
+        status == OrderStatuses.cancelled;
+    if (sendsNotice) {
+      final cancel = status == OrderStatuses.cancelled;
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(cancel ? 'Siparişi iptal et' : 'Siparişi kuryeye ver'),
+          content: Text(
+            cancel
+                ? 'Müşteriye iptal SMS’i ve uygulama bildirimi gidecek.'
+                : 'Müşteriye “siparişiniz yola çıktı” SMS’i ve uygulama bildirimi gidecek.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Vazgeç'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Onayla ve bildir'),
+            ),
+          ],
+        ),
+      );
+      if (ok != true || !mounted) return;
+    }
+
+    await _setStatus(order, status);
+    if (!mounted || !sendsNotice) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Durum güncellendi. SMS ve bildirim gönderiliyor.'),
+      ),
+    );
   }
 
   Future<void> _confirmDelivered(AdminOrder order) async {
@@ -88,6 +249,61 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     );
   }
 
+  Future<void> _confirmDelete(AdminOrder order) async {
+    if (_deletingId != null) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Siparişi sil'),
+        content: const Text(
+          'Sipariş tamamen silinecek. Stok geri yüklenecek, kullanılan '
+          'kupon iade edilecek ve işlem hiç olmamış sayılacak. '
+          'Müşteriye SMS gitmez. Bu işlem geri alınamaz.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Sil ve stoğu geri yükle'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _deletingId = order.id);
+    try {
+      await _functions.httpsCallable('deleteOrder').call(<String, dynamic>{
+        'orderId': order.id,
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sipariş silindi. Stok geri yüklendi.')),
+      );
+    } on FirebaseFunctionsException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error.message?.trim().isNotEmpty == true
+                ? error.message!
+                : 'Sipariş silinemedi.',
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sipariş silinemedi. Lütfen tekrar deneyin.')),
+      );
+    } finally {
+      if (mounted) setState(() => _deletingId = null);
+    }
+  }
+
   List<AdminOrder> _filter(List<AdminOrder> orders) {
     var list = [...orders]
       ..sort((a, b) {
@@ -102,6 +318,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     if (query.isEmpty) return list;
     return list.where((order) {
       return order.id.toLowerCase().contains(query) ||
+          OrderNo.fromId(order.id).toLowerCase().contains(query) ||
           order.customerName.toLowerCase().contains(query) ||
           order.phone.toLowerCase().contains(query) ||
           order.address.toLowerCase().contains(query);
@@ -141,6 +358,12 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                 subtitle:
                     'Durumu güncelleyin, adresi ve ürünleri kontrol edin.',
                 actions: [
+                  TextButton.icon(
+                    onPressed: _showBirfaturaSetup,
+                    icon: const Icon(Icons.receipt_long_outlined),
+                    label: const Text('BirFatura'),
+                  ),
+                  const SizedBox(width: 8),
                   Text(
                     '${visible.length} kayıt',
                     style: const TextStyle(
@@ -292,7 +515,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
         ),
         chip('Tümü', null),
         chip('Hazırlanıyor', OrderStatuses.preparing),
-        chip('Kargoda', OrderStatuses.shipping),
+        chip('Kuryede', OrderStatuses.shipping),
         chip('Teslim', OrderStatuses.delivered),
         chip('İptal', OrderStatuses.cancelled),
       ],
@@ -318,12 +541,25 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                   Expanded(
                     child: Text(
                       order.customerName.isEmpty
-                          ? '#${order.id.length > 8 ? order.id.substring(0, 8) : order.id}'
+                          ? OrderNo.labeled(order.id)
                           : order.customerName,
                       style: const TextStyle(
                         fontWeight: FontWeight.w800,
                         fontSize: 13,
                       ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Siparişi sil — stok geri yüklenir',
+                    visualDensity: VisualDensity.compact,
+                    onPressed: _deletingId == order.id
+                        ? null
+                        : () => _confirmDelete(order),
+                    icon: Icon(
+                      Icons.delete_outline_rounded,
+                      color: _deletingId == order.id
+                          ? AppColors.subText
+                          : AppColors.error,
                     ),
                   ),
                   IconButton(
@@ -351,7 +587,8 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
               ),
               const SizedBox(height: 4),
               Text(
-                '${AdminUi.dateTime(order.createdAt)} · ${order.itemCount} ürün',
+                '${AdminUi.dateTime(order.createdAt)} · ${order.itemCount} ürün'
+                '${order.gifts.isEmpty ? '' : ' · ${order.gifts.length} hediye'}',
                 style: const TextStyle(
                   color: AppColors.subText,
                   fontSize: 12,
@@ -359,9 +596,20 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              AdminStatusChip(
-                label: AdminUi.orderStatusLabel(order.status),
-                color: AdminUi.orderStatusColor(order.status),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  AdminStatusChip(
+                    label: AdminUi.orderStatusLabel(order.status),
+                    color: AdminUi.orderStatusColor(order.status),
+                  ),
+                  if (order.gifts.isNotEmpty)
+                    AdminStatusChip(
+                      label: '${order.gifts.length} hediye',
+                      color: AppColors.primary,
+                    ),
+                ],
               ),
             ],
           ),
@@ -380,7 +628,27 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
       ),
       builder: (ctx) => SizedBox(
         height: MediaQuery.of(ctx).size.height * 0.86,
-        child: _detail(order),
+        child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+          stream: FirebaseFirestore.instance
+              .collection(FirestoreCollections.orders)
+              .doc(order.id)
+              .snapshots(),
+          builder: (context, snap) {
+            final doc = snap.data;
+            if (doc != null &&
+                !doc.exists &&
+                snap.connectionState == ConnectionState.active) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (ctx.mounted) Navigator.pop(ctx);
+              });
+              return const SizedBox.shrink();
+            }
+            final live = doc != null && doc.exists
+                ? AdminOrder.fromDoc(doc)
+                : order;
+            return _detail(live);
+          },
+        ),
       ),
     );
   }
@@ -414,14 +682,14 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                     ),
                 ],
                 onChanged: (value) {
-                  if (value != null) _setStatus(order, value);
+                  if (value != null) _confirmStatusChange(order, value);
                 },
               ),
             ],
           ),
           const SizedBox(height: 4),
           Text(
-            '#${order.id}',
+            OrderNo.labeled(order.id),
             style: const TextStyle(
               color: AppColors.subText,
               fontWeight: FontWeight.w600,
@@ -452,12 +720,34 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                 'Teslimat',
                 order.deliverySlot.isEmpty ? '—' : order.deliverySlot,
               ),
+              if (order.couponCode.isNotEmpty)
+                _info(
+                  'Kupon',
+                  '${order.couponCode}'
+                  '${order.couponDiscount > 0 ? ' (−${AdminUi.money(order.couponDiscount)})' : ''}',
+                ),
               _info('Telefon', order.phone.isEmpty ? '—' : order.phone),
               _info(
                 'Sipariş SMS',
                 order.smsCreatedAt != null
                     ? AdminUi.dateTime(order.smsCreatedAt)
                     : 'Bekleniyor',
+              ),
+              _info(
+                'Kurye SMS',
+                order.smsShippingAt != null
+                    ? AdminUi.dateTime(order.smsShippingAt)
+                    : (order.status == OrderStatuses.shipping
+                          ? 'Gönderiliyor'
+                          : 'Kuryede olunca'),
+              ),
+              _info(
+                'İptal SMS',
+                order.smsCancelledAt != null
+                    ? AdminUi.dateTime(order.smsCancelledAt)
+                    : (order.status == OrderStatuses.cancelled
+                          ? 'Gönderiliyor'
+                          : 'İptalde gider'),
               ),
               _info(
                 'Teslim SMS',
@@ -480,6 +770,22 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
               ),
             ),
           ],
+          if (order.status == OrderStatuses.cancelled ||
+              order.status == OrderStatuses.shipping ||
+              order.status == OrderStatuses.delivered) ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () async {
+                await _dispatchNotice(order.id, force: true);
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('SMS ve bildirim gönderildi.')),
+                );
+              },
+              icon: const Icon(Icons.sms_outlined),
+              label: const Text('SMS ve bildirimi gönder'),
+            ),
+          ],
           const SizedBox(height: 16),
           const Text(
             'Adres',
@@ -494,6 +800,74 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
               height: 1.4,
             ),
           ),
+          if (order.billingAddress.isNotEmpty ||
+              order.billingNationalId.isNotEmpty ||
+              order.billingTaxId.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            const Text(
+              'Fatura bilgisi',
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 16,
+              runSpacing: 10,
+              children: [
+                _info(
+                  'Hesap',
+                  order.billingAccountType == 'corporate'
+                      ? 'Kurumsal'
+                      : 'Bireysel',
+                ),
+                if (order.billingName.isNotEmpty)
+                  _info('Unvan', order.billingName),
+                if (order.billingNationalId.isNotEmpty)
+                  _info('T.C.', order.billingNationalId),
+                if (order.billingTaxId.isNotEmpty)
+                  _info('Vergi no', order.billingTaxId),
+                if (order.billingTaxOffice.isNotEmpty)
+                  _info('Vergi dairesi', order.billingTaxOffice),
+              ],
+            ),
+            if (order.billingAddress.isNotEmpty &&
+                order.billingAddress != order.address) ...[
+              const SizedBox(height: 6),
+              Text(
+                order.billingAddress,
+                style: const TextStyle(
+                  color: AppColors.subText,
+                  fontWeight: FontWeight.w600,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ],
+          if (order.invoiceNumber.isNotEmpty ||
+              order.invoiceLink.isNotEmpty ||
+              order.cargoTrackingCode.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            const Text(
+              'BirFatura',
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 16,
+              runSpacing: 10,
+              children: [
+                if (order.invoiceNumber.isNotEmpty)
+                  _info('Fatura no', order.invoiceNumber),
+                if (order.invoiceDate.isNotEmpty)
+                  _info('Fatura tarihi', order.invoiceDate),
+                if (order.invoiceLink.isNotEmpty)
+                  _info('Fatura linki', order.invoiceLink),
+                if (order.cargoCompany.isNotEmpty)
+                  _info('Kargo', order.cargoCompany),
+                if (order.cargoTrackingCode.isNotEmpty)
+                  _info('Takip no', order.cargoTrackingCode),
+              ],
+            ),
+          ],
           const SizedBox(height: 16),
           const Text(
             'Ürünler',
@@ -553,7 +927,105 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                   ],
                 ),
               ),
+          const SizedBox(height: 16),
+          const Text(
+            'Hediyeler',
+            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+          ),
+          const SizedBox(height: 8),
+          if (order.gifts.isEmpty)
+            const Text(
+              'Hediye seçilmedi.',
+              style: TextStyle(color: AppColors.subText),
+            )
+          else
+            for (final gift in order.gifts)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Row(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: SizedBox(
+                        width: 48,
+                        height: 48,
+                        child: buildProductImage(
+                          gift.imageUrl,
+                          fit: BoxFit.contain,
+                          errorWidget: const ColoredBox(
+                            color: AppColors.selected,
+                            child: Icon(Icons.card_giftcard_rounded, size: 20),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            gift.title.isEmpty ? 'Hediye' : gift.title,
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                          Text(
+                            gift.premium ? 'Premium hediye' : 'Sipariş hediyesi',
+                            style: const TextStyle(
+                              color: AppColors.subText,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Text(
+                      'Ücretsiz',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
           const Divider(height: 28),
+          if (order.courierFee > 0 || order.subtotal > 0) ...[
+            Row(
+              children: [
+                const Text(
+                  'Ara toplam',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                ),
+                const Spacer(),
+                Text(
+                  AdminUi.money(order.subtotal > 0 ? order.subtotal : order.total),
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Text(
+                  'Getirme ücreti',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                ),
+                const Spacer(),
+                Text(
+                  order.courierFee > 0
+                      ? AdminUi.money(order.courierFee)
+                      : 'Ücretsiz',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: order.courierFee > 0
+                        ? AppColors.text
+                        : AppColors.primary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+          ],
           Row(
             children: [
               const Text(
@@ -570,6 +1042,21 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 20),
+          OutlinedButton.icon(
+            onPressed: _deletingId == order.id
+                ? null
+                : () => _confirmDelete(order),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.error,
+              side: const BorderSide(color: AppColors.error),
+              minimumSize: const Size.fromHeight(44),
+            ),
+            icon: const Icon(Icons.delete_outline_rounded),
+            label: Text(
+              _deletingId == order.id ? 'Siliniyor…' : 'Siparişi sil',
+            ),
           ),
         ],
       ),

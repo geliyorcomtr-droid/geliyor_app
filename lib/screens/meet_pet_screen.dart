@@ -5,6 +5,7 @@ import 'package:geliyor_app/data/dog_feeding_guide.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/state/pet_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:geliyor_app/utils/login_gate.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
 import 'package:geliyor_app/widgets/app_banner_slider.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
@@ -125,7 +126,14 @@ class _MeetPetScreenState extends State<MeetPetScreen> {
     _extraFood = pet.extraFood;
   }
 
-  void _savePet() {
+  Future<void> _savePet() async {
+    final editingAsMember = LoginGate.isLoggedIn && _selectedPetIndex != null;
+    final ok = await LoginGate.require(
+      context: context,
+      message: 'Dost kaydetmek için giriş yapmanız gerekir.',
+    );
+    if (!ok || !mounted) return;
+
     final species = _species ?? 'Kedi';
     final typedName = _nameController.text.trim();
     final dailyFoodGrams = species == 'Köpek'
@@ -139,7 +147,7 @@ class _MeetPetScreenState extends State<MeetPetScreen> {
             activityLevel: _activityLevel,
           );
     setState(() {
-      if (_selectedPetIndex != null) {
+      if (editingAsMember) {
         final existing = _savedPets[_selectedPetIndex!];
         PetStore.instance.updatePet(
           _selectedPetIndex!,
@@ -787,8 +795,13 @@ class _MeetPetScreenState extends State<MeetPetScreen> {
     );
   }
 
-  void _deletePet() {
+  Future<void> _deletePet() async {
     if (_selectedPetIndex == null) return;
+    final ok = await LoginGate.require(
+      context: context,
+      message: 'Dost silmek için giriş yapmanız gerekir.',
+    );
+    if (!ok || !mounted) return;
     setState(() {
       PetStore.instance.removePet(_selectedPetIndex!);
       _selectedPetIndex = null;
@@ -839,7 +852,9 @@ class _MeetPetScreenState extends State<MeetPetScreen> {
         Expanded(
           flex: 2,
           child: AppPressableButton(
-            onTap: _savePet,
+            onTap: () {
+              _savePet();
+            },
             height: 42,
             backgroundColor: AppColors.primaryLight,
             pressedBackgroundColor: AppColors.primary,

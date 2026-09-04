@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geliyor_app/screens/account_screen.dart';
 import 'package:geliyor_app/screens/register_screen.dart';
+import 'package:geliyor_app/services/user_profile_sync.dart';
 import 'package:geliyor_app/state/auth_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
@@ -9,7 +10,13 @@ import 'package:geliyor_app/widgets/app_page_frame.dart';
 import 'package:geliyor_app/widgets/app_pressable_button.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({
+    super.key,
+    this.returnToPrevious = false,
+  });
+
+  /// Sipariş / sepet gibi bir işlemden geldiyse giriş sonrası geri döner.
+  final bool returnToPrevious;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -71,7 +78,12 @@ class _LoginScreenState extends State<LoginScreen> {
         smsCode: code,
         requireExistingUser: true,
       );
+      await UserProfileSync.sync(force: true);
       if (!mounted) return;
+      if (widget.returnToPrevious) {
+        Navigator.of(context).pop(true);
+        return;
+      }
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
           settings: const RouteSettings(name: 'profile'),

@@ -1,16 +1,26 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:async';
+import 'dart:typed_data';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/material.dart';
+import 'package:geliyor_app/data/firestore_collections.dart';
 import 'package:geliyor_app/data/product_repository.dart';
+import 'package:geliyor_app/state/auth_store.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
 import 'package:geliyor_app/screens/product_detail_screen.dart';
 import 'package:geliyor_app/state/cart_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:geliyor_app/utils/login_gate.dart';
 import 'package:geliyor_app/utils/market_product_helpers.dart';
+import 'package:geliyor_app/utils/product_tag_filter.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
 import 'package:geliyor_app/widgets/app_pressable_button.dart';
 import 'package:geliyor_app/widgets/market_product_card.dart';
+import 'package:image_picker/image_picker.dart';
 
 enum _PetType { cat, dog }
 
@@ -30,8 +40,10 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
   bool _supplyOpen = false;
   final _requestNameController = TextEditingController();
   final _requestNoteController = TextEditingController();
-  String? _requestImagePath;
+  Uint8List? _requestImageBytes;
   _SupplyStatus? _requestStatus;
+  bool _savingRequest = false;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _supplySub;
 
   static const _needs = <_MamaNeed>[
     _MamaNeed(
@@ -40,7 +52,7 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
       iconPath: 'assets/images/app_ikonlar/sindirim.png',
     ),
     _MamaNeed(
-      id: 'bobre',
+      id: 'bobrek',
       title: 'Böbrek\nDesteği',
       iconPath: 'assets/images/app_ikonlar/bobrek.png',
     ),
@@ -110,18 +122,32 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
     return '$base +${_selectedNeedIds.length - 1} için Önerilen Mamalar';
   }
 
-  List<_MamaProduct> _exampleFrom(MarketProductData item) {
-    return [_MamaProduct(
-      id: item.id,
-      brand: item.brand,
-      name: item.title,
-      description: item.subtitle,
-      tags: [item.dietTag],
-      weight: item.weights.isNotEmpty ? item.weights.first : '',
-      price: item.prices.isNotEmpty ? item.prices.first : 0,
-      imagePath: item.imagePath,
-      source: item,
-    )];
+  List<_MamaProduct> _toMamaProducts(List<MarketProductData> items) {
+    return [
+      for (final item in items)
+        _MamaProduct(
+          id: item.id,
+          brand: item.brand,
+          name: item.title,
+          description: item.subtitle,
+          tags: [item.dietTag],
+          weight: item.weights.isNotEmpty ? item.weights.first : '',
+          price: item.prices.isNotEmpty ? item.prices.first : 0,
+          imagePath: item.imagePath,
+          source: item,
+        ),
+    ];
+  }
+
+  List<_MamaProduct> _productsForSelection(List<MarketProductData> catalog) {
+    final petLabel = _petType == _PetType.cat ? 'Kedi' : 'Köpek';
+    final matched = ProductTagFilter.apply(
+      catalog: catalog,
+      tags: _selectedNeedIds,
+      petLabel: petLabel,
+      matchAll: true,
+    );
+    return _toMamaProducts(matched);
   }
 
   void _toggleNeed(String id) {
@@ -142,9 +168,11 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
     setState(() => _supplyOpen = false);
   }
 
-  void _saveSupplyRequest() {
+  Future<void> _saveSupplyRequest() async {
+    if (_savingRequest) return;
     final name = _requestNameController.text.trim();
-    if (name.isEmpty && _requestImagePath == null) {
+    final note = _requestNoteController.text.trim();
+    if (name.isEmpty && _requestImageBytes == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Ürün adı veya görsel eklemen gerekiyor.'),
@@ -153,35 +181,272 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
       );
       return;
     }
-    setState(() {
-      _requestStatus = _SupplyStatus.received;
-      _supplyOpen = false;
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Talebin iletildi. Takip bilgisini kartta görebilirsin.'),
-        behavior: SnackBarBehavior.floating,
-        duration: Duration(seconds: 2),
+
+    final loggedIn = await LoginGate.require(
+      context: context,
+      message: 'Mama talebi göndermek için giriş yapmanız gerekir.',
+    );
+    if (!loggedIn || !mounted) return;
+
+    setState(() => _savingRequest = true);
+    try {
+      var imageUrl = '';
+      final bytes = _requestImageBytes;
+      final uid = AuthStore.instance.uid ?? '';
+      if (bytes != null && uid.isNotEmpty) {
+        final ref = FirebaseStorage.instance.ref(
+          'supply_requests/$uid/${DateTime.now().millisecondsSinceEpoch}.jpg',
+        );
+        await ref.putData(
+          bytes,
+          SettableMetadata(contentType: 'image/jpeg'),
+        );
+        imageUrl = await ref.getDownloadURL();
+      }
+
+      await FirebaseFirestore.instance
+          .collection(FirestoreCollections.supportTickets)
+          .add({
+            SupportTicketFields.kind: SupportTicketKinds.supply,
+            SupportTicketFields.subject: 'Mama tedarik talebi',
+            SupportTicketFields.productName: name,
+            SupportTicketFields.message: note.isEmpty
+                ? (name.isEmpty ? 'Görsel ile mama talebi' : name)
+                : note,
+            SupportTicketFields.imageUrl: imageUrl,
+            SupportTicketFields.name: AuthStore.instance.fullName.trim(),
+            SupportTicketFields.email: AuthStore.instance.email.trim(),
+            SupportTicketFields.phone: AuthStore.instance.phone.trim(),
+            SupportTicketFields.userId: uid,
+            SupportTicketFields.status: SupportTicketStatuses.open,
+            SupportTicketFields.reply: '',
+            SupportTicketFields.createdAt: FieldValue.serverTimestamp(),
+            SupportTicketFields.updatedAt: FieldValue.serverTimestamp(),
+          });
+
+      if (!mounted) return;
+      setState(() {
+        _requestStatus = _SupplyStatus.received;
+        _supplyOpen = false;
+        _savingRequest = false;
+        _requestImageBytes = null;
+      });
+      _requestNameController.clear();
+      _requestNoteController.clear();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Talebin iletildi. Takip bilgisini kartta görebilirsin.'),
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _savingRequest = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Talep gönderilemedi. Bağlantını kontrol et.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<void> _openImageSourceSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (sheetContext) {
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            16,
+            12,
+            16,
+            12 + MediaQuery.paddingOf(sheetContext).bottom,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Görsel ekle',
+                  style: TextStyle(
+                    color: AppColors.text,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Fotoğraf çek veya galeriden seç.',
+                  style: TextStyle(
+                    color: AppColors.subText,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              _buildImageSourceButton(
+                icon: Icons.photo_camera_outlined,
+                label: 'Fotoğraf çek',
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  _pickRequestImage(ImageSource.camera);
+                },
+              ),
+              const SizedBox(height: 8),
+              _buildImageSourceButton(
+                icon: Icons.photo_library_outlined,
+                label: 'Galeriden seç',
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  _pickRequestImage(ImageSource.gallery);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildImageSourceButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return AppPressableButton(
+      onTap: onTap,
+      width: double.infinity,
+      height: 42,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      backgroundColor: AppColors.background,
+      pressedBackgroundColor: AppColors.selected,
+      borderColor: AppColors.border,
+      pressedBorderColor: AppColors.primaryLight,
+      child: Row(
+        children: [
+          Icon(icon, color: AppColors.primary, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.text,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          const Icon(
+            Icons.chevron_right_rounded,
+            color: AppColors.subText,
+            size: 20,
+          ),
+        ],
       ),
     );
+  }
 
-    Future.delayed(const Duration(seconds: 2), () {
+  Future<void> _pickRequestImage(ImageSource source) async {
+    try {
+      final file = await ImagePicker().pickImage(
+        source: source,
+        maxWidth: 1600,
+        imageQuality: 85,
+      );
+      if (file == null || !mounted) return;
+      final bytes = await file.readAsBytes();
+      if (!mounted || bytes.isEmpty) return;
+      setState(() => _requestImageBytes = bytes);
+    } catch (_) {
       if (!mounted) return;
-      if (_requestStatus != _SupplyStatus.received) return;
-      setState(() => _requestStatus = _SupplyStatus.processing);
-    });
-    Future.delayed(const Duration(seconds: 4), () {
-      if (!mounted) return;
-      if (_requestStatus != _SupplyStatus.processing) return;
-      setState(() => _requestStatus = _SupplyStatus.supplied);
-    });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            source == ImageSource.camera
+                ? 'Kamera açılamadı. İzinleri kontrol edin.'
+                : 'Galeri açılamadı.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    AuthStore.instance.addListener(_onAuthChanged);
+    _bindSupplyTicket();
   }
 
   @override
   void dispose() {
+    AuthStore.instance.removeListener(_onAuthChanged);
+    _supplySub?.cancel();
     _requestNameController.dispose();
     _requestNoteController.dispose();
     super.dispose();
+  }
+
+  void _onAuthChanged() {
+    _bindSupplyTicket();
+  }
+
+  void _bindSupplyTicket() {
+    _supplySub?.cancel();
+    final uid = AuthStore.instance.uid;
+    if (uid == null || uid.isEmpty) return;
+    _supplySub = FirebaseFirestore.instance
+        .collection(FirestoreCollections.supportTickets)
+        .where(SupportTicketFields.userId, isEqualTo: uid)
+        .snapshots()
+        .listen((snap) {
+      final tickets = snap.docs.where((doc) {
+        final kind = (doc.data()[SupportTicketFields.kind] as String?) ?? '';
+        return kind == SupportTicketKinds.supply;
+      }).toList();
+      tickets.sort((a, b) {
+        final left = a.data()[SupportTicketFields.createdAt];
+        final right = b.data()[SupportTicketFields.createdAt];
+        final leftTime = left is Timestamp
+            ? left.toDate()
+            : DateTime.fromMillisecondsSinceEpoch(0);
+        final rightTime = right is Timestamp
+            ? right.toDate()
+            : DateTime.fromMillisecondsSinceEpoch(0);
+        return rightTime.compareTo(leftTime);
+      });
+      if (tickets.isEmpty || !mounted) return;
+      final status =
+          (tickets.first.data()[SupportTicketFields.status] as String?) ??
+          SupportTicketStatuses.open;
+      setState(() {
+        _requestStatus = switch (status) {
+          SupportTicketStatuses.replied => _SupplyStatus.processing,
+          SupportTicketStatuses.closed => _SupplyStatus.supplied,
+          _ => _SupplyStatus.received,
+        };
+      });
+    });
   }
 
   @override
@@ -214,10 +479,9 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
                     builder: (context, snapshot) {
                       final catalog =
                           snapshot.data ?? const <MarketProductData>[];
-                      if (catalog.isEmpty) {
-                        return _buildProductsGrid(const []);
-                      }
-                      return _buildProductsGrid(_exampleFrom(catalog.first));
+                      return _buildProductsGrid(
+                        _productsForSelection(catalog),
+                      );
                     },
                   ),
                 ],
@@ -842,12 +1106,7 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
                       ),
                       const SizedBox(height: 6),
                       GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _requestImagePath =
-                                'assets/images/nd_kuzu_kisir.jpg';
-                          });
-                        },
+                        onTap: _openImageSourceSheet,
                         child: Container(
                           width: double.infinity,
                           height: 84,
@@ -859,7 +1118,7 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
                               width: 1.2,
                             ),
                           ),
-                          child: _requestImagePath == null
+                          child: _requestImageBytes == null
                               ? const Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
@@ -870,7 +1129,7 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
                                     ),
                                     SizedBox(width: 8),
                                     Text(
-                                      'Görsel eklemek için dokun',
+                                      'Fotoğraf çek veya galeriden seç',
                                       style: TextStyle(
                                         color: AppColors.subText,
                                         fontSize: 12,
@@ -884,8 +1143,8 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
                                     Positioned.fill(
                                       child: ClipRRect(
                                         borderRadius: BorderRadius.circular(18),
-                                        child: Image.asset(
-                                          _requestImagePath!,
+                                        child: Image.memory(
+                                          _requestImageBytes!,
                                           fit: BoxFit.contain,
                                         ),
                                       ),
@@ -896,7 +1155,7 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
                                       child: GestureDetector(
                                         onTap: () {
                                           setState(
-                                            () => _requestImagePath = null,
+                                            () => _requestImageBytes = null,
                                           );
                                         },
                                         child: Container(
@@ -960,11 +1219,12 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
                       const SizedBox(height: 12),
                       AppPressableButton.primary(
                         onTap: _saveSupplyRequest,
+                        enabled: !_savingRequest,
                         width: double.infinity,
                         height: 42,
-                        child: const Text(
-                          'Kaydet',
-                          style: TextStyle(fontSize: 14),
+                        child: Text(
+                          _savingRequest ? 'Gönderiliyor...' : 'Kaydet',
+                          style: const TextStyle(fontSize: 14),
                         ),
                       ),
                     ],

@@ -1,11 +1,17 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:geliyor_app/app_navigator.dart';
 import 'package:geliyor_app/firebase_options.dart';
+import 'package:geliyor_app/screens/login_screen.dart';
 import 'package:geliyor_app/screens/splash_screen.dart';
 import 'package:geliyor_app/services/food_reminder_sync.dart';
 import 'package:geliyor_app/services/push_service.dart';
+import 'package:geliyor_app/services/user_profile_sync.dart';
+import 'package:geliyor_app/state/health_calendar_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:geliyor_app/utils/login_gate.dart';
+import 'package:geliyor_app/widgets/in_app_notice_host.dart';
 import 'package:geliyor_app/widgets/mobile_web_shell.dart';
 
 Future<void> main() async {
@@ -14,7 +20,17 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
   await PushService.instance.start();
+  UserProfileSync.start();
   FoodReminderSync.start();
+  HealthCalendarStore.start();
+  LoginGate.openLogin = (context) async {
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => const LoginScreen(returnToPrevious: true),
+      ),
+    );
+    return result == true;
+  };
 
   // Durum çubuğu (saat / Wi‑Fi) ile uygulama aynı zeminde görünsün;
   // gri şerit “sayfa üstünde sayfa” etkisini kaldırır.
@@ -41,6 +57,7 @@ class GeliyorApp extends StatelessWidget {
     return MaterialApp(
       title: 'geliyor.tr',
       debugShowCheckedModeBanner: false,
+      navigatorKey: appNavigatorKey,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: AppColors.primary,
@@ -60,7 +77,9 @@ class GeliyorApp extends StatelessWidget {
       builder: (context, child) {
         return AnnotatedRegion<SystemUiOverlayStyle>(
           value: _appSystemUi,
-          child: MobileWebShell(child: child ?? const SizedBox.shrink()),
+          child: InAppNoticeHost(
+            child: MobileWebShell(child: child ?? const SizedBox.shrink()),
+          ),
         );
       },
       home: const SplashScreen(),

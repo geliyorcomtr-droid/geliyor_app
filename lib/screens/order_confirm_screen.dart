@@ -7,12 +7,16 @@ import 'package:geliyor_app/screens/addresses_screen.dart';
 import 'package:geliyor_app/screens/order_success_screen.dart';
 import 'package:geliyor_app/state/address_store.dart';
 import 'package:geliyor_app/state/cart_store.dart';
+import 'package:geliyor_app/state/coupon_store.dart';
 import 'package:geliyor_app/state/order_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:geliyor_app/utils/courier_fee.dart';
+import 'package:geliyor_app/utils/login_gate.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
 import 'package:geliyor_app/widgets/app_pressable_button.dart';
+import 'package:geliyor_app/widgets/coupon_sheet.dart';
 
 class OrderConfirmScreen extends StatefulWidget {
   const OrderConfirmScreen({
@@ -37,30 +41,111 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
   @override
   void initState() {
     super.initState();
-    AddressStore.instance.addListener(_onAddressChanged);
+    AddressStore.instance.addListener(_onChanged);
+    CouponStore.instance.addListener(_onChanged);
+    CouponStore.instance.ensureLoaded();
   }
 
   @override
   void dispose() {
-    AddressStore.instance.removeListener(_onAddressChanged);
+    AddressStore.instance.removeListener(_onChanged);
+    CouponStore.instance.removeListener(_onChanged);
     super.dispose();
   }
 
-  void _onAddressChanged() {
+  void _onChanged() {
     if (mounted) setState(() {});
   }
 
+  void _openAddressPicker() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const AddressesScreen(selectForDelivery: true),
+      ),
+    );
+  }
+
   Future<void> _submitOrder(String deliveryTime) async {
+    if (!AddressStore.instance.hasDeliveryAddress) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Sipariş için teslimat adresi ekleyin.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => const AddressesScreen(selectForDelivery: true),
+        ),
+      );
+      return;
+    }
+
+    final ok = await LoginGate.require(
+      context: context,
+      message: 'Sipariş vermek için giriş yapmanız gerekir.',
+    );
+    if (!ok || !mounted) return;
+
+    if (!AddressStore.instance.hasDeliveryAddress) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Sipariş için teslimat adresi ekleyin.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => const AddressesScreen(selectForDelivery: true),
+        ),
+      );
+      return;
+    }
+
     try {
       final id = await OrderRepository.instance.placeCurrentCart(
         paymentMethod: selectedPayment,
         deliverySlot: deliveryTime,
       );
-      if (id != null) {
-        CartStore.instance.clear();
+      if (id == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Sipariş oluşturulamadı. Giriş yapıp tekrar deneyin.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
       }
+      OrderStore.instance.saveLastOrderFromCart(orderId: id);
+      final coupon = CouponStore.instance.selected;
+      final couponDiscount = CouponStore.instance.discountFor(widget.cartTotal);
+      await CouponStore.instance.onOrderPlaced();
+      CartStore.instance.clear();
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => OrderSuccessScreen(
+            cartTotal: widget.cartTotal,
+            itemCount: widget.itemCount,
+            deliverySlot: selectedDeliveryTime,
+            deliveryTime: deliveryTime,
+            paymentMethod: selectedPayment,
+            couponTitle: coupon?.title ?? '',
+            couponDiscount: couponDiscount,
+            orderId: id,
+          ),
+        ),
+      );
     } catch (_) {
-      // Yerel başarı ekranı açılsın; admin paneline yazılamazsa sessiz geç.
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Sipariş gönderilemedi. Lütfen tekrar deneyin.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -77,7 +162,15 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final totalText = '${_formatPrice(widget.cartTotal)} TL';
+    final coupons = CouponStore.instance;
+    final courierFee = CourierFee.forSubtotal(widget.cartTotal);
+    final couponDiscount = coupons.discountFor(widget.cartTotal);
+    final payableTotal = coupons.payableTotal(widget.cartTotal);
+    final productText = '${_formatPrice(widget.cartTotal)} TL';
+    final payableText = '${_formatPrice(payableTotal)} TL';
+    final courierText = courierFee > 0
+        ? '${_formatPrice(courierFee)} TL'
+        : 'Ücretsiz';
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -98,11 +191,19 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
               const SizedBox(height: 12),
               _buildPaymentSection(),
               const SizedBox(height: 12),
-              _buildOrderSummary(totalText),
+              _buildCouponSection(couponDiscount),
+              const SizedBox(height: 12),
+              _buildOrderSummary(
+                productText,
+                courierText,
+                payableText,
+                courierFee,
+                couponDiscount,
+              ),
               const SizedBox(height: 10),
-              _buildCompleteButton(totalText),
+              _buildCompleteButton(payableText),
               const SizedBox(height: 8),
-              _buildTrustBadges(),
+              _buildTrustBadges(CourierFee.isFree(widget.cartTotal)),
             ],
           ),
         ),
@@ -217,7 +318,8 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
   }
 
   Widget _buildAddressSection() {
-    final address = AddressStore.instance.defaultAddress;
+    final hasAddress = AddressStore.instance.hasDeliveryAddress;
+    final address = hasAddress ? AddressStore.instance.defaultAddress : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -226,17 +328,18 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
           '1',
           'Teslimat Adresi',
           showChange: true,
-          onChange: () {
-            Navigator.of(
-              context,
-            ).push(MaterialPageRoute(builder: (_) => const AddressesScreen()));
-          },
+          onChange: _openAddressPicker,
         ),
         const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: _cardDecoration(),
-          child: address == null
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: _openAddressPicker,
+            borderRadius: BorderRadius.circular(24),
+            child: Ink(
+              padding: const EdgeInsets.all(12),
+              decoration: _cardDecoration(),
+              child: address == null
               ? Row(
                   children: [
                     const Expanded(
@@ -250,13 +353,7 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
                       ),
                     ),
                     AppPressableButton.primary(
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const AddressesScreen(),
-                          ),
-                        );
-                      },
+                      onTap: _openAddressPicker,
                       height: 32,
                       padding: const EdgeInsets.symmetric(horizontal: 10),
                       child: const Text(
@@ -307,8 +404,19 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
                             ],
                           ),
                           const SizedBox(height: 4),
+                          if (address.cityDistrictLabel.isNotEmpty)
+                            Text(
+                              address.cityDistrictLabel,
+                              style: const TextStyle(
+                                color: AppColors.text,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          if (address.cityDistrictLabel.isNotEmpty)
+                            const SizedBox(height: 4),
                           Text(
-                            '${address.contactName} • ${address.phone}',
+                            address.contactName,
                             style: const TextStyle(
                               color: AppColors.subText,
                               fontSize: 11,
@@ -320,6 +428,8 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
                     ),
                   ],
                 ),
+            ),
+          ),
         ),
       ],
     );
@@ -340,25 +450,11 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: _timeCard('Sabah', '09:00-12:00', Icons.wb_sunny_outlined),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _timeCard(
-                'Öğle',
-                '12:00-18:00',
-                Icons.wb_twilight_outlined,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _timeCard('Akşam', '19:00-22:00', Icons.nightlight_round),
-            ),
-          ],
-        ),
+        _timeCard('Sabah', '09:00 - 12:00', Icons.wb_sunny_outlined),
+        const SizedBox(height: 6),
+        _timeCard('Öğle', '12:00 - 18:00', Icons.wb_twilight_outlined),
+        const SizedBox(height: 6),
+        _timeCard('Akşam', '19:00 - 22:00', Icons.nightlight_round),
         const SizedBox(height: 8),
         Container(
           width: double.infinity,
@@ -395,48 +491,143 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
       onTap: () => setState(() => selectedDeliveryTime = id),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
           color: selected ? AppColors.selected : AppColors.surface,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
             color: selected ? AppColors.primaryLight : AppColors.border,
-            width: selected ? 1.8 : 1.2,
+            width: selected ? 1.6 : 1.2,
           ),
         ),
-        child: Column(
+        child: Row(
           children: [
-            Align(
-              alignment: Alignment.topRight,
-              child: Icon(
-                selected
-                    ? Icons.check_circle_rounded
-                    : Icons.radio_button_unchecked,
-                color: selected ? AppColors.primary : AppColors.border,
-                size: 14,
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Icon(icon, color: AppColors.primary, size: 18),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    id,
+                    style: TextStyle(
+                      color: selected ? AppColors.primary : AppColors.text,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  Text(
+                    time,
+                    style: const TextStyle(
+                      color: AppColors.subText,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
               ),
             ),
-            Icon(icon, color: AppColors.primary, size: 20),
-            const SizedBox(height: 4),
-            Text(
-              id,
-              style: TextStyle(
-                color: selected ? AppColors.primary : AppColors.text,
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            Text(
-              time,
-              style: TextStyle(
-                color: selected ? AppColors.primary : AppColors.subText,
-                fontSize: 9.5,
-                fontWeight: FontWeight.w600,
-              ),
+            Icon(
+              selected
+                  ? Icons.radio_button_checked
+                  : Icons.radio_button_unchecked,
+              color: selected ? AppColors.primary : AppColors.border,
+              size: 20,
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildCouponSection(double couponDiscount) {
+    final selected = CouponStore.instance.selected;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionHeader('4', 'Kupon'),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: () => CouponSheet.show(context, subtotal: widget.cartTotal),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: selected != null ? AppColors.selected : AppColors.surface,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: selected != null
+                    ? AppColors.primaryLight
+                    : AppColors.border,
+                width: selected != null ? 1.6 : 1.2,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: const Icon(
+                    Icons.local_offer_outlined,
+                    color: AppColors.primary,
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        selected == null ? 'Kupon kullan' : selected.title,
+                        style: TextStyle(
+                          color: selected != null
+                              ? AppColors.primary
+                              : AppColors.text,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      Text(
+                        selected == null
+                            ? 'Tanımlı veya kazandığınız kuponları uygulayın'
+                            : '${selected.code} · -${_formatPrice(couponDiscount)} TL',
+                        style: const TextStyle(
+                          color: AppColors.subText,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  selected != null
+                      ? Icons.check_circle_rounded
+                      : Icons.chevron_right_rounded,
+                  color: selected != null
+                      ? AppColors.primary
+                      : AppColors.subText,
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -575,23 +766,37 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
     );
   }
 
-  Widget _buildOrderSummary(String totalText) {
+  Widget _buildOrderSummary(
+    String productText,
+    String courierText,
+    String payableText,
+    double courierFee,
+    double couponDiscount,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionHeader('4', 'Sipariş Özeti'),
+        _sectionHeader('5', 'Sipariş Özeti'),
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.all(12),
           decoration: _cardDecoration(),
           child: Column(
             children: [
-              _summaryRow('${widget.itemCount} ürün', totalText),
+              _summaryRow('${widget.itemCount} ürün', productText),
+              if (couponDiscount > 0) ...[
+                const SizedBox(height: 6),
+                _summaryRow(
+                  'Kupon',
+                  '-${_formatPrice(couponDiscount)} TL',
+                  valueColor: AppColors.primary,
+                ),
+              ],
               const SizedBox(height: 6),
               _summaryRow(
-                'Teslimat Ücreti',
-                'Ücretsiz',
-                valueColor: AppColors.primary,
+                'Getirme ücreti',
+                courierText,
+                valueColor: courierFee > 0 ? AppColors.text : AppColors.primary,
               ),
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 8),
@@ -609,7 +814,7 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
                   ),
                   const Spacer(),
                   Text(
-                    totalText,
+                    payableText,
                     style: const TextStyle(
                       color: AppColors.primary,
                       fontSize: 16,
@@ -649,7 +854,7 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
     );
   }
 
-  Widget _buildCompleteButton(String totalText) {
+  Widget _buildCompleteButton(String payableText) {
     final deliveryTime = selectedDeliveryTime == 'Sabah'
         ? '09:00 - 12:00'
         : selectedDeliveryTime == 'Öğle'
@@ -658,21 +863,7 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
 
     return AppPressableButton.primary(
       onTap: () {
-        if (widget.saveCartAsLastOrder) {
-          OrderStore.instance.saveLastOrderFromCart();
-        }
         unawaited(_submitOrder(deliveryTime));
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => OrderSuccessScreen(
-              cartTotal: widget.cartTotal,
-              itemCount: widget.itemCount,
-              deliverySlot: selectedDeliveryTime,
-              deliveryTime: deliveryTime,
-              paymentMethod: selectedPayment,
-            ),
-          ),
-        );
       },
       width: double.infinity,
       height: 52,
@@ -698,7 +889,7 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
             ),
           ),
           Text(
-            totalText,
+            payableText,
             style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
           ),
           const SizedBox(width: 4),
@@ -708,7 +899,7 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
     );
   }
 
-  Widget _buildTrustBadges() {
+  Widget _buildTrustBadges(bool courierFree) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
@@ -716,15 +907,15 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: AppColors.border),
       ),
-      child: const Row(
+      child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
           _TrustBadge(
             icon: Icons.delivery_dining_rounded,
-            label: 'Ücretsiz Kurye',
+            label: courierFree ? 'Ücretsiz Kurye' : 'Hızlı Kurye',
           ),
-          _TrustBadge(icon: Icons.shield_outlined, label: 'Güvenli Teslimat'),
-          _TrustBadge(icon: Icons.support_agent_rounded, label: '7/24 Destek'),
+          const _TrustBadge(icon: Icons.shield_outlined, label: 'Güvenli Teslimat'),
+          const _TrustBadge(icon: Icons.support_agent_rounded, label: '7/24 Destek'),
         ],
       ),
     );
