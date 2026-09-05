@@ -361,16 +361,7 @@ class _HealthScreenState extends State<HealthScreen> {
             iconPath: 'assets/images/app_ikonlar/kopek.png',
             selected: false,
             enabled: false,
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Köpek sağlığı yakında eklenecek.',
-                  ),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            },
+            onTap: () {},
           ),
         ),
       ],
@@ -385,7 +376,7 @@ class _HealthScreenState extends State<HealthScreen> {
     required VoidCallback onTap,
   }) {
     return AppPressableButton(
-      onTap: onTap,
+      onTap: enabled ? onTap : null,
       height: 36,
       padding: EdgeInsets.zero,
       backgroundColor: selected ? AppColors.selected : AppColors.surface,

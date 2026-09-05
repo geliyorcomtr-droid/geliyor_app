@@ -43,7 +43,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
     ),
     (
       'Hangi ödeme yöntemlerini kullanabilirim?',
-      'Havale/EFT, kapıda nakit ve kapıda POS ile ödeme yapabilirsiniz. Online kart ödemesi yakında eklenecektir.',
+      'Havale/EFT, kapıda nakit ve kapıda POS ile ödeme yapabilirsiniz.',
     ),
     (
       'Getirme ücreti ne kadar?',

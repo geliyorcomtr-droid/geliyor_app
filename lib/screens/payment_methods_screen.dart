@@ -94,8 +94,6 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                 _buildMethodCard(_methods[i]),
                 if (i != _methods.length - 1) const SizedBox(height: 10),
               ],
-              const SizedBox(height: 12),
-              _buildComingSoonBanner(),
             ],
           ),
         ),
@@ -170,7 +168,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                 ),
                 SizedBox(height: 4),
                 Text(
-                  'Şu anda yalnızca aşağıdaki ödeme yöntemlerini kullanabilirsin. Online ödeme yakında eklenecektir.',
+                  'Siparişlerde havale/EFT, kapıda nakit ve kapıda POS kullanabilirsiniz.',
                   style: TextStyle(
                     color: AppColors.subText,
                     fontSize: 10,
@@ -281,90 +279,6 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
               activeTrackColor: AppColors.primary,
               activeThumbColor: AppColors.surface,
               onChanged: (value) => _setEnabled(method.id, value),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildComingSoonBanner() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.selected,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: const Icon(
-              Icons.schedule_rounded,
-              color: AppColors.primary,
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 10),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Online Ödeme Yakında!',
-                  style: TextStyle(
-                    color: AppColors.primary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                SizedBox(height: 3),
-                Text(
-                  'Kredi kartı ile online ödeme seçeneği çok yakında kullanıma sunulacak.',
-                  style: TextStyle(
-                    color: AppColors.subText,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    height: 1.3,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            width: 52,
-            height: 40,
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Icon(
-                  Icons.credit_card_rounded,
-                  color: AppColors.primary.withValues(alpha: 0.85),
-                  size: 28,
-                ),
-                Positioned(
-                  top: 4,
-                  right: 6,
-                  child: Icon(
-                    Icons.lock_rounded,
-                    color: AppColors.warning.withValues(alpha: 0.9),
-                    size: 12,
-                  ),
-                ),
-              ],
             ),
           ),
         ],

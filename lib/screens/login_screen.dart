@@ -212,21 +212,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
               ),
-              const SizedBox(height: 18),
-              _orDivider(),
-              const SizedBox(height: 14),
-              _socialButton(
-                label: 'Apple ile Giriş Yap',
-                icon: Icons.apple,
-                onTap: () => _showMessage('Apple ile giriş yakında eklenecek.'),
-              ),
-              const SizedBox(height: 10),
-              _socialButton(
-                label: 'Google ile Giriş Yap',
-                icon: Icons.g_mobiledata_rounded,
-                onTap: () =>
-                    _showMessage('Google ile giriş yakında eklenecek.'),
-              ),
               const SizedBox(height: 22),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -369,46 +354,4 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _orDivider() {
-    return const Row(
-      children: [
-        Expanded(child: Divider(color: AppColors.border, thickness: 1)),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: 10),
-          child: Text(
-            'veya',
-            style: TextStyle(
-              color: AppColors.subText,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-        Expanded(child: Divider(color: AppColors.border, thickness: 1)),
-      ],
-    );
-  }
-
-  Widget _socialButton({
-    required String label,
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
-    return AppPressableButton.outline(
-      onTap: onTap,
-      width: double.infinity,
-      height: 46,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 20),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
-          ),
-        ],
-      ),
-    );
-  }
 }
