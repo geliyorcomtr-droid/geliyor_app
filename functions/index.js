@@ -900,6 +900,128 @@ function otpRef(gsmno) {
   return db().collection("otp_codes").doc(gsmno);
 }
 
+/** App Store Review: SMS almayan inceleme hesabı (telefon + kod). */
+const APP_REVIEW_PHONE = "5555550000";
+const APP_REVIEW_CODE = "246810";
+
+function isAppReviewPhone(gsmno) {
+  return gsmno === APP_REVIEW_PHONE;
+}
+
+function ymdPlusDays(days) {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + days);
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+async function ensureAppReviewAccount(auth) {
+  const phoneE164 = e164FromGsm(APP_REVIEW_PHONE);
+  let user;
+  try {
+    user = await auth.getUserByPhoneNumber(phoneE164);
+  } catch (error) {
+    if (error.code !== "auth/user-not-found") throw error;
+    user = await auth.createUser({
+      phoneNumber: phoneE164,
+      displayName: "Apple Reviewer",
+    });
+  }
+
+  const ref = db().collection("users").doc(user.uid);
+  const snap = await ref.get();
+  const data = snap.data() || {};
+  const pets = Array.isArray(data.pets) ? data.pets : [];
+  if (pets.length > 0) return user;
+
+  await ref.set(
+      {
+        uid: user.uid,
+        display_name: "Apple Reviewer",
+        phone_number: phoneE164,
+        phone: phoneE164,
+        user_role: "customer",
+        is_guest: false,
+        active: true,
+        updatedAt: FieldValue.serverTimestamp(),
+        ...(snap.exists ? {} : {created_time: FieldValue.serverTimestamp()}),
+        pets: [
+          {
+            name: "Misket",
+            species: "Kedi",
+            ageRange: "Genç (1-6 yaş)",
+            weight: "2-3 kg",
+            bodyType: "Normal",
+            neutered: "Kısır",
+            activityLevel: "Orta",
+            extraFood: "Hayır",
+            dailyFoodGrams: 45,
+            allergies: [],
+          },
+        ],
+        active_pet_index: 0,
+        food_tracking: {
+          active: true,
+          foodName: "Pro Plan Somonlu Kısır Kedi Maması",
+          bagKg: 10,
+          purchaseDate: ymdPlusDays(-20),
+          petName: "Misket",
+          petSpecies: "Kedi",
+        },
+        health_calendar: {
+          enabled: true,
+          daysBefore: 7,
+          timeHour: 9,
+          items: [
+            {
+              title: "Karma Aşı",
+              category: "vaccine",
+              frequency: "Yılda bir",
+              intervalMonths: 12,
+              lastDoneDate: ymdPlusDays(-350),
+              nextDueDate: ymdPlusDays(6),
+              sentFor: "",
+              reminderDate: ymdPlusDays(-1),
+            },
+            {
+              title: "Dış Parazit",
+              category: "parasite",
+              frequency: "Ayda bir",
+              intervalMonths: 1,
+              lastDoneDate: ymdPlusDays(-20),
+              nextDueDate: ymdPlusDays(16),
+              sentFor: "",
+              reminderDate: ymdPlusDays(9),
+            },
+          ],
+        },
+        addresses: [
+          {
+            id: "review-home",
+            title: "Ev",
+            contactName: "Apple Reviewer",
+            phone: `0${APP_REVIEW_PHONE}`,
+            address: "Atatürk Cad. No:12 Daire:5",
+            city: "İstanbul",
+            district: "Kadıköy",
+            icon: "home",
+            isDefault: true,
+            accountType: "individual",
+            nationalId: "",
+            taxId: "",
+            taxOffice: "",
+            isDelivery: true,
+            isInvoice: true,
+          },
+        ],
+      },
+      {merge: true},
+  );
+  return user;
+}
+
 function isPlaceholderName(value) {
   const n = String(value || "").trim().toLowerCase();
   return !n || n === "uye" || n === "üye" || n === "member";
@@ -1027,6 +1149,17 @@ exports.sendLoginCode = onCall(callOpts(), async (request) => {
   }
 
   const ref = otpRef(gsmno);
+  if (isAppReviewPhone(gsmno)) {
+    await ensureAppReviewAccount(getAuth());
+    await ref.set({
+      hash: hashOtp(gsmno, APP_REVIEW_CODE),
+      sentAt: FieldValue.serverTimestamp(),
+      expiresAt: Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000),
+      attempts: 0,
+      review: true,
+    });
+    return {ok: true};
+  }
   const existing = await ref.get();
   const prev = existing.data() || {};
   const sentAtMs = typeof prev.sentAt?.toMillis === "function"
