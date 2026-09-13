@@ -17,11 +17,14 @@ import 'package:geliyor_app/state/order_store.dart';
 import 'package:geliyor_app/state/pet_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/utils/advantage_search.dart';
+import 'package:geliyor_app/utils/product_image.dart';
 import 'package:geliyor_app/widgets/app_banner_slider.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
 import 'package:geliyor_app/widgets/app_pressable_button.dart';
+import 'package:geliyor_app/widgets/banner_image_preview.dart';
+import 'package:geliyor_app/widgets/pet_photo.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -51,7 +54,18 @@ class _HomeScreenState extends State<HomeScreen> {
     'muayene',
   ];
 
+  static const double _serviceCardHeight = 118;
+  static const double _serviceCardGap = 8;
+  static const double _serviceCardRadius = 18;
+  static const _homeAdSlots = <({BannerPlacement placement, Color color})>[
+    (placement: BannerPlacement.homeAd1, color: AppColors.success),
+    (placement: BannerPlacement.homeAd2, color: AppColors.error),
+    (placement: BannerPlacement.homeAd3, color: AppColors.warning),
+    (placement: BannerPlacement.homeAd4, color: AppColors.violet),
+  ];
+
   final _searchController = TextEditingController();
+  static const double _actionBarHeight = 48;
 
   @override
   void initState() {
@@ -119,6 +133,12 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 12),
               _buildPetMarket(),
               const SizedBox(height: 12),
+              _buildHomeAdRow(),
+              const SizedBox(height: 12),
+              _buildAdoption(),
+              const SizedBox(height: 12),
+              _buildHomeHalfBanner(),
+              const SizedBox(height: 12),
             ],
           ),
         ),
@@ -173,11 +193,15 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildBannerSlider() {
     return const AppBannerSlot(
       placement: BannerPlacement.home,
-      fallbackAssets: [
-        'assets/images/banner_mutlu_patiler.png',
-        'assets/images/banner_geliyor.png',
-        'assets/images/banner1.png',
-      ],
+      autoPlay: true,
+      openOnTap: false,
+    );
+  }
+
+  Widget _buildHomeHalfBanner() {
+    return const AppBannerSlot(
+      placement: BannerPlacement.homeBottom,
+      openOnTap: false,
     );
   }
 
@@ -186,7 +210,7 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         Expanded(
           child: Container(
-            height: 44,
+            height: _actionBarHeight,
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
               color: AppColors.surface,
@@ -256,8 +280,8 @@ class _HomeScreenState extends State<HomeScreen> {
             ).push(MaterialPageRoute(builder: (_) => const FilterScreen()));
           },
           child: Container(
-            width: 44,
-            height: 44,
+            width: _actionBarHeight,
+            height: _actionBarHeight,
             decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(999),
@@ -493,35 +517,35 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         const SizedBox(height: 12),
         SizedBox(
-          height: 118,
+          height: _serviceCardHeight,
           child: Row(
             children: [
               _serviceCard(
                 title: 'Kolay\nSipariş',
                 icon: Icons.delivery_dining_rounded,
-                color: const Color(0xFF22C55E),
+                color: AppColors.success,
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const EasyOrderScreen()),
                   );
                 },
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: _serviceCardGap),
               _serviceCard(
                 title: 'Pet\nE-nabız',
                 icon: Icons.health_and_safety_rounded,
-                color: const Color(0xFFEF4444),
+                color: AppColors.error,
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const HealthScreen()),
                   );
                 },
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: _serviceCardGap),
               _serviceCard(
                 title: 'Bilgi\nBankası',
                 icon: Icons.menu_book_rounded,
-                color: const Color(0xFFF59E0B),
+                color: AppColors.warning,
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
@@ -530,12 +554,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   );
                 },
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: _serviceCardGap),
               _serviceCard(
                 title: 'Hangi\nMama',
                 icon: Icons.restaurant_rounded,
                 imagePath: 'assets/images/son_ikonlar/hangi_mama.png',
-                color: const Color(0xFF8B5CF6),
+                color: AppColors.violet,
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const HangiMamaScreen()),
@@ -563,7 +587,7 @@ class _HomeScreenState extends State<HomeScreen> {
           padding: const EdgeInsets.fromLTRB(6, 10, 6, 8),
           decoration: BoxDecoration(
             color: AppColors.surface,
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(_serviceCardRadius),
             border: Border.all(color: color.withValues(alpha: 0.25)),
           ),
           child: Column(
@@ -619,11 +643,10 @@ class _HomeScreenState extends State<HomeScreen> {
         final pet = pets.isEmpty ? null : pets.first;
         final loggedIn = AuthStore.instance.isLoggedIn;
         final name = pet?.name ?? (loggedIn ? 'Dostun yok' : 'Misafir');
-        final nameLabel = loggedIn || pet == null ? name : '$name (örnek)';
 
         return Container(
-          height: 48,
-          padding: const EdgeInsets.fromLTRB(8, 0, 8, 0),
+          height: _actionBarHeight,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(999),
@@ -637,70 +660,60 @@ class _HomeScreenState extends State<HomeScreen> {
                 clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
+                  color: AppColors.selected,
                   border: Border.all(color: AppColors.border),
                 ),
                 child: pet == null
                     ? const Icon(
                         Icons.pets_rounded,
                         color: AppColors.primary,
-                        size: 16,
+                        size: 18,
                       )
-                    : Image.asset(
-                        pet.imagePath,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Icon(
-                            Icons.pets_rounded,
-                            color: AppColors.primary,
-                            size: 16,
-                          );
-                        },
+                    : PetPhoto(pet: pet, iconSize: 18),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                          height: 1.1,
+                        ),
                       ),
-              ),
-              const SizedBox(width: 6),
-              Flexible(
-                child: Text(
-                  nameLabel,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppColors.primary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-              if (pet != null) ...[
-                const SizedBox(width: 6),
-                Container(width: 1, height: 20, color: AppColors.border),
-                const SizedBox(width: 6),
-                Expanded(
-                  flex: 3,
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Row(
-                      children: [
-                        _PetMeta(
+                    ),
+                    if (pet != null) ...[
+                      Flexible(
+                        child: _PetMeta(
                           icon: Icons.calendar_month_rounded,
                           label: pet.shortAge,
                         ),
-                        const SizedBox(width: 8),
-                        _PetMeta(
+                      ),
+                      Flexible(
+                        child: _PetMeta(
                           icon: Icons.pets_rounded,
                           label: pet.species,
                         ),
-                        const SizedBox(width: 8),
-                        _PetMeta(
+                      ),
+                      Flexible(
+                        child: _PetMeta(
                           icon: Icons.monitor_weight_outlined,
                           label: pet.weight ?? '-',
                         ),
-                      ],
-                    ),
-                  ),
+                      ),
+                    ],
+                  ],
                 ),
-              ],
-              const SizedBox(width: 6),
+              ),
+              const SizedBox(width: 8),
               AppPressableButton.soft(
                 onTap: () {
                   Navigator.of(context).push(
@@ -730,7 +743,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ).push(MaterialPageRoute(builder: (_) => const PetMarketScreen()));
       },
       child: Container(
-        height: 56,
+        height: _actionBarHeight,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
           color: AppColors.surface,
@@ -804,6 +817,110 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+
+  Widget _buildHomeAdRow() {
+    return StreamBuilder<List<AppBanner>>(
+      stream: BannerRepository.instance.watchActive(),
+      builder: (context, snapshot) {
+        final banners = snapshot.data ?? const <AppBanner>[];
+        return SizedBox(
+          height: _serviceCardHeight,
+          child: Row(
+            children: [
+              for (var i = 0; i < _homeAdSlots.length; i++) ...[
+                if (i > 0) const SizedBox(width: _serviceCardGap),
+                _homeAdCard(
+                  color: _homeAdSlots[i].color,
+                  banner: _adBannerFor(_homeAdSlots[i].placement.id, banners),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  AppBanner? _adBannerFor(String placement, List<AppBanner> banners) {
+    for (final item in banners) {
+      if (item.placement == placement && item.displayImage.isNotEmpty) {
+        return item;
+      }
+    }
+    return null;
+  }
+
+  Widget _homeAdCard({required Color color, required AppBanner? banner}) {
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    final decodeW = (85 * dpr).round().clamp(160, 400);
+    final imageUrl = banner?.displayImage ?? '';
+    return Expanded(
+      child: GestureDetector(
+        onTap: banner == null
+            ? null
+            : () => BannerImagePreview.show(context, banner),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(_serviceCardRadius),
+            border: Border.all(color: color.withValues(alpha: 0.25)),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: imageUrl.isEmpty
+              ? const SizedBox.expand()
+              : buildProductImage(
+                  imageUrl,
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  height: double.infinity,
+                  cacheWidth: decodeW,
+                  filterQuality: FilterQuality.medium,
+                  errorWidget: const SizedBox.expand(),
+                ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAdoption() {
+    return Container(
+      height: _actionBarHeight,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          _barSideImage('assets/images/app_ikonlar/sahiplendirme_kopek.png'),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text(
+              'Sahiplendirme',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.sectionHeader,
+            ),
+          ),
+          const SizedBox(width: 10),
+          _barSideImage('assets/images/app_ikonlar/sahiplendirme_kedi.png'),
+        ],
+      ),
+    );
+  }
+
+  Widget _barSideImage(String path) {
+    return SizedBox(
+      width: 40,
+      height: 40,
+      child: Image.asset(
+        path,
+        fit: BoxFit.contain,
+        alignment: Alignment.center,
+        filterQuality: FilterQuality.medium,
+      ),
+    );
+  }
 }
 
 class _PetMeta extends StatelessWidget {
@@ -816,15 +933,21 @@ class _PetMeta extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(icon, color: AppColors.primary, size: 12),
-        const SizedBox(width: 2),
-        Text(
-          label,
-          style: const TextStyle(
-            color: AppColors.subText,
-            fontSize: 9.5,
-            fontWeight: FontWeight.w700,
+        Icon(icon, color: AppColors.primary, size: 14),
+        const SizedBox(width: 3),
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.text,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              height: 1.1,
+            ),
           ),
         ),
       ],
