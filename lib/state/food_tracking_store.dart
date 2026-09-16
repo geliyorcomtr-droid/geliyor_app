@@ -13,6 +13,7 @@ class FoodTrackingStore extends ChangeNotifier {
 
   bool _isActive = false;
   String _foodName = '';
+  String _foodId = '';
   double _bagKg = 0;
   DateTime _purchaseDate = DateTime.now();
   String? _petName;
@@ -22,6 +23,7 @@ class FoodTrackingStore extends ChangeNotifier {
 
   bool get isActive => _isActive;
   String get foodName => _foodName;
+  String get foodId => _foodId;
   double get bagKg => _bagKg;
   DateTime get purchaseDate => _purchaseDate;
   String? get petName => _petName;
@@ -32,6 +34,7 @@ class FoodTrackingStore extends ChangeNotifier {
     _bound = false;
     _isActive = false;
     _foodName = '';
+    _foodId = '';
     _bagKg = 0;
     _purchaseDate = DateTime.now();
     _petName = null;
@@ -48,12 +51,14 @@ class FoodTrackingStore extends ChangeNotifier {
     if (!remoteActive) {
       _isActive = false;
       _foodName = '';
+      _foodId = '';
       _bagKg = 0;
       _petName = null;
       _petSpecies = null;
     } else {
       _isActive = true;
       _foodName = (data[FoodTrackingFields.foodName] as String?)?.trim() ?? '';
+      _foodId = (data[FoodTrackingFields.foodId] as String?)?.trim() ?? '';
       _bagKg = (data[FoodTrackingFields.bagKg] as num?)?.toDouble() ?? 0;
       _purchaseDate = _parseDate(data[FoodTrackingFields.purchaseDate]) ??
           DateTime.now();
@@ -66,6 +71,7 @@ class FoodTrackingStore extends ChangeNotifier {
 
   void start({
     required String foodName,
+    String foodId = '',
     required double bagKg,
     required DateTime purchaseDate,
     String? petName,
@@ -74,6 +80,7 @@ class FoodTrackingStore extends ChangeNotifier {
     if (bagKg <= 0) return;
     _isActive = true;
     _foodName = foodName.trim();
+    _foodId = foodId.trim();
     _bagKg = bagKg;
     _purchaseDate = DateTime(
       purchaseDate.year,
@@ -89,6 +96,7 @@ class FoodTrackingStore extends ChangeNotifier {
   void stop() {
     _isActive = false;
     _foodName = '';
+    _foodId = '';
     _bagKg = 0;
     _petName = null;
     _petSpecies = null;
@@ -108,6 +116,7 @@ class FoodTrackingStore extends ChangeNotifier {
     return {
       FoodTrackingFields.active: true,
       FoodTrackingFields.foodName: _foodName,
+      FoodTrackingFields.foodId: _foodId,
       FoodTrackingFields.bagKg: _bagKg,
       FoodTrackingFields.purchaseDate: _ymd(_purchaseDate),
       FoodTrackingFields.petName: _petName,

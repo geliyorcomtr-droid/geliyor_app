@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:geliyor_app/screens/account_screen.dart';
+import 'package:geliyor_app/screens/home_screen.dart';
 import 'package:geliyor_app/screens/login_screen.dart';
 import 'package:geliyor_app/services/user_profile_sync.dart';
 import 'package:geliyor_app/state/auth_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
+import 'package:geliyor_app/widgets/app_brand_logo.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
 import 'package:geliyor_app/widgets/app_pressable_button.dart';
 
@@ -86,8 +87,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
-          settings: const RouteSettings(name: 'profile'),
-          builder: (_) => const AccountScreen(),
+          settings: const RouteSettings(name: 'home'),
+          builder: (_) => const HomeScreen(),
         ),
         (route) => false,
       );
@@ -281,14 +282,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Widget _buildBrand() {
-    return Image.asset(
-      'assets/images/geliyor_splash_logo.png',
-      height: 240,
-      fit: BoxFit.contain,
-      filterQuality: FilterQuality.high,
-      errorBuilder: (context, error, stackTrace) =>
-          const Icon(Icons.pets_rounded, color: AppColors.primary, size: 48),
-    );
+    return const AppBrandLogo(height: 240, errorIconSize: 48);
   }
 
   Widget _fieldLabel(String label) {

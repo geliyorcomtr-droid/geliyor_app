@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:geliyor_app/data/knowledge_article_repository.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:geliyor_app/utils/product_image.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
@@ -15,13 +17,29 @@ class ArticleDetailScreen extends StatelessWidget {
     required this.imagePath,
     required this.minutes,
     this.summary,
+    this.body,
+    this.keyPoints = const [],
   });
+
+  factory ArticleDetailScreen.fromArticle(AppKnowledgeArticle article) {
+    return ArticleDetailScreen(
+      title: article.title,
+      category: article.categoryTitle,
+      imagePath: article.displayImage,
+      minutes: article.minutes,
+      summary: article.summary,
+      body: article.body,
+      keyPoints: article.keyPoints,
+    );
+  }
 
   final String title;
   final String category;
   final String imagePath;
   final int minutes;
   final String? summary;
+  final String? body;
+  final List<String> keyPoints;
 
   Color get _categoryColor {
     switch (category.toLowerCase()) {
@@ -37,6 +55,7 @@ class ArticleDetailScreen extends StatelessWidget {
   }
 
   List<String> get _keyPoints {
+    if (keyPoints.isNotEmpty) return keyPoints;
     switch (category.toLowerCase()) {
       case 'beslenme':
         return const [
@@ -132,20 +151,18 @@ class ArticleDetailScreen extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          Image.asset(
+          buildProductImage(
             imagePath,
             fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) {
-              return Container(
-                color: AppColors.selected,
-                alignment: Alignment.center,
-                child: const Icon(
-                  Icons.article_outlined,
-                  color: AppColors.primary,
-                  size: 48,
-                ),
-              );
-            },
+            errorWidget: Container(
+              color: AppColors.selected,
+              alignment: Alignment.center,
+              child: const Icon(
+                Icons.article_outlined,
+                color: AppColors.primary,
+                size: 48,
+              ),
+            ),
           ),
           const DecoratedBox(
             decoration: BoxDecoration(
@@ -295,16 +312,19 @@ class ArticleDetailScreen extends StatelessWidget {
   }
 
   Widget _buildContentSection() {
+    final text = (body ?? '').trim().isNotEmpty
+        ? body!.trim()
+        : 'Her evcil hayvanın yaşı, ırkı, yaşam biçimi ve sağlık geçmişi '
+            'farklıdır. Önerileri uygularken dostunuzun bireysel ihtiyaçlarını '
+            'göz önünde bulundurun. Ani davranış değişikliklerini, iştah kaybını '
+            've devam eden belirtileri kayıt altına almanız veteriner '
+            'değerlendirmesini kolaylaştırır.';
     return _sectionCard(
       icon: Icons.lightbulb_outline_rounded,
       title: 'Nelere Dikkat Etmelisiniz?',
-      child: const Text(
-        'Her evcil hayvanın yaşı, ırkı, yaşam biçimi ve sağlık geçmişi '
-        'farklıdır. Önerileri uygularken dostunuzun bireysel ihtiyaçlarını '
-        'göz önünde bulundurun. Ani davranış değişikliklerini, iştah kaybını '
-        've devam eden belirtileri kayıt altına almanız veteriner '
-        'değerlendirmesini kolaylaştırır.',
-        style: TextStyle(
+      child: Text(
+        text,
+        style: const TextStyle(
           color: AppColors.text,
           fontSize: 12,
           fontWeight: FontWeight.w500,

@@ -1,7 +1,11 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:async';
+
+import 'package:flutter/material.dart';
 import 'package:geliyor_app/data/banner_repository.dart';
+import 'package:geliyor_app/data/knowledge_article_repository.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/screens/article_detail_screen.dart';
+import 'package:geliyor_app/utils/product_image.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
@@ -51,103 +55,13 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
     ),
   ];
 
-  static const _articles = <_Article>[
-    // Beslenme
-    _Article(
-      categoryId: 'beslenme',
-      title: 'Kedilerde Doğru Beslenme Rehberi',
-      summary: 'Yaşa ve ırka göre porsiyon, mama seçimi ve öğün düzeni.',
-      minutes: 5,
-      imagePath: 'assets/images/bilgi_beslenme.png',
-    ),
-    _Article(
-      categoryId: 'beslenme',
-      title: 'Yaş Mama mı Kuru Mama mı?',
-      summary: 'İki mama türünün avantajları ve doğru kullanımı.',
-      minutes: 4,
-      imagePath: 'assets/images/bilgi_beslenme.png',
-    ),
-    _Article(
-      categoryId: 'beslenme',
-      title: 'Kilo Kontrolü İçin Beslenme İpuçları',
-      summary: 'Fazla kilolu dostlar için pratik öneriler.',
-      minutes: 6,
-      imagePath: 'assets/images/bilgi_beslenme.png',
-    ),
-    // Sağlık
-    _Article(
-      categoryId: 'saglik',
-      title: 'Kedilerde En Sık Görülen Hastalıklar',
-      summary: 'Belirtiler, korunma yolları ve ne zaman veterinere gidilmeli.',
-      minutes: 7,
-      imagePath: 'assets/images/bilgi_saglik.png',
-    ),
-    _Article(
-      categoryId: 'saglik',
-      title: 'Düzenli Veteriner Kontrolünün Önemi',
-      summary: 'Yıllık kontrol takvimi ve erken teşhisin faydaları.',
-      minutes: 5,
-      imagePath: 'assets/images/bilgi_saglik.png',
-    ),
-    _Article(
-      categoryId: 'saglik',
-      title: 'İdrar Yolu Sağlığına Dikkat',
-      summary: 'Belirtiler ve günlük hayatta alınacak önlemler.',
-      minutes: 6,
-      imagePath: 'assets/images/bilgi_saglik.png',
-    ),
-    // Bakım
-    _Article(
-      categoryId: 'bakim',
-      title: 'Tüy Bakımı Nasıl Yapılmalı?',
-      summary: 'Fırçalama sıklığı, doğru araçlar ve tüy dökülmesi.',
-      minutes: 4,
-      imagePath: 'assets/images/bilgi_bakim.png',
-    ),
-    _Article(
-      categoryId: 'bakim',
-      title: 'Diş ve Ağız Bakımı',
-      summary: 'Diş taşı önleme ve düzenli bakım alışkanlıkları.',
-      minutes: 5,
-      imagePath: 'assets/images/bilgi_bakim.png',
-    ),
-    _Article(
-      categoryId: 'bakim',
-      title: 'Tırnak ve Pati Bakımı',
-      summary: 'Evde güvenli tırnak kesimi ve pati temizliği.',
-      minutes: 3,
-      imagePath: 'assets/images/bilgi_bakim.png',
-    ),
-    // Aşı
-    _Article(
-      categoryId: 'asi',
-      title: 'Aşı Takvimi ve Koruyucu Hekimlik',
-      summary: 'Hangi aşı ne zaman? Yavru ve yetişkin takvimi.',
-      minutes: 6,
-      imagePath: 'assets/images/bilgi_asi_koruma.png',
-    ),
-    _Article(
-      categoryId: 'asi',
-      title: 'İç ve Dış Parazit Koruması',
-      summary: 'Düzenli koruma planı ve mevsimsel dikkat noktaları.',
-      minutes: 5,
-      imagePath: 'assets/images/bilgi_asi_koruma.png',
-    ),
-    _Article(
-      categoryId: 'asi',
-      title: 'Kuduz Aşısı Hakkında Bilinmesi Gerekenler',
-      summary: 'Yasal zorunluluklar ve aşı sonrası bakım.',
-      minutes: 4,
-      imagePath: 'assets/images/bilgi_asi_koruma.png',
-    ),
-  ];
-
   @override
   void initState() {
     super.initState();
     final valid = _categories.any((c) => c.id == widget.initialCategoryId);
     _selectedCategoryId =
         valid ? widget.initialCategoryId! : _categories.first.id;
+    unawaited(KnowledgeArticleRepository.instance.ensureDefaults());
   }
 
   @override
@@ -159,9 +73,9 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
   _ArticleCategory get _selectedCategory =>
       _categories.firstWhere((c) => c.id == _selectedCategoryId);
 
-  List<_Article> get _visibleArticles {
+  List<AppKnowledgeArticle> _visibleFrom(List<AppKnowledgeArticle> all) {
     final q = _query.trim().toLowerCase();
-    return _articles.where((a) {
+    return all.where((a) {
       final inCategory = a.categoryId == _selectedCategoryId;
       final matchesQuery = q.isEmpty ||
           a.title.toLowerCase().contains(q) ||
@@ -172,33 +86,41 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: AppPageFrame.standard(
-        backgroundColor: AppColors.background,
-        header: _buildHeader(context),
-        content: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildBanner(),
-              const SizedBox(height: 10),
-              _buildSearchBar(),
-              const SizedBox(height: 12),
-              _buildCategoryCards(),
-              const SizedBox(height: 14),
-              _buildArticlesHeader(),
-              const SizedBox(height: 8),
-              _buildArticlesList(),
-              const SizedBox(height: 12),
-              const KnowledgeDisclaimer(),
-            ],
+    return StreamBuilder<List<AppKnowledgeArticle>>(
+      stream: KnowledgeArticleRepository.instance.watchActive(),
+      builder: (context, snapshot) {
+        final visible = _visibleFrom(
+          snapshot.data ?? AppKnowledgeArticle.defaults(),
+        );
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          body: AppPageFrame.standard(
+            backgroundColor: AppColors.background,
+            header: _buildHeader(context),
+            content: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildBanner(),
+                  const SizedBox(height: 10),
+                  _buildSearchBar(),
+                  const SizedBox(height: 12),
+                  _buildCategoryCards(),
+                  const SizedBox(height: 14),
+                  _buildArticlesHeader(visible.length),
+                  const SizedBox(height: 8),
+                  _buildArticlesList(visible),
+                  const SizedBox(height: 12),
+                  const KnowledgeDisclaimer(),
+                ],
+              ),
+            ),
+            navbar: const AppBottomNavbar(),
           ),
-        ),
-        navbar: const AppBottomNavbar(),
-      ),
+        );
+      },
     );
   }
 
@@ -350,7 +272,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
     );
   }
 
-  Widget _buildArticlesHeader() {
+  Widget _buildArticlesHeader(int count) {
     return Row(
       children: [
         Icon(Icons.article_outlined, color: _selectedCategory.color, size: 16),
@@ -364,7 +286,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
           ),
         ),
         Text(
-          '${_visibleArticles.length} makale',
+          '$count makale',
           style: const TextStyle(
             color: AppColors.subText,
             fontSize: 11,
@@ -375,8 +297,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
     );
   }
 
-  Widget _buildArticlesList() {
-    final articles = _visibleArticles;
+  Widget _buildArticlesList(List<AppKnowledgeArticle> articles) {
     if (articles.isEmpty) {
       return Container(
         width: double.infinity,
@@ -402,21 +323,12 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
     );
   }
 
-  Widget _buildArticleCard(_Article article) {
-    final category = _categories.firstWhere(
-      (item) => item.id == article.categoryId,
-    );
+  Widget _buildArticleCard(AppKnowledgeArticle article) {
     return GestureDetector(
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => ArticleDetailScreen(
-              title: article.title,
-              category: category.title,
-              imagePath: article.imagePath,
-              minutes: article.minutes,
-              summary: article.summary,
-            ),
+            builder: (_) => ArticleDetailScreen.fromArticle(article),
           ),
         );
       },
@@ -433,19 +345,17 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
           SizedBox(
             width: 96,
             height: double.infinity,
-            child: Image.asset(
-              article.imagePath,
+            child: buildProductImage(
+              article.displayImage,
               fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  color: AppColors.selected,
-                  alignment: Alignment.center,
-                  child: const Icon(
-                    Icons.image_outlined,
-                    color: AppColors.subText,
-                  ),
-                );
-              },
+              errorWidget: Container(
+                color: AppColors.selected,
+                alignment: Alignment.center,
+                child: const Icon(
+                  Icons.image_outlined,
+                  color: AppColors.subText,
+                ),
+              ),
             ),
           ),
           Expanded(
@@ -525,21 +435,5 @@ class _ArticleCategory {
   final String id;
   final String title;
   final Color color;
-  final String imagePath;
-}
-
-class _Article {
-  const _Article({
-    required this.categoryId,
-    required this.title,
-    required this.summary,
-    required this.minutes,
-    required this.imagePath,
-  });
-
-  final String categoryId;
-  final String title;
-  final String summary;
-  final int minutes;
   final String imagePath;
 }

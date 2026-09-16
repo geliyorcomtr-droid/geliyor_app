@@ -3,6 +3,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:geliyor_app/data/product_advantage_repository.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:geliyor_app/utils/compress_upload_image.dart';
 import 'package:geliyor_app/utils/product_image.dart';
 
 class AdminProductAdvantagesScreen extends StatefulWidget {
@@ -293,14 +294,18 @@ class _AdminProductAdvantagesScreenState
     setState(() => _uploading = true);
     try {
       final bytes = await file.readAsBytes();
-      final safeName = file.name.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+      final prepared = prepareUploadImage(
+        bytes,
+        file.name,
+        style: UploadImageStyle.icon,
+      );
       final ref = FirebaseStorage.instance.ref(
         'product_advantages/'
-        '${DateTime.now().microsecondsSinceEpoch}_$safeName',
+        '${DateTime.now().microsecondsSinceEpoch}_${prepared.fileName}',
       );
       await ref.putData(
-        bytes,
-        SettableMetadata(contentType: _contentType(file.name)),
+        prepared.bytes,
+        SettableMetadata(contentType: prepared.contentType),
       );
       return ref.getDownloadURL();
     } catch (error) {
@@ -593,13 +598,5 @@ class _AdminProductAdvantagesScreenState
         .replaceAll(RegExp(r'^-+|-+$'), '');
     return '${slug.isEmpty ? 'avantaj' : slug}-'
         '${DateTime.now().millisecondsSinceEpoch}';
-  }
-
-  String _contentType(String fileName) {
-    final lower = fileName.toLowerCase();
-    if (lower.endsWith('.png')) return 'image/png';
-    if (lower.endsWith('.webp')) return 'image/webp';
-    if (lower.endsWith('.gif')) return 'image/gif';
-    return 'image/jpeg';
   }
 }

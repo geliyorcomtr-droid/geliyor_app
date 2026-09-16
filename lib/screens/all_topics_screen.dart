@@ -1,7 +1,11 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:async';
+
+import 'package:flutter/material.dart';
 import 'package:geliyor_app/data/banner_repository.dart';
+import 'package:geliyor_app/data/knowledge_content_repository.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/screens/featured_questions_screen.dart';
+import 'package:geliyor_app/utils/product_image.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
@@ -19,149 +23,13 @@ class AllTopicsScreen extends StatefulWidget {
 
 class _AllTopicsScreenState extends State<AllTopicsScreen> {
   final _searchController = TextEditingController();
+  String _query = '';
 
-  static const _topics = <_TopicItem>[
-    _TopicItem(
-      title: 'Sindirim',
-      subtitle: 'İshal & kusma',
-      iconPath: 'assets/images/app_ikonlar/sindirim.png',
-      color: Color(0xFF1E90FF),
-      featuredTopicId: 'sindirim',
-    ),
-    _TopicItem(
-      title: 'Böbrek',
-      subtitle: 'Böbrek sağlığı',
-      iconPath: 'assets/images/app_ikonlar/bobrek.png',
-      color: Color(0xFFEC4899),
-      featuredTopicId: 'idrar',
-    ),
-    _TopicItem(
-      title: 'İdrar Yolu',
-      subtitle: 'İdrar sağlığı',
-      iconPath: 'assets/images/app_ikonlar/idrar.png',
-      color: Color(0xFFDB2777),
-      featuredTopicId: 'idrar',
-    ),
-    _TopicItem(
-      title: 'Tüy & Deri',
-      subtitle: 'Tüy bakımı',
-      iconPath: 'assets/images/app_ikonlar/tuy_deri.png',
-      color: Color(0xFF9B4DCA),
-      featuredTopicId: 'alerji',
-    ),
-    _TopicItem(
-      title: 'Alerji',
-      subtitle: 'Hassas cilt',
-      iconPath: 'assets/images/app_ikonlar/hypoallergenic.png',
-      color: Color(0xFF22C55E),
-      featuredTopicId: 'alerji',
-    ),
-    _TopicItem(
-      title: 'Ağız & Diş',
-      subtitle: 'Diş bakımı',
-      iconPath: 'assets/images/app_ikonlar/dis.png',
-      color: Color(0xFF0EA5E9),
-      featuredTopicId: 'dis',
-    ),
-    _TopicItem(
-      title: 'Kilo Kontrolü',
-      subtitle: 'İdeal kilo',
-      iconPath: 'assets/images/app_ikonlar/kilo_kontrol.png',
-      color: Color(0xFFFF6600),
-      featuredTopicId: 'kilo',
-    ),
-    _TopicItem(
-      title: 'Kalp Sağlığı',
-      subtitle: 'Kalp desteği',
-      iconPath: 'assets/images/app_ikonlar/kalp.png',
-      color: Color(0xFFEF4444),
-      featuredTopicId: 'genel',
-    ),
-    _TopicItem(
-      title: 'Bağışıklık',
-      subtitle: 'Bağışıklık',
-      iconPath: 'assets/images/app_ikonlar/bagisiklik.png',
-      color: Color(0xFF16A34A),
-      featuredTopicId: 'genel',
-    ),
-    _TopicItem(
-      title: 'Diyabet',
-      subtitle: 'Kan şekeri',
-      iconPath: 'assets/images/app_ikonlar/diyabet.png',
-      color: Color(0xFFF59E0B),
-      featuredTopicId: 'kilo',
-    ),
-    _TopicItem(
-      title: 'Eklem',
-      subtitle: 'Hareket desteği',
-      iconPath: 'assets/images/app_ikonlar/eklem.png',
-      color: Color(0xFF84CC16),
-      featuredTopicId: 'genel',
-    ),
-    _TopicItem(
-      title: 'Karaciğer',
-      subtitle: 'Karaciğer',
-      iconPath: 'assets/images/app_ikonlar/karaciger.png',
-      color: Color(0xFF14B8A6),
-      featuredTopicId: 'genel',
-    ),
-    _TopicItem(
-      title: 'Parazit',
-      subtitle: 'İç & dış',
-      iconPath: 'assets/images/app_ikonlar/parazit.png',
-      color: Color(0xFF2563EB),
-      featuredTopicId: 'parazit',
-    ),
-    _TopicItem(
-      title: 'Aşı Takibi',
-      subtitle: 'Aşı takvimi',
-      iconPath: 'assets/images/app_ikonlar/asi_takvimi.png',
-      color: Color(0xFFFF6600),
-      featuredTopicId: 'genel',
-    ),
-    _TopicItem(
-      title: 'İlaç & Tedavi',
-      subtitle: 'Tedavi planı',
-      iconPath: 'assets/images/app_ikonlar/ilac_tedavi.png',
-      color: Color(0xFF00A859),
-      featuredTopicId: 'genel',
-    ),
-    _TopicItem(
-      title: 'Özel Mama',
-      subtitle: 'Özel formül',
-      iconPath: 'assets/images/app_ikonlar/mama_kabi.png',
-      color: Color(0xFF8B5CF6),
-      featuredTopicId: 'kilo',
-    ),
-    _TopicItem(
-      title: 'Acil Durum',
-      subtitle: 'Acil yardım',
-      iconPath: 'assets/images/app_ikonlar/acil_durum.png',
-      color: Color(0xFFE60000),
-      featuredTopicId: 'genel',
-    ),
-    _TopicItem(
-      title: 'Zehirlenme',
-      subtitle: 'Toksik risk',
-      iconPath: 'assets/images/app_ikonlar/zehirlenme.png',
-      color: Color(0xFFDC2626),
-      featuredTopicId: 'genel',
-    ),
-    _TopicItem(
-      title: 'Yaralanma',
-      subtitle: 'İlk yardım',
-      iconPath: 'assets/images/app_ikonlar/yaralanma.png',
-      color: Color(0xFFB91C1C),
-      featuredTopicId: 'genel',
-    ),
-    _TopicItem(
-      title: 'Doğal İçerik',
-      subtitle: 'Doğal formül',
-      iconPath: 'assets/images/app_ikonlar/dogal_icerik.png',
-      color: Color(0xFF65A30D),
-      featuredTopicId: 'kilo',
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    unawaited(KnowledgeContentRepository.instance.ensureDefaults());
+  }
 
   @override
   void dispose() {
@@ -246,6 +114,7 @@ class _AllTopicsScreenState extends State<AllTopicsScreen> {
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
               ),
+              onChanged: (value) => setState(() => _query = value),
               decoration: const InputDecoration(
                 isDense: true,
                 border: InputBorder.none,
@@ -264,37 +133,67 @@ class _AllTopicsScreenState extends State<AllTopicsScreen> {
   }
 
   Widget _buildTopicsGrid() {
-    const columns = 4;
-    const rows = 5;
-    return Column(
-      children: [
-        for (int row = 0; row < rows; row++) ...[
-          if (row > 0) const SizedBox(height: 10),
-          SizedBox(
-            height: 92,
-            child: Row(
-              children: [
-                for (int col = 0; col < columns; col++) ...[
-                  if (col > 0) const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildTopicItem(_topics[row * columns + col]),
-                  ),
-                ],
-              ],
+    return StreamBuilder<List<AppKnowledgeTopic>>(
+      stream: KnowledgeContentRepository.instance.watchActiveTopics(),
+      builder: (context, snapshot) {
+        final q = _query.trim().toLowerCase();
+        final topics = (snapshot.data ?? AppKnowledgeTopic.defaults()).where((
+          item,
+        ) {
+          if (q.isEmpty) return true;
+          return item.title.toLowerCase().contains(q) ||
+              item.subtitle.toLowerCase().contains(q);
+        }).toList();
+        if (topics.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(
+              child: Text(
+                'Konu bulunamadı',
+                style: TextStyle(color: AppColors.subText),
+              ),
             ),
-          ),
-        ],
-      ],
+          );
+        }
+        const columns = 4;
+        final rows = (topics.length / columns).ceil();
+        return Column(
+          children: [
+            for (int row = 0; row < rows; row++) ...[
+              if (row > 0) const SizedBox(height: 10),
+              SizedBox(
+                height: 92,
+                child: Row(
+                  children: [
+                    for (int col = 0; col < columns; col++) ...[
+                      if (col > 0) const SizedBox(width: 8),
+                      Expanded(
+                        child: () {
+                          final index = row * columns + col;
+                          if (index >= topics.length) {
+                            return const SizedBox.shrink();
+                          }
+                          return _buildTopicItem(topics[index]);
+                        }(),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 
-  Widget _buildTopicItem(_TopicItem topic) {
+  Widget _buildTopicItem(AppKnowledgeTopic topic) {
     return GestureDetector(
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => FeaturedQuestionsScreen(
-              initialTopicId: topic.featuredTopicId,
+              initialTopicId: topic.questionTopicId,
             ),
           ),
         );
@@ -316,17 +215,15 @@ class _AllTopicsScreenState extends State<AllTopicsScreen> {
               ),
             ),
             child: ClipOval(
-              child: Image.asset(
-                topic.iconPath,
+              child: buildProductImage(
+                topic.displayIcon,
                 fit: BoxFit.contain,
                 filterQuality: FilterQuality.high,
-                errorBuilder: (context, error, stackTrace) {
-                  return Icon(
-                    Icons.health_and_safety_outlined,
-                    color: topic.color,
-                    size: 24,
-                  );
-                },
+                errorWidget: Icon(
+                  Icons.health_and_safety_outlined,
+                  color: topic.color,
+                  size: 24,
+                ),
               ),
             ),
           ),
@@ -359,21 +256,5 @@ class _AllTopicsScreenState extends State<AllTopicsScreen> {
       ),
     );
   }
-
 }
 
-class _TopicItem {
-  const _TopicItem({
-    required this.title,
-    required this.subtitle,
-    required this.iconPath,
-    required this.color,
-    required this.featuredTopicId,
-  });
-
-  final String title;
-  final String subtitle;
-  final String iconPath;
-  final Color color;
-  final String featuredTopicId;
-}

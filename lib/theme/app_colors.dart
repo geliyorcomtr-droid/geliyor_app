@@ -22,4 +22,7 @@ class AppColors {
   static const Color soft = selected;
   static const Color textDark = text;
   static const Color textGray = subText;
+
+  /// Hangi Mama hizmet rengi
+  static const Color violet = Color(0xFF8B5CF6);
 }

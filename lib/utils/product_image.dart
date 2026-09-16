@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 
@@ -17,12 +18,55 @@ bool isUiIconAsset(String path) {
 /// UI ikonları ekranda en fazla ~64 logical px; 3x ekran için 256 px yeter.
 const int uiIconAssetPx = 256;
 
+/// Ürün fotoğrafı detayda ~240 logical px; 3x için 900 px decode yeter.
+const int productPhotoCachePx = 900;
+
+ImageProvider? productImageProvider(
+  String path, {
+  bool useHtmlElement = true,
+  int? cacheWidth,
+  int? cacheHeight,
+}) {
+  final trimmed = path.trim();
+  if (trimmed.isEmpty) return null;
+
+  if (isNetworkProductImage(trimmed)) {
+    final html = kIsWeb || useHtmlElement;
+    final network = NetworkImage(
+      trimmed,
+      webHtmlElementStrategy: html
+          ? WebHtmlElementStrategy.prefer
+          : WebHtmlElementStrategy.never,
+    );
+    // Web'de ResizeImage canvas + CORS ister; Storage görselleri HTML img ile görünür.
+    if (kIsWeb) return network;
+    return ResizeImage.resizeIfNeeded(cacheWidth, cacheHeight, network);
+  }
+
+  return ResizeImage.resizeIfNeeded(
+    cacheWidth,
+    cacheHeight,
+    AssetImage(trimmed),
+  );
+}
+
+/// Detay ekranının kullandığı canvas + 900px decode önbelleğini ısıtır.
+Future<void> precacheProductImage(BuildContext context, String path) {
+  final provider = productImageProvider(
+    path,
+    useHtmlElement: false,
+    cacheWidth: productPhotoCachePx,
+  );
+  if (provider == null) return Future.value();
+  return precacheImage(provider, context).onError((_, _) {});
+}
+
 Widget buildProductImage(
   String path, {
   BoxFit fit = BoxFit.contain,
   double? width,
   double? height,
-  FilterQuality filterQuality = FilterQuality.low,
+  FilterQuality filterQuality = FilterQuality.medium,
   Widget? errorWidget,
   Alignment alignment = Alignment.center,
   bool useHtmlElement = true,
@@ -39,54 +83,25 @@ Widget buildProductImage(
 
   if (path.trim().isEmpty) return fallback;
 
-  if (isNetworkProductImage(path)) {
-    return Image.network(
-      path,
-      fit: fit,
-      width: width,
-      height: height,
-      alignment: alignment,
-      filterQuality: filterQuality,
-      gaplessPlayback: true,
-      cacheWidth: cacheWidth,
-      cacheHeight: cacheHeight,
-      webHtmlElementStrategy: useHtmlElement
-          ? WebHtmlElementStrategy.prefer
-          : WebHtmlElementStrategy.never,
-      errorBuilder: (_, _, _) => fallback,
-    );
-  }
-
-  if (isUiIconAsset(path)) {
-    return _UiIconImage(
-      path: path,
-      fit: fit,
-      width: width,
-      height: height,
-      alignment: alignment,
-      filterQuality: filterQuality,
-      fallback: fallback,
-      cacheWidth: cacheWidth,
-      cacheHeight: cacheHeight,
-    );
-  }
-
-  return Image.asset(
-    path,
+  final icon = isUiIconAsset(path);
+  return _FittedDecodeImage(
+    path: path,
     fit: fit,
     width: width,
     height: height,
     alignment: alignment,
-    filterQuality: filterQuality,
-    gaplessPlayback: true,
+    filterQuality: icon ? FilterQuality.low : filterQuality,
+    fallback: fallback,
     cacheWidth: cacheWidth,
     cacheHeight: cacheHeight,
-    errorBuilder: (_, _, _) => fallback,
+    maxDecodePx: icon ? uiIconAssetPx : productPhotoCachePx,
+    minDecodePx: icon ? 64 : 160,
+    useHtmlElement: kIsWeb || useHtmlElement,
   );
 }
 
-class _UiIconImage extends StatelessWidget {
-  const _UiIconImage({
+class _FittedDecodeImage extends StatelessWidget {
+  const _FittedDecodeImage({
     required this.path,
     required this.fit,
     required this.width,
@@ -94,6 +109,9 @@ class _UiIconImage extends StatelessWidget {
     required this.alignment,
     required this.filterQuality,
     required this.fallback,
+    required this.maxDecodePx,
+    required this.minDecodePx,
+    required this.useHtmlElement,
     this.cacheWidth,
     this.cacheHeight,
   });
@@ -105,49 +123,78 @@ class _UiIconImage extends StatelessWidget {
   final Alignment alignment;
   final FilterQuality filterQuality;
   final Widget fallback;
+  final int maxDecodePx;
+  final int minDecodePx;
+  final bool useHtmlElement;
   final int? cacheWidth;
   final int? cacheHeight;
 
   @override
   Widget build(BuildContext context) {
-    final dpr = MediaQuery.maybeDevicePixelRatioOf(context) ?? 3;
-
     return LayoutBuilder(
       builder: (context, constraints) {
-        final logical = _smallestFinite([
-          width,
-          height,
-          constraints.maxWidth,
-          constraints.maxHeight,
-        ]);
-        final decodePx = cacheWidth ??
-            cacheHeight ??
-            (logical == null
-                ? uiIconAssetPx
-                : (logical * dpr).round().clamp(48, uiIconAssetPx));
-
-        return Image.asset(
+        final decodePx = _layoutDecodePx(
+          context: context,
+          constraints: constraints,
+          width: width,
+          height: height,
+          cacheWidth: cacheWidth,
+          cacheHeight: cacheHeight,
+          maxPx: maxDecodePx,
+          minPx: minDecodePx,
+        );
+        final provider = productImageProvider(
           path,
+          useHtmlElement: useHtmlElement,
+          cacheWidth: decodePx,
+          cacheHeight: cacheHeight == null ? null : decodePx,
+        );
+        if (provider == null) return fallback;
+
+        return Image(
+          image: provider,
           fit: fit,
           width: width,
           height: height,
           alignment: alignment,
           filterQuality: filterQuality,
           gaplessPlayback: true,
-          cacheWidth: decodePx,
-          cacheHeight: decodePx,
           errorBuilder: (_, _, _) => fallback,
         );
       },
     );
   }
+}
 
-  double? _smallestFinite(List<double?> values) {
-    double? smallest;
-    for (final value in values) {
-      if (value == null || !value.isFinite || value <= 0) continue;
-      smallest = smallest == null ? value : math.min(smallest, value);
-    }
-    return smallest;
+int _layoutDecodePx({
+  required BuildContext context,
+  required BoxConstraints constraints,
+  double? width,
+  double? height,
+  int? cacheWidth,
+  int? cacheHeight,
+  required int maxPx,
+  int minPx = 64,
+}) {
+  if (cacheWidth != null) return cacheWidth.clamp(minPx, maxPx);
+  if (cacheHeight != null) return cacheHeight.clamp(minPx, maxPx);
+
+  final dpr = MediaQuery.maybeDevicePixelRatioOf(context) ?? 3;
+  // cacheWidth görselin genişliğidir; kısa kenarı (banner yüksekliği) kullanma.
+  final logical = _firstFinite([
+    width,
+    constraints.maxWidth,
+    height,
+    constraints.maxHeight,
+  ]);
+  if (logical == null) return math.min(maxPx, 720);
+  return (logical * dpr).round().clamp(minPx, maxPx);
+}
+
+double? _firstFinite(List<double?> values) {
+  for (final value in values) {
+    if (value == null || !value.isFinite || value <= 0) continue;
+    return value;
   }
+  return null;
 }

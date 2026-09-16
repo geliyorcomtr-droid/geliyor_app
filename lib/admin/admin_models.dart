@@ -81,6 +81,7 @@ class AdminProduct {
   bool get showAsGift => placements.contains(ProductPlacements.gift);
   bool get showAsPremiumGift =>
       placements.contains(ProductPlacements.giftPremium);
+  bool get isInStock => stock > 0;
 
   factory AdminProduct.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final d = doc.data() ?? <String, dynamic>{};
@@ -233,15 +234,9 @@ class AdminProduct {
   /// Yeni ürün olarak kopyala — barkod boş, id yok (yeni kayıt).
   /// Orijinal ürün değişmez; kaydedince Firestore’da ayrı doküman oluşur.
   AdminProduct asCopy() {
-    final baseTitle = title.trim();
-    final copyTitle = baseTitle.isEmpty
-        ? 'Kopya ürün'
-        : (baseTitle.contains('(Kopya)')
-              ? baseTitle
-              : '$baseTitle (Kopya)');
     return AdminProduct(
       id: '',
-      title: copyTitle,
+      title: title.trim(),
       brand: brand,
       weight: weight,
       barcode: '',

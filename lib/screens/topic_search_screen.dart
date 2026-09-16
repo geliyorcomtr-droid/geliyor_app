@@ -1,4 +1,5 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:geliyor_app/data/knowledge_catalog.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
@@ -13,83 +14,18 @@ class TopicSearchScreen extends StatefulWidget {
 
   final String selectedTopicId;
 
-  static const topics = <TopicSearchItem>[
-    TopicSearchItem(
-      id: 'sindirim',
-      title: 'Sindirim Sistemi',
-      count: 64,
-      color: Color(0xFF1E90FF),
-      iconPath: 'assets/images/app_ikonlar/sindirim.png',
-      icon: Icons.restaurant_rounded,
-    ),
-    TopicSearchItem(
-      id: 'idrar',
-      title: 'İdrar Yolu Sağlığı',
-      count: 48,
-      color: Color(0xFFEC4899),
-      iconPath: 'assets/images/app_ikonlar/bobrek.png',
-      icon: Icons.water_drop_outlined,
-    ),
-    TopicSearchItem(
-      id: 'alerji',
-      title: 'Alerji & Deri',
-      count: 52,
-      color: Color(0xFF9B4DCA),
-      iconPath: 'assets/images/app_ikonlar/tuy_deri.png',
-      icon: Icons.spa_outlined,
-    ),
-    TopicSearchItem(
-      id: 'kilo',
-      title: 'Kilo & Beslenme',
-      count: 41,
-      color: Color(0xFFFF6600),
-      iconPath: 'assets/images/app_ikonlar/kilo_kontrol.png',
-      icon: Icons.monitor_weight_outlined,
-    ),
-    TopicSearchItem(
-      id: 'genel',
-      title: 'Genel Sağlık',
-      count: 73,
-      color: Color(0xFF22C55E),
-      iconPath: 'assets/images/app_ikonlar/bagisiklik.png',
-      icon: Icons.favorite_outline_rounded,
-    ),
-    TopicSearchItem(
-      id: 'dis',
-      title: 'Ağız & Diş Sağlığı',
-      count: 36,
-      color: Color(0xFF0EA5E9),
-      iconPath: 'assets/images/app_ikonlar/dis.png',
-      icon: Icons.sentiment_satisfied_alt_outlined,
-    ),
-    TopicSearchItem(
-      id: 'goz',
-      title: 'Göz Hastalıkları',
-      count: 29,
-      color: Color(0xFF16A34A),
-      icon: Icons.visibility_outlined,
-    ),
-    TopicSearchItem(
-      id: 'kulak',
-      title: 'Kulak Hastalıkları',
-      count: 27,
-      color: Color(0xFF8B5CF6),
-      icon: Icons.hearing_outlined,
-    ),
-    TopicSearchItem(
-      id: 'solunum',
-      title: 'Solunum Sistemi',
-      count: 33,
-      color: Color(0xFFF97316),
-      icon: Icons.air_rounded,
-    ),
-    TopicSearchItem(
-      id: 'parazit',
-      title: 'Parazitler',
-      count: 45,
-      color: Color(0xFF2563EB),
-      icon: Icons.bug_report_outlined,
-    ),
+  static List<TopicSearchItem> get topics => [
+    for (final topic in KnowledgeQuestionTopic.all)
+      TopicSearchItem(
+        id: topic.id,
+        title: topic.title,
+        count: defaultKnowledgeQuestions
+            .where((item) => item.topicId == topic.id)
+            .length,
+        color: topic.color,
+        iconPath: topic.iconPath,
+        icon: topic.icon,
+      ),
   ];
 
   @override

@@ -20,160 +20,182 @@ class InfoGuideSheet {
     String buttonLabel = 'Bu etiketli ürünleri gör',
     VoidCallback? onSeeProducts,
   }) {
-    return showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      enableDrag: true,
-      isDismissible: true,
-      backgroundColor: Colors.transparent,
+    return showCentered(
+      context,
       builder: (sheetContext) {
         final paragraphs = guide
             .split(RegExp(r'\n\s*\n'))
             .map((part) => part.trim())
             .where((part) => part.isNotEmpty)
             .toList();
-        final media = MediaQuery.of(sheetContext);
-        final sheetHeight = _heightBelowProductImage(media);
         return Padding(
-          padding: EdgeInsets.only(top: media.size.height - sheetHeight),
-          child: Align(
-            alignment: Alignment.bottomCenter,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: AppPageFrame.width),
-              child: Material(
-                color: AppColors.surface,
-                clipBehavior: Clip.antiAlias,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(28),
-                ),
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    16,
-                    8,
-                    16,
-                    16 + media.padding.bottom,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      SizedBox(
-                        height: 32,
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            Container(
-                              width: 36,
-                              height: 4,
-                              decoration: BoxDecoration(
-                                color: AppColors.border,
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                            ),
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: GestureDetector(
-                                onTap: () => Navigator.of(sheetContext).pop(),
-                                behavior: HitTestBehavior.opaque,
-                                child: const SizedBox(
-                                  width: 32,
-                                  height: 32,
-                                  child: Icon(
-                                    Icons.close_rounded,
-                                    color: AppColors.text,
-                                    size: 22,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                height: 32,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppColors.border,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: GestureDetector(
+                        onTap: () => Navigator.of(sheetContext).pop(),
+                        behavior: HitTestBehavior.opaque,
+                        child: const SizedBox(
+                          width: 32,
+                          height: 32,
+                          child: Icon(
+                            Icons.close_rounded,
+                            color: AppColors.text,
+                            size: 22,
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          _GuideIconBox(
-                            iconPath: iconPath,
-                            imageUrl: imageUrl,
-                            fallbackIcon: fallbackIcon,
-                            fallbackIconColor: fallbackIconColor,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  _GuideIconBox(
+                    iconPath: iconPath,
+                    imageUrl: imageUrl,
+                    fallbackIcon: fallbackIcon,
+                    fallbackIconColor: fallbackIconColor,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            color: AppColors.text,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                            height: 1.25,
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  title,
-                                  style: const TextStyle(
-                                    color: AppColors.text,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w900,
-                                    height: 1.25,
-                                  ),
-                                ),
-                                if (subtitle.trim().isNotEmpty) ...[
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    subtitle,
-                                    style: const TextStyle(
-                                      color: AppColors.primary,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ],
-                              ],
+                        ),
+                        if (subtitle.trim().isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            subtitle,
+                            style: const TextStyle(
+                              color: AppColors.primary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ],
-                      ),
-                      const SizedBox(height: 12),
-                      Expanded(
-                        child: SingleChildScrollView(
-                          physics: const BouncingScrollPhysics(),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              for (int i = 0; i < paragraphs.length; i++) ...[
-                                if (i > 0) const SizedBox(height: 12),
-                                Text(
-                                  paragraphs[i],
-                                  style: const TextStyle(
-                                    color: AppColors.subText,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    height: 1.45,
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ),
-                      if (onSeeProducts != null) ...[
-                        const SizedBox(height: 12),
-                        AppPressableButton.primary(
-                          onTap: () {
-                            Navigator.of(sheetContext).pop();
-                            if (onSeeProducts == null) return;
-                            WidgetsBinding.instance.addPostFrameCallback((_) {
-                              onSeeProducts();
-                            });
-                          },
-                          width: double.infinity,
-                          height: 44,
-                          padding: EdgeInsets.zero,
-                          child: Text(
-                            buttonLabel,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w900,
-                            ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (int i = 0; i < paragraphs.length; i++) ...[
+                        if (i > 0) const SizedBox(height: 12),
+                        Text(
+                          paragraphs[i],
+                          style: const TextStyle(
+                            color: AppColors.subText,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            height: 1.45,
                           ),
                         ),
                       ],
                     ],
                   ),
+                ),
+              ),
+              if (onSeeProducts != null) ...[
+                const SizedBox(height: 12),
+                AppPressableButton.primary(
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    if (onSeeProducts == null) return;
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      onSeeProducts();
+                    });
+                  },
+                  width: double.infinity,
+                  height: 44,
+                  padding: EdgeInsets.zero,
+                  child: Text(
+                    buttonLabel,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  static Future<void> showCentered(
+    BuildContext context, {
+    required Widget Function(BuildContext sheetContext) builder,
+    bool dismissOnContentTap = true,
+    double? height,
+  }) {
+    return showGeneralDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Kapat',
+      barrierColor: const Color(0x59000000),
+      pageBuilder: (sheetContext, animation, secondaryAnimation) {
+        final media = MediaQuery.of(sheetContext);
+        final panelH = height ?? panelHeight(media);
+        final verticalGap = ((media.size.height - panelH) / 2).clamp(
+          24.0,
+          media.size.height,
+        );
+        Widget panel = builder(sheetContext);
+        if (dismissOnContentTap) {
+          panel = GestureDetector(
+            onTap: () => Navigator.of(sheetContext).pop(),
+            behavior: HitTestBehavior.opaque,
+            child: panel,
+          );
+        }
+        return Padding(
+          padding: EdgeInsets.symmetric(vertical: verticalGap),
+          child: Align(
+            alignment: Alignment.center,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: AppPageFrame.width),
+              child: Material(
+                color: AppColors.surface,
+                clipBehavior: Clip.antiAlias,
+                borderRadius: BorderRadius.circular(28),
+                child: SizedBox(
+                  height: panelH,
+                  width: media.size.width,
+                  child: panel,
                 ),
               ),
             ),
@@ -183,8 +205,8 @@ class InfoGuideSheet {
     );
   }
 
-  /// Ürün detayında sheet üstü, orta karttaki ürün görselinin altına gelir.
-  static double _heightBelowProductImage(MediaQueryData media) {
+  /// Ortalanmış bilgi paneli yüksekliği (üst-alt eşit boşluk).
+  static double panelHeight(MediaQueryData media) {
     const heroHeight = 488.0;
     const cardTopPad = 10.0;
     const cardBottomPad = 12.0;

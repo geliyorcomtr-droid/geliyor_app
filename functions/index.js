@@ -27,6 +27,9 @@ const MAIL_USER = "fatih@geliyor.com.tr";
 const MAIL_FROM_NOREPLY = '"geliyor.tr" <noreply@geliyor.com.tr>';
 const MAIL_FROM_ACTIVE = '"geliyor.tr" <fatih@geliyor.com.tr>';
 
+/** Yeni sipariş SMS’i; kurye/iptal/teslim müşteriye gider. */
+const ADMIN_ORDER_SMS_PHONE = "05402990000";
+
 const DEFAULT_TEMPLATES = {
   welcome:
     "Sn. {{name}}, geliyor.tr uyeliginiz olusturulmustur. " +
@@ -269,6 +272,38 @@ async function sendOrderStatusSms(ref, data, {
     patch.phone = phone;
   }
   await markSms(ref, patch);
+  return result;
+}
+
+async function sendAdminNewOrderSms(ref, data, orderId) {
+  if (data.smsAdminCreatedAt) return {ok: true, skipped: true};
+  const customerPhone = await resolveOrderPhone(data);
+  const customerGsm = normalizePhone(customerPhone) || normalizePhone(data.phone);
+  const name = String(data.customerName || "Uye").trim() || "Uye";
+  const message =
+    `Yeni siparis ${shortOrderNo(orderId)}. Musteri: ${name}` +
+    (customerGsm ? ` 0${customerGsm}` : "") +
+    `. Toplam: ${formatTotal(data.total)} TL. geliyor.tr`;
+  const result = await sendNetgsmSms({
+    phone: ADMIN_ORDER_SMS_PHONE,
+    message,
+    kind: "order_created_admin",
+    docPath: ref.path,
+  });
+  const patch = result.ok
+    ? {
+      smsAdminCreatedAt: FieldValue.serverTimestamp(),
+      smsAdminCreatedJobId: result.jobid || "",
+      smsAdminLastError: FieldValue.delete(),
+    }
+    : {smsAdminLastError: result.error || "order_created_admin-failed"};
+  await markSms(ref, patch);
+  logger.info("Admin new-order SMS", {
+    orderId,
+    ok: result.ok === true,
+    skipped: result.skipped === true,
+    error: result.error || "",
+  });
   return result;
 }
 
@@ -753,25 +788,35 @@ exports.onOrderCreated = onDocumentCreated(
           error: String(error),
         });
       }
-      if (data.smsCreatedAt) return;
       const orderId = event.params.orderId;
       const orderNo = shortOrderNo(orderId);
       const total = formatTotal(data.total);
-      await sendOrderStatusSms(snap.ref, data, {
-        orderId,
-        kind: "order_created",
-        templateKey: "orderCreated",
-        stampField: "smsCreatedAt",
-        jobField: "smsCreatedJobId",
-      });
+      if (!data.smsCreatedAt) {
+        await sendOrderStatusSms(snap.ref, data, {
+          orderId,
+          kind: "order_created",
+          templateKey: "orderCreated",
+          stampField: "smsCreatedAt",
+          jobField: "smsCreatedJobId",
+        });
 
-      await notifyUser(data.userId, {
-        title: "Siparişiniz alındı",
-        body: `${orderNo} numaralı siparişiniz alındı. Toplam: ${total} TL.`,
-        category: "order",
-        data: {type: "order_created", orderId},
-        includeSms: false,
-      });
+        await notifyUser(data.userId, {
+          title: "Siparişiniz alındı",
+          body: `${orderNo} numaralı siparişiniz alındı. Toplam: ${total} TL.`,
+          category: "order",
+          data: {type: "order_created", orderId},
+          includeSms: false,
+        });
+      }
+
+      try {
+        await sendAdminNewOrderSms(snap.ref, data, orderId);
+      } catch (error) {
+        logger.error("Admin new-order SMS failed", {
+          orderId,
+          error: String(error),
+        });
+      }
     },
 );
 
@@ -1898,8 +1943,58 @@ exports.verifyEmailCode = onCall(callOpts(), async (request) => {
     email_verified: true,
     updatedAt: FieldValue.serverTimestamp(),
   }, {merge: true});
+  try {
+    await getAuth().updateUser(uid, {email, emailVerified: true});
+  } catch (error) {
+    if (error.code === "auth/email-already-exists") {
+      throw new HttpsError(
+          "already-exists",
+          "Bu e-posta baska bir hesapta kayitli.",
+      );
+    }
+    logger.warn("Auth email update failed", {uid, error: String(error)});
+  }
   await ref.delete();
   return {ok: true, email};
+});
+
+exports.setEmailPassword = onCall(callOpts(), async (request) => {
+  if (!request.auth || !request.auth.uid) {
+    throw new HttpsError("unauthenticated", "Giris yapin.");
+  }
+  const uid = request.auth.uid;
+  const password = String(request.data?.password || "");
+  if (password.length < 6) {
+    throw new HttpsError("invalid-argument", "Sifre en az 6 karakter olmali.");
+  }
+
+  const snap = await db().collection("users").doc(uid).get();
+  const data = snap.data() || {};
+  const email = normalizeEmail(data.email);
+  if (!email || data.email_verified !== true) {
+    throw new HttpsError(
+        "failed-precondition",
+        "Once e-posta adresinizi dogrulayin.",
+    );
+  }
+  await assertEmailAvailable(email, uid);
+  try {
+    await getAuth().updateUser(uid, {
+      email,
+      emailVerified: true,
+      password,
+    });
+  } catch (error) {
+    if (error.code === "auth/email-already-exists") {
+      throw new HttpsError(
+          "already-exists",
+          "Bu e-posta baska bir hesapta kayitli.",
+      );
+    }
+    logger.error("setEmailPassword failed", {uid, error: String(error)});
+    throw new HttpsError("internal", "Sifre kaydedilemedi. Tekrar deneyin.");
+  }
+  return {ok: true};
 });
 
 exports.sendBroadcast = onCall(

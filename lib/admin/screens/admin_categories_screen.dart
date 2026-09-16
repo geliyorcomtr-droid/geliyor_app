@@ -3,6 +3,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:geliyor_app/admin/category_repository.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:geliyor_app/utils/compress_upload_image.dart';
 
 class AdminCategoriesScreen extends StatefulWidget {
   const AdminCategoriesScreen({super.key});
@@ -364,14 +365,18 @@ class _AdminCategoriesScreenState extends State<AdminCategoriesScreen> {
     setState(() => _uploading = true);
     try {
       final bytes = await file.readAsBytes();
-      final safeName = file.name.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+      final prepared = prepareUploadImage(
+        bytes,
+        file.name,
+        style: UploadImageStyle.icon,
+      );
       final ref = FirebaseStorage.instance.ref(
-        '$folder/${DateTime.now().microsecondsSinceEpoch}_$safeName',
+        '$folder/${DateTime.now().microsecondsSinceEpoch}_${prepared.fileName}',
       );
-      final metadata = SettableMetadata(
-        contentType: _contentTypeFor(file.name),
+      await ref.putData(
+        prepared.bytes,
+        SettableMetadata(contentType: prepared.contentType),
       );
-      await ref.putData(bytes, metadata);
       return await ref.getDownloadURL();
     } catch (e) {
       if (mounted) {
@@ -817,12 +822,4 @@ class _AdminCategoriesScreenState extends State<AdminCategoriesScreen> {
     borderRadius: BorderRadius.circular(16),
     border: Border.all(color: AppColors.border),
   );
-
-  String _contentTypeFor(String fileName) {
-    final lower = fileName.toLowerCase();
-    if (lower.endsWith('.png')) return 'image/png';
-    if (lower.endsWith('.webp')) return 'image/webp';
-    if (lower.endsWith('.gif')) return 'image/gif';
-    return 'image/jpeg';
-  }
 }

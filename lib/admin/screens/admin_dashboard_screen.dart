@@ -285,6 +285,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               label: const Text('Talepler'),
             ),
             FilledButton.tonalIcon(
+              onPressed: () => _open(AdminPage.knowledge),
+              icon: const Icon(Icons.menu_book_rounded, size: 18),
+              label: const Text('Bilgi Bankası'),
+            ),
+            FilledButton.tonalIcon(
               onPressed: () => _open(AdminPage.broadcasts),
               icon: const Icon(Icons.notifications_active_outlined, size: 18),
               label: const Text('Duyuru'),

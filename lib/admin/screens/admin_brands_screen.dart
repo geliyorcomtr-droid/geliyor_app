@@ -1,8 +1,11 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
+import 'package:geliyor_app/admin/screens/admin_brand_feeding_dialog.dart';
+import 'package:geliyor_app/data/brand_feeding_guide.dart';
 import 'package:geliyor_app/data/brand_repository.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:geliyor_app/utils/compress_upload_image.dart';
 
 class AdminBrandsScreen extends StatefulWidget {
   const AdminBrandsScreen({super.key});
@@ -171,6 +174,7 @@ class _AdminBrandsScreenState extends State<AdminBrandsScreen> {
         assetPath: existing?.assetPath ?? '',
         order: brandOrder,
         active: active,
+        feeding: existing?.feeding ?? BrandFeedingGuide.empty,
       ),
     );
     if (!mounted) return;
@@ -222,13 +226,17 @@ class _AdminBrandsScreenState extends State<AdminBrandsScreen> {
     setState(() => _uploading = true);
     try {
       final bytes = await file.readAsBytes();
-      final safeName = file.name.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+      final prepared = prepareUploadImage(
+        bytes,
+        file.name,
+        style: UploadImageStyle.icon,
+      );
       final reference = FirebaseStorage.instance.ref(
-        'brands/${DateTime.now().microsecondsSinceEpoch}_$safeName',
+        'brands/${DateTime.now().microsecondsSinceEpoch}_${prepared.fileName}',
       );
       await reference.putData(
-        bytes,
-        SettableMetadata(contentType: _contentTypeFor(file.name)),
+        prepared.bytes,
+        SettableMetadata(contentType: prepared.contentType),
       );
       return reference.getDownloadURL();
     } catch (error) {
@@ -372,6 +380,7 @@ class _AdminBrandsScreenState extends State<AdminBrandsScreen> {
                   DataColumn(label: Text('Marka Adı')),
                   DataColumn(label: Text('Sıra No')),
                   DataColumn(label: Text('Yayın Durumu')),
+                  DataColumn(label: Text('Tüketim (g)')),
                   DataColumn(label: Text('İşlem')),
                 ],
                 rows: [
@@ -424,9 +433,35 @@ class _AdminBrandsScreenState extends State<AdminBrandsScreen> {
                           ),
                         ),
                         DataCell(
+                          TextButton(
+                            onPressed: () =>
+                                showAdminBrandFeedingDialog(context, brand),
+                            child: Text(
+                              brand.feeding.isEmpty
+                                  ? 'Gir'
+                                  : '${brand.feeding.filledCatCount()} kedi / ${brand.feeding.filledDogCount()} köpek',
+                              style: TextStyle(
+                                color: brand.feeding.isEmpty
+                                    ? AppColors.subText
+                                    : AppColors.primary,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ),
+                        DataCell(
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
+                              IconButton(
+                                tooltip: 'Tüketim gramajı',
+                                onPressed: () =>
+                                    showAdminBrandFeedingDialog(context, brand),
+                                icon: const Icon(
+                                  Icons.scale_outlined,
+                                  size: 19,
+                                ),
+                              ),
                               IconButton(
                                 tooltip: 'Görsel Ekle / Değiştir',
                                 onPressed: _uploading
@@ -544,13 +579,5 @@ class _AdminBrandsScreenState extends State<AdminBrandsScreen> {
         .replaceAll(RegExp(r'^-+|-+$'), '');
     final base = slug.isEmpty ? 'marka' : slug;
     return '$base-${DateTime.now().millisecondsSinceEpoch}';
-  }
-
-  String _contentTypeFor(String fileName) {
-    final lower = fileName.toLowerCase();
-    if (lower.endsWith('.png')) return 'image/png';
-    if (lower.endsWith('.webp')) return 'image/webp';
-    if (lower.endsWith('.gif')) return 'image/gif';
-    return 'image/jpeg';
   }
 }

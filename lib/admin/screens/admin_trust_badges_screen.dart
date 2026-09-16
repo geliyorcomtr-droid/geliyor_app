@@ -3,6 +3,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:geliyor_app/data/trust_badge_repository.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:geliyor_app/utils/compress_upload_image.dart';
 import 'package:geliyor_app/utils/product_image.dart';
 
 class AdminTrustBadgesScreen extends StatefulWidget {
@@ -261,13 +262,17 @@ class _AdminTrustBadgesScreenState extends State<AdminTrustBadgesScreen> {
     setState(() => _uploading = true);
     try {
       final bytes = await file.readAsBytes();
-      final safeName = file.name.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+      final prepared = prepareUploadImage(
+        bytes,
+        file.name,
+        style: UploadImageStyle.icon,
+      );
       final reference = FirebaseStorage.instance.ref(
-        'trust_badges/${DateTime.now().microsecondsSinceEpoch}_$safeName',
+        'trust_badges/${DateTime.now().microsecondsSinceEpoch}_${prepared.fileName}',
       );
       await reference.putData(
-        bytes,
-        SettableMetadata(contentType: _contentTypeFor(file.name)),
+        prepared.bytes,
+        SettableMetadata(contentType: prepared.contentType),
       );
       return reference.getDownloadURL();
     } catch (error) {
@@ -644,13 +649,5 @@ class _AdminTrustBadgesScreenState extends State<AdminTrustBadgesScreen> {
         .replaceAll(RegExp(r'^-+|-+$'), '');
     final base = slug.isEmpty ? 'rozet' : slug;
     return '$base-${DateTime.now().millisecondsSinceEpoch}';
-  }
-
-  String _contentTypeFor(String fileName) {
-    final lower = fileName.toLowerCase();
-    if (lower.endsWith('.png')) return 'image/png';
-    if (lower.endsWith('.webp')) return 'image/webp';
-    if (lower.endsWith('.gif')) return 'image/gif';
-    return 'image/jpeg';
   }
 }

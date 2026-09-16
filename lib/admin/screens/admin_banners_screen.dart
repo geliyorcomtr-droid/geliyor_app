@@ -2,14 +2,20 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
+import 'package:geliyor_app/admin/admin_models.dart';
 import 'package:geliyor_app/admin/admin_ui.dart';
 import 'package:geliyor_app/data/banner_repository.dart';
 import 'package:geliyor_app/data/firestore_collections.dart';
+import 'package:geliyor_app/data/knowledge_article_repository.dart';
+import 'package:geliyor_app/data/product_repository.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:geliyor_app/utils/compress_upload_image.dart';
 import 'package:geliyor_app/utils/product_image.dart';
 
 class AdminBannersScreen extends StatefulWidget {
-  const AdminBannersScreen({super.key});
+  const AdminBannersScreen({super.key, this.initialGroup = 'all'});
+
+  final String initialGroup;
 
   @override
   State<AdminBannersScreen> createState() => _AdminBannersScreenState();
@@ -18,6 +24,13 @@ class AdminBannersScreen extends StatefulWidget {
 class _AdminBannersScreenState extends State<AdminBannersScreen> {
   bool _seeding = true;
   bool _uploading = false;
+  late String _group = widget.initialGroup;
+
+  bool _matches(BannerPlacement slot) {
+    if (_group == 'all') return true;
+    if (_group == 'ads') return slot.pageId == 'home';
+    return slot.pageId == _group;
+  }
 
   @override
   void initState() {
@@ -76,17 +89,23 @@ class _AdminBannersScreenState extends State<AdminBannersScreen> {
     setState(() => _uploading = true);
     try {
       final bytes = await file.readAsBytes();
-      final safeName = file.name.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+      if (bytes.isEmpty) {
+        throw Exception('Dosya okunamadı, başka bir görsel dene.');
+      }
+      final prepared = prepareUploadImage(bytes, file.name);
       final reference = FirebaseStorage.instance.ref(
-        'banners/${DateTime.now().microsecondsSinceEpoch}_$safeName',
+        'banners/${DateTime.now().microsecondsSinceEpoch}_${prepared.fileName}',
       );
-      await reference.putData(bytes);
+      await reference.putData(
+        prepared.bytes,
+        SettableMetadata(contentType: prepared.contentType),
+      );
       return reference.getDownloadURL();
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Görsel yüklenemedi: $error')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Görsel yüklenemedi: $error')),
+        );
       }
       return null;
     } finally {
@@ -99,10 +118,20 @@ class _AdminBannersScreenState extends State<AdminBannersScreen> {
     required BannerPlacement placement,
     required int nextOrder,
   }) async {
-    final title = TextEditingController(text: existing?.title ?? '');
+    final title = TextEditingController(
+      text: existing?.title.isNotEmpty == true
+          ? existing!.title
+          : placement.title,
+    );
     var imageUrl = existing?.imageUrl ?? '';
     var active = existing?.active ?? true;
     var selectedPlacement = existing?.placement ?? placement.id;
+    var linkType = existing?.linkType ?? BannerLinkType.none;
+    if (linkType != BannerLinkType.product &&
+        linkType != BannerLinkType.article) {
+      linkType = BannerLinkType.none;
+    }
+    var linkId = existing?.linkId ?? '';
 
     final saved = await showDialog<bool>(
       context: context,
@@ -129,7 +158,7 @@ class _AdminBannersScreenState extends State<AdminBannersScreen> {
                         border: Border.all(color: AppColors.border),
                       ),
                       child: Text(
-                        'Önerilen ölçü: ${slot.sizeLabel}',
+                        'Nereye ait: ${slot.belongsLabel}\nÖlçü: ${slot.pxLabel}\nGörsel otomatik küçültülür (en fazla ~250 KB).',
                         style: const TextStyle(
                           color: AppColors.primary,
                           fontWeight: FontWeight.w800,
@@ -148,6 +177,10 @@ class _AdminBannersScreenState extends State<AdminBannersScreen> {
                               ? imageUrl
                               : (existing?.assetPath ?? ''),
                           fit: BoxFit.cover,
+                          width: double.infinity,
+                          height: double.infinity,
+                          filterQuality: FilterQuality.medium,
+                          cacheWidth: 1080,
                         ),
                       ),
                     ),
@@ -159,12 +192,15 @@ class _AdminBannersScreenState extends State<AdminBannersScreen> {
                     const SizedBox(height: 10),
                     DropdownButtonFormField<String>(
                       initialValue: selectedPlacement,
+                      isExpanded: true,
                       decoration: const InputDecoration(labelText: 'Bölüm'),
                       items: [
                         for (final item in BannerPlacement.values)
                           DropdownMenuItem(
                             value: item.id,
-                            child: Text('${item.title}  ·  ${item.sizeLabel}'),
+                            child: Text(
+                              '${item.belongsLabel}  ·  ${item.pxLabel}',
+                            ),
                           ),
                       ],
                       onChanged: (value) {
@@ -183,6 +219,106 @@ class _AdminBannersScreenState extends State<AdminBannersScreen> {
                       icon: const Icon(Icons.upload_rounded),
                       label: Text(_uploading ? 'Yükleniyor…' : 'Görsel yükle'),
                     ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Tıklanınca',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        for (final option in const [
+                          (BannerLinkType.none, 'Yok'),
+                          (BannerLinkType.product, 'Ürün'),
+                          (BannerLinkType.article, 'Makale'),
+                        ])
+                          ChoiceChip(
+                            label: Text(option.$2),
+                            selected: linkType == option.$1,
+                            onSelected: (_) {
+                              setDialog(() {
+                                linkType = option.$1;
+                                linkId = '';
+                              });
+                            },
+                          ),
+                      ],
+                    ),
+                    if (linkType == BannerLinkType.product) ...[
+                      const SizedBox(height: 10),
+                      StreamBuilder<List<AdminProduct>>(
+                        stream: ProductRepository.instance.watchAll(),
+                        builder: (context, snapshot) {
+                          final products = snapshot.data ?? const <AdminProduct>[];
+                          final ids = {for (final item in products) item.id};
+                          final selected = ids.contains(linkId) ? linkId : null;
+                          return DropdownButtonFormField<String>(
+                            key: ValueKey('product-$selected-${products.length}'),
+                            initialValue: selected,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Ürün',
+                            ),
+                            items: [
+                              for (final item in products)
+                                DropdownMenuItem(
+                                  value: item.id,
+                                  child: Text(
+                                    item.title,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                            ],
+                            onChanged: (value) {
+                              if (value == null) return;
+                              setDialog(() => linkId = value);
+                            },
+                          );
+                        },
+                      ),
+                    ],
+                    if (linkType == BannerLinkType.article) ...[
+                      const SizedBox(height: 10),
+                      StreamBuilder<List<AppKnowledgeArticle>>(
+                        stream:
+                            KnowledgeArticleRepository.instance.watchActive(),
+                        builder: (context, snapshot) {
+                          final articles =
+                              snapshot.data ?? AppKnowledgeArticle.defaults();
+                          final ids = {for (final item in articles) item.id};
+                          final selected =
+                              ids.contains(linkId) ? linkId : null;
+                          return DropdownButtonFormField<String>(
+                            key: ValueKey(
+                              'article-$selected-${articles.length}',
+                            ),
+                            initialValue: selected,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Makale',
+                            ),
+                            items: [
+                              for (final item in articles)
+                                DropdownMenuItem(
+                                  value: item.id,
+                                  child: Text(
+                                    item.title,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                            ],
+                            onChanged: (value) {
+                              if (value == null) return;
+                              setDialog(() => linkId = value);
+                            },
+                          );
+                        },
+                      ),
+                    ],
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
                       title: const Text('Yayında göster'),
@@ -200,7 +336,9 @@ class _AdminBannersScreenState extends State<AdminBannersScreen> {
               ),
               FilledButton(
                 onPressed: () {
-                  if (title.text.trim().isEmpty) return;
+                  if (title.text.trim().isEmpty) {
+                    title.text = slot.title;
+                  }
                   Navigator.pop(ctx, true);
                 },
                 child: const Text('Kaydet'),
@@ -210,20 +348,36 @@ class _AdminBannersScreenState extends State<AdminBannersScreen> {
         },
       ),
     );
-    if (saved != true) return;
-    await _save(
-      AppBanner(
-        id:
-            existing?.id ??
-            FirebaseFirestore.instance.collection('banners').doc().id,
-        title: title.text.trim(),
-        imageUrl: imageUrl,
-        assetPath: existing?.assetPath ?? '',
-        placement: selectedPlacement,
-        order: existing?.order ?? nextOrder,
-        active: active,
-      ),
-    );
+    if (saved != true) {
+      title.dispose();
+      return;
+    }
+    final resolvedTitle = title.text.trim().isEmpty
+        ? placement.title
+        : title.text.trim();
+    title.dispose();
+    try {
+      await _save(
+        AppBanner(
+          id:
+              existing?.id ??
+              FirebaseFirestore.instance.collection('banners').doc().id,
+          title: resolvedTitle,
+          imageUrl: imageUrl,
+          assetPath: existing?.assetPath ?? '',
+          placement: selectedPlacement,
+          order: existing?.order ?? nextOrder,
+          active: active,
+          linkType: linkType,
+          linkId: linkType == BannerLinkType.none ? '' : linkId,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Kaydedilemedi: $error')),
+      );
+    }
   }
 
   @override
@@ -235,38 +389,139 @@ class _AdminBannersScreenState extends State<AdminBannersScreen> {
           return const Center(child: CircularProgressIndicator());
         }
         final banners = snapshot.data!;
+        final visibleSlots = BannerPlacement.values.where(_matches).toList();
+        final pageBoxes = <(String pageId, String pageLabel, List<BannerPlacement> slots)>[
+          for (final page in BannerPlacement.pages)
+            if (visibleSlots.any((slot) => slot.pageId == page.$1))
+              (
+                page.$1,
+                page.$2,
+                visibleSlots.where((slot) => slot.pageId == page.$1).toList(),
+              ),
+        ];
         return ListView(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
           children: [
             const AdminPageHeader(
               title: 'Bannerlar',
               subtitle:
-                  'Her sayfa ayrı bölüm. Ortak carousel yapısı; ölçü her bölümün kendi yüksekliğidir.',
+                  'Her kutu bir uygulama sayfasına aittir. Banner ve reklamlar o sayfanın kutusunda durur; üstte ölçü (px) ve nereye ait olduğu yazar.',
             ),
-            for (final slot in BannerPlacement.values) ...[
-              _SectionBlock(
-                placement: slot,
-                banners: banners
-                    .where((item) => item.placement == slot.id)
-                    .toList(),
-                onAdd: () => _edit(
-                  placement: slot,
-                  nextOrder: banners.where((b) => b.placement == slot.id).length,
-                ),
-                onEdit: (banner) => _edit(
-                  existing: banner,
-                  placement: slot,
-                  nextOrder: banners.length,
-                ),
-                onToggle: (banner, value) =>
-                    _save(banner.copyWith(active: value)),
-                onDelete: _delete,
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _groupChip('all', 'Tüm sayfalar'),
+                for (final page in BannerPlacement.pages)
+                  _groupChip(page.$1, page.$2),
+              ],
+            ),
+            const SizedBox(height: 16),
+            for (final box in pageBoxes) ...[
+              _PageCategoryBox(
+                pageLabel: box.$2,
+                slotCount: box.$3.length,
+                children: [
+                  for (final slot in box.$3) ...[
+                    _SectionBlock(
+                      placement: slot,
+                      banners: banners
+                          .where((item) => item.placement == slot.id)
+                          .toList(),
+                      onAdd: () => _edit(
+                        placement: slot,
+                        nextOrder: banners
+                            .where((b) => b.placement == slot.id)
+                            .length,
+                      ),
+                      onEdit: (banner) => _edit(
+                        existing: banner,
+                        placement: slot,
+                        nextOrder: banners.length,
+                      ),
+                      onToggle: (banner, value) =>
+                          _save(banner.copyWith(active: value)),
+                      onDelete: _delete,
+                    ),
+                    if (slot != box.$3.last) const SizedBox(height: 14),
+                  ],
+                ],
               ),
               const SizedBox(height: 18),
             ],
           ],
         );
       },
+    );
+  }
+
+  Widget _groupChip(String value, String label) {
+    final selected = _group == value;
+    return FilterChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => setState(() => _group = value),
+      selectedColor: AppColors.selected,
+      checkmarkColor: AppColors.primary,
+      labelStyle: TextStyle(
+        color: selected ? AppColors.primary : AppColors.text,
+        fontWeight: FontWeight.w800,
+      ),
+    );
+  }
+}
+
+class _PageCategoryBox extends StatelessWidget {
+  const _PageCategoryBox({
+    required this.pageLabel,
+    required this.slotCount,
+    required this.children,
+  });
+
+  final String pageLabel;
+  final int slotCount;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  pageLabel,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.text,
+                  ),
+                ),
+              ),
+              _SizeChip(label: '$slotCount bölüm'),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Bu kutudaki banner ve reklamlar yalnızca $pageLabel sayfasına aittir.',
+            style: const TextStyle(
+              color: AppColors.subText,
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 14),
+          ...children,
+        ],
+      ),
     );
   }
 }
@@ -303,7 +558,9 @@ class _SectionBlock extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      placement.title,
+                      placement.slotLabel.isEmpty
+                          ? placement.title
+                          : placement.slotLabel,
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w800,
@@ -315,7 +572,8 @@ class _SectionBlock extends StatelessWidget {
                       spacing: 8,
                       runSpacing: 6,
                       children: [
-                        _SizeChip(label: placement.sizeLabel),
+                        _SizeChip(label: placement.pxLabel),
+                        _SizeChip(label: placement.belongsLabel),
                         if (placement.description.isNotEmpty)
                           _SizeChip(label: placement.description),
                         _SizeChip(label: '${banners.length} görsel'),
@@ -376,10 +634,36 @@ class _SectionBlock extends StatelessWidget {
                                 ),
                                 child: AspectRatio(
                                   aspectRatio:
-                                      BannerPlacement.width / placement.height,
-                                  child: buildProductImage(
-                                    banner.displayImage,
-                                    fit: BoxFit.cover,
+                                      placement.boxWidth / placement.height,
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      buildProductImage(
+                                        banner.displayImage,
+                                        fit: BoxFit.cover,
+                                        width: double.infinity,
+                                        height: double.infinity,
+                                        filterQuality: FilterQuality.medium,
+                                        cacheWidth: 1080,
+                                      ),
+                                      Positioned(
+                                        left: 8,
+                                        right: 8,
+                                        bottom: 8,
+                                        child: Wrap(
+                                          spacing: 6,
+                                          runSpacing: 4,
+                                          children: [
+                                            _OverlayChip(
+                                              label: placement.pxLabel,
+                                            ),
+                                            _OverlayChip(
+                                              label: placement.belongsLabel,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),
@@ -406,7 +690,25 @@ class _SectionBlock extends StatelessWidget {
                                             ),
                                           ),
                                           Text(
-                                            banner.active ? 'Yayında' : 'Gizli',
+                                            '${placement.pxLabel} · ${placement.belongsLabel}',
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700,
+                                              color: AppColors.primary,
+                                            ),
+                                          ),
+                                          Text(
+                                            [
+                                              banner.active ? 'Yayında' : 'Gizli',
+                                              if (banner.linkType ==
+                                                  BannerLinkType.product)
+                                                'Ürüne git',
+                                              if (banner.linkType ==
+                                                  BannerLinkType.article)
+                                                'Makaleye git',
+                                            ].join(' · '),
                                             style: TextStyle(
                                               fontSize: 12,
                                               fontWeight: FontWeight.w600,
@@ -467,6 +769,31 @@ class _SizeChip extends StatelessWidget {
         style: const TextStyle(
           color: AppColors.primary,
           fontSize: 12,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
+class _OverlayChip extends StatelessWidget {
+  const _OverlayChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 10,
           fontWeight: FontWeight.w800,
         ),
       ),

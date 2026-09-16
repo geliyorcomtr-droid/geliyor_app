@@ -12,7 +12,9 @@ class AdminAccents {
   static const Color campaigns = Color(0xFF8B5CF6);
   static const Color broadcasts = AppColors.primary;
   static const Color banners = Color(0xFFEC4899);
+  static const Color knowledge = AppColors.warning;
   static const Color support = Color(0xFF14B8A6);
+  static const Color adoption = AppColors.warning;
   static const Color bankTransfer = Color(0xFF0EA5E9);
   static const Color canvas = Color(0xFFF4F7FB);
 }

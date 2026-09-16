@@ -1,5 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:geliyor_app/data/banner_repository.dart';
+import 'package:geliyor_app/data/knowledge_catalog.dart';
+import 'package:geliyor_app/data/knowledge_content_repository.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
 import 'package:geliyor_app/screens/question_detail_screen.dart';
@@ -27,135 +31,15 @@ class _FeaturedQuestionsScreenState extends State<FeaturedQuestionsScreen> {
   @override
   void initState() {
     super.initState();
-    final exists = TopicSearchScreen.topics.any(
+    final exists = KnowledgeQuestionTopic.all.any(
       (t) => t.id == widget.initialTopicId,
     );
     _selectedTopicId = exists ? widget.initialTopicId : 'sindirim';
+    unawaited(KnowledgeContentRepository.instance.ensureDefaults());
   }
 
-  static const _questionsByTopic = <String, List<_FqQuestion>>{
-    'sindirim': [
-      _FqQuestion('Kedimin iştahı azaldı, ne yapmalıyım?', '12,4B'),
-      _FqQuestion('Kedimin kusması normal mi?', '9,8B'),
-      _FqQuestion('Kedimin ishal olması ne anlama gelir?', '8,1B'),
-      _FqQuestion('Kedimde tüy yeme (kıl yutma) neden olur?', '7,4B'),
-      _FqQuestion('Kedimin dışkısı sert, ne yapmalıyım?', '6,9B'),
-      _FqQuestion('Kedi mama değişikliğine nasıl alıştırılır?', '6,9B'),
-      _FqQuestion('Kedimin gazı var, nasıl geçer?', '5,7B'),
-      _FqQuestion('Kedimin bağırsak parazit belirtileri nelerdir?', '5,3B'),
-    ],
-    'idrar': [
-      _FqQuestion(
-        'Kedilerde idrar yolu enfeksiyonu belirtileri nelerdir?',
-        '9,8B',
-      ),
-      _FqQuestion('Kum kabı dışında idrar yapıyorsa ne anlama gelir?', '7,6B'),
-      _FqQuestion('Kedimin idrarı kanlıysa ne yapmalıyım?', '6,4B'),
-      _FqQuestion('Su tüketimini nasıl artırabilirim?', '5,9B'),
-      _FqQuestion('İdrar yolu sağlığı için mama seçimi nasıl olmalı?', '5,2B'),
-      _FqQuestion(
-        'Kedilerde böbrek yetmezliği erken belirtileri neler?',
-        '4,8B',
-      ),
-      _FqQuestion('Erkek kedilerde idrar tıkanıklığı acil midir?', '4,5B'),
-      _FqQuestion('Kum tipi idrar sağlığını etkiler mi?', '3,9B'),
-    ],
-    'alerji': [
-      _FqQuestion('Kedimin tüyleri çok dökülüyor, normal mi?', '8,1B'),
-      _FqQuestion('Kaşıntı ve kızarıklık alerji belirtisi midir?', '7,0B'),
-      _FqQuestion(
-        'Alerjik deri sorunlarında mama değişimi gerekir mi?',
-        '5,6B',
-      ),
-      _FqQuestion('Tüy bakımı alerjiyi nasıl etkiler?', '4,9B'),
-      _FqQuestion('Kedilerde yiyecek alerjisi nasıl anlaşılır?', '4,4B'),
-      _FqQuestion(
-        'Pire alerjisi ile gıda alerjisi nasıl ayırt edilir?',
-        '4,1B',
-      ),
-      _FqQuestion('Deri yaraları için evde ne yapabilirim?', '3,7B'),
-      _FqQuestion('Hiperalerjenik mama ne zaman tercih edilmeli?', '3,3B'),
-    ],
-    'kilo': [
-      _FqQuestion('Kedimin iştahı azaldı, ne yapmalıyım?', '12,4B'),
-      _FqQuestion(
-        'Fazla kilolu kediler için porsiyon nasıl ayarlanır?',
-        '6,8B',
-      ),
-      _FqQuestion('Günlük kalori ihtiyacı nasıl hesaplanır?', '5,1B'),
-      _FqQuestion('Ödül mamaları kilo alımına yol açar mı?', '4,0B'),
-      _FqQuestion('Kedi ideal kilosu nasıl ölçülür?', '3,8B'),
-      _FqQuestion('Zayıflama mamaları ne kadar süre verilmeli?', '3,5B'),
-      _FqQuestion('İştahsızlık ile kilo kaybı ne zaman acildir?', '3,2B'),
-      _FqQuestion('Serbest mama bırakmak kilo yapar mı?', '2,9B'),
-    ],
-    'genel': [
-      _FqQuestion('Kedime hangi aşıları yaptırmalıyım?', '15,2B'),
-      _FqQuestion('Yıllık veteriner kontrolü ne zaman yapılmalı?', '8,7B'),
-      _FqQuestion('İç ve dış parazit koruması nasıl planlanır?', '7,3B'),
-      _FqQuestion('Evde sağlık takibi için nelere dikkat etmeliyim?', '5,5B'),
-      _FqQuestion('Kedimin ateşi olup olmadığını nasıl anlarım?', '5,0B'),
-      _FqQuestion('Halsizlik ne zaman ciddiye alınmalı?', '4,6B'),
-      _FqQuestion('Yaşlı kedilerde kontrol sıklığı nasıl olmalı?', '4,2B'),
-      _FqQuestion('Acil veteriner durumları nelerdir?', '3,9B'),
-    ],
-    'dis': [
-      _FqQuestion('Kedilerde diş taşı nasıl önlenir?', '6,2B'),
-      _FqQuestion('Ağız kokusu hastalık belirtisi midir?', '5,4B'),
-      _FqQuestion('Diş fırçalama ne sıklıkla yapılmalı?', '4,8B'),
-      _FqQuestion('Kediler kuru mama ile diş temizler mi?', '4,1B'),
-      _FqQuestion('Diş eti kanaması ne anlama gelir?', '3,7B'),
-      _FqQuestion('Yemek yemeyi reddetmek diş ağrısı olabilir mi?', '3,4B'),
-      _FqQuestion('Dental mama ne zaman önerilir?', '3,0B'),
-      _FqQuestion('Diş çekimi sonrası bakım nasıl olmalı?', '2,7B'),
-    ],
-    'goz': [
-      _FqQuestion('Kedimin gözü sulanıyorsa ne yapmalıyım?', '5,8B'),
-      _FqQuestion('Gözde akıntı enfeksiyon belirtisi midir?', '4,9B'),
-      _FqQuestion('Üçüncü göz kapağı görünürse ne olur?', '4,3B'),
-      _FqQuestion('Kedilerde göz rengi değişimi normal midir?', '3,8B'),
-      _FqQuestion('Göz kapağı şişmesi neden olur?', '3,4B'),
-      _FqQuestion('Kornea çizilmesi belirtileri nelerdir?', '3,1B'),
-      _FqQuestion('Göz damlası evde kullanılabilir mi?', '2,8B'),
-      _FqQuestion('Işığa hassasiyet ne zaman acildir?', '2,5B'),
-    ],
-    'kulak': [
-      _FqQuestion('Kedimin kulağı kaşınıyorsa ne yapmalıyım?', '5,5B'),
-      _FqQuestion('Kulak akıntısı enfeksiyon mudur?', '4,7B'),
-      _FqQuestion('Kulak temizliği nasıl yapılır?', '4,2B'),
-      _FqQuestion('Kulak akarları belirtileri nelerdir?', '3,9B'),
-      _FqQuestion('Kafa sallama neden olur?', '3,5B'),
-      _FqQuestion('Kulak kokusu hastalık belirtisi midir?', '3,2B'),
-      _FqQuestion('Dış kulak yolu enfeksiyonu nasıl anlaşılır?', '2,9B'),
-      _FqQuestion('Kulak temizleyici seçerken nelere dikkat?', '2,6B'),
-    ],
-    'solunum': [
-      _FqQuestion('Kedimin öksürmesi normal mi?', '6,0B'),
-      _FqQuestion('Hapşırma ne zaman ciddiye alınmalı?', '5,1B'),
-      _FqQuestion('Burun akıntısı neden olur?', '4,6B'),
-      _FqQuestion('Nefes darlığı acil midir?', '4,3B'),
-      _FqQuestion('Üst solunum yolu enfeksiyonu belirtileri?', '3,9B'),
-      _FqQuestion('Horlama hastalık belirtisi olabilir mi?', '3,4B'),
-      _FqQuestion('Ağızdan nefes alma ne anlama gelir?', '3,1B'),
-      _FqQuestion('Astım şüphesinde ne yapılmalı?', '2,8B'),
-    ],
-    'parazit': [
-      _FqQuestion('İç parazit belirtileri nelerdir?', '7,1B'),
-      _FqQuestion('Dış parazit koruması ne sıklıkla yapılmalı?', '6,3B'),
-      _FqQuestion('Pire tedavisi nasıl uygulanır?', '5,5B'),
-      _FqQuestion('Kene ısırığında ne yapmalıyım?', '4,9B'),
-      _FqQuestion('Solucan ilaçları güvenli midir?', '4,4B'),
-      _FqQuestion('Yavru kedilerde parazit koruması nasıl?', '4,0B'),
-      _FqQuestion('Evde parazit temizliği yeterli midir?', '3,6B'),
-      _FqQuestion('Doğal parazit önleme yöntemleri işe yarar mı?', '3,1B'),
-    ],
-  };
-
-  TopicSearchItem get _selectedTopic =>
-      TopicSearchScreen.topics.firstWhere((t) => t.id == _selectedTopicId);
-
-  List<_FqQuestion> get _questions =>
-      _questionsByTopic[_selectedTopicId] ?? const [];
+  KnowledgeQuestionTopic get _selectedTopic =>
+      KnowledgeQuestionTopic.byId(_selectedTopicId);
 
   Future<void> _openTopicSearch() async {
     final result = await Navigator.of(context).push<String>(
@@ -187,7 +71,36 @@ class _FeaturedQuestionsScreenState extends State<FeaturedQuestionsScreen> {
               const SizedBox(height: 12),
               _buildQuestionsHeader(),
               const SizedBox(height: 8),
-              _buildQuestionsList(),
+              StreamBuilder<List<AppKnowledgeQuestion>>(
+                stream: KnowledgeContentRepository.instance
+                    .watchActiveQuestions(topicId: _selectedTopicId),
+                builder: (context, snapshot) {
+                  final questions =
+                      snapshot.data ??
+                      AppKnowledgeQuestion.defaults()
+                          .where((item) => item.topicId == _selectedTopicId)
+                          .toList();
+                  if (questions.isEmpty) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 24),
+                      child: Center(
+                        child: Text(
+                          'Bu konuda henüz soru yok.',
+                          style: TextStyle(color: AppColors.subText),
+                        ),
+                      ),
+                    );
+                  }
+                  return Column(
+                    children: [
+                      for (int i = 0; i < questions.length; i++) ...[
+                        if (i > 0) const SizedBox(height: 6),
+                        _buildQuestionCard(questions[i]),
+                      ],
+                    ],
+                  );
+                },
+              ),
               const SizedBox(height: 12),
               const KnowledgeDisclaimer(),
             ],
@@ -314,26 +227,17 @@ class _FeaturedQuestionsScreenState extends State<FeaturedQuestionsScreen> {
     );
   }
 
-  Widget _buildQuestionsList() {
-    return Column(
-      children: [
-        for (int i = 0; i < _questions.length; i++) ...[
-          if (i > 0) const SizedBox(height: 6),
-          _buildQuestionCard(_questions[i]),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildQuestionCard(_FqQuestion q) {
+  Widget _buildQuestionCard(AppKnowledgeQuestion q) {
     return GestureDetector(
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => QuestionDetailScreen(
-              question: q.text,
+              question: q.title,
               views: q.views,
               topicTitle: _selectedTopic.title,
+              answer: q.answer,
+              tips: q.tips,
             ),
           ),
         );
@@ -363,7 +267,7 @@ class _FeaturedQuestionsScreenState extends State<FeaturedQuestionsScreen> {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                q.text,
+                q.title,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
@@ -400,11 +304,4 @@ class _FeaturedQuestionsScreenState extends State<FeaturedQuestionsScreen> {
       ),
     );
   }
-}
-
-class _FqQuestion {
-  const _FqQuestion(this.text, this.views);
-
-  final String text;
-  final String views;
 }

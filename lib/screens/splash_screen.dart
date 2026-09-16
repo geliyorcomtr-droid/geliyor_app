@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geliyor_app/screens/home_screen.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:geliyor_app/widgets/app_brand_logo.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
 import 'package:geliyor_app/widgets/paw_print_background.dart';
+import 'package:geliyor_app/widgets/welcome_feature_circles.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -14,8 +16,6 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-  static const _logoPath = 'assets/images/geliyor_splash_logo.png';
-
   static const _autoNavigateDelay = Duration(seconds: 4);
   static const _tapEnabledAfter = Duration(seconds: 1);
 
@@ -66,18 +66,16 @@ class _SplashScreenState extends State<SplashScreen> {
         child: GestureDetector(
           onTap: _onTapAnywhere,
           behavior: HitTestBehavior.opaque,
-          child: Center(
+          child: const Center(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 40),
-              child: Image.asset(
-                _logoPath,
-                fit: BoxFit.contain,
-                filterQuality: FilterQuality.high,
-                errorBuilder: (context, error, stackTrace) => const Icon(
-                  Icons.pets_rounded,
-                  color: AppColors.primary,
-                  size: 88,
-                ),
+              padding: EdgeInsets.symmetric(horizontal: 40),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AppBrandLogo(height: 320, errorIconSize: 88),
+                  SizedBox(height: 8),
+                  WelcomePhoneLine(),
+                ],
               ),
             ),
           ),

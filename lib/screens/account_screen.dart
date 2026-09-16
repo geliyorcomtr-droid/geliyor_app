@@ -10,6 +10,7 @@ import 'package:geliyor_app/screens/payment_methods_screen.dart';
 import 'package:geliyor_app/screens/privacy_security_screen.dart';
 import 'package:geliyor_app/screens/logout_success_screen.dart';
 import 'package:geliyor_app/screens/personal_info_screen.dart';
+import 'package:geliyor_app/screens/adoption_submit_screen.dart';
 import 'package:geliyor_app/services/user_profile_sync.dart';
 import 'package:geliyor_app/state/auth_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
@@ -92,6 +93,11 @@ class AccountScreen extends StatelessWidget {
                     icon: Icons.headset_mic_outlined,
                     label: 'Yardım & Destek',
                     opensHelpSupport: true,
+                  ),
+                  _MenuItem(
+                    icon: Icons.pets_outlined,
+                    label: 'Sahiplendirme İlanı',
+                    opensAdoption: true,
                   ),
                   _MenuItem(
                     icon: Icons.verified_user_outlined,
@@ -445,6 +451,14 @@ class AccountScreen extends StatelessWidget {
                   MaterialPageRoute(builder: (_) => const HelpSupportScreen()),
                 );
               }
+            : item.opensAdoption
+            ? () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const AdoptionSubmitScreen(),
+                  ),
+                );
+              }
             : item.opensPrivacySecurity
             ? () {
                 Navigator.of(context).push(
@@ -516,6 +530,7 @@ class _MenuItem {
     this.opensFavorites = false,
     this.opensOrders = false,
     this.opensHelpSupport = false,
+    this.opensAdoption = false,
     this.opensPrivacySecurity = false,
     this.opensLogout = false,
   });
@@ -530,6 +545,7 @@ class _MenuItem {
   final bool opensFavorites;
   final bool opensOrders;
   final bool opensHelpSupport;
+  final bool opensAdoption;
   final bool opensPrivacySecurity;
   final bool opensLogout;
 }

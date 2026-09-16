@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geliyor_app/app_navigator.dart';
+import 'package:geliyor_app/data/brand_repository.dart';
 import 'package:geliyor_app/firebase_options.dart';
 import 'package:geliyor_app/screens/login_screen.dart';
 import 'package:geliyor_app/screens/splash_screen.dart';
@@ -16,6 +17,8 @@ import 'package:geliyor_app/widgets/mobile_web_shell.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  imageCache.maximumSize = 200;
+  imageCache.maximumSizeBytes = 120 << 20;
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -23,6 +26,7 @@ Future<void> main() async {
   UserProfileSync.start();
   FoodReminderSync.start();
   HealthCalendarStore.start();
+  BrandRepository.instance.startListening();
   LoginGate.openLogin = (context) async {
     final result = await Navigator.of(context).push<bool>(
       MaterialPageRoute(

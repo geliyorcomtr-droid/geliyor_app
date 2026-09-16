@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:geliyor_app/screens/account_screen.dart';
+import 'package:geliyor_app/screens/home_screen.dart';
 import 'package:geliyor_app/screens/register_screen.dart';
 import 'package:geliyor_app/services/user_profile_sync.dart';
 import 'package:geliyor_app/state/auth_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
+import 'package:geliyor_app/widgets/app_brand_logo.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
 import 'package:geliyor_app/widgets/app_pressable_button.dart';
 
@@ -23,20 +24,27 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _phoneController = TextEditingController();
+  final _identifierController = TextEditingController();
   final _codeController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _codeSent = false;
   bool _busy = false;
+  bool _obscurePassword = true;
+
+  bool get _isEmailEntry {
+    return _identifierController.text.trim().contains('@');
+  }
 
   @override
   void dispose() {
-    _phoneController.dispose();
+    _identifierController.dispose();
     _codeController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
   Future<void> _sendCode() async {
-    final phone = _phoneController.text.trim();
+    final phone = _identifierController.text.trim();
     if (phone.length < 10) {
       _showMessage('Geçerli bir telefon numarası girin.');
       return;
@@ -55,12 +63,61 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Future<void> _finishLogin() async {
+    await UserProfileSync.sync(force: true);
+    if (!mounted) return;
+    if (widget.returnToPrevious) {
+      Navigator.of(context).pop(true);
+      return;
+    }
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(
+        settings: const RouteSettings(name: 'home'),
+        builder: (_) => const HomeScreen(),
+      ),
+      (route) => false,
+    );
+  }
+
+  Future<void> _loginWithEmail() async {
+    final email = _identifierController.text.trim();
+    final password = _passwordController.text;
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
+      _showMessage('Geçerli bir e-posta adresi girin.');
+      return;
+    }
+    if (password.trim().length < 6) {
+      _showMessage('Şifrenizi girin.');
+      return;
+    }
+
+    setState(() => _busy = true);
+    try {
+      await AuthStore.instance.signInWithEmail(
+        email: email,
+        password: password,
+      );
+      if (!mounted) return;
+      await _finishLogin();
+    } catch (e) {
+      if (!mounted) return;
+      _showMessage(AuthStore.friendlyError(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _login() async {
-    final phone = _phoneController.text.trim();
+    if (_isEmailEntry) {
+      await _loginWithEmail();
+      return;
+    }
+
+    final phone = _identifierController.text.trim();
     final code = _codeController.text.trim();
 
     if (phone.length < 10) {
-      _showMessage('Geçerli bir telefon numarası girin.');
+      _showMessage('Geçerli bir telefon numarası veya e-posta girin.');
       return;
     }
     if (!_codeSent) {
@@ -78,19 +135,8 @@ class _LoginScreenState extends State<LoginScreen> {
         smsCode: code,
         requireExistingUser: true,
       );
-      await UserProfileSync.sync(force: true);
       if (!mounted) return;
-      if (widget.returnToPrevious) {
-        Navigator.of(context).pop(true);
-        return;
-      }
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(
-          settings: const RouteSettings(name: 'profile'),
-          builder: (_) => const AccountScreen(),
-        ),
-        (route) => false,
-      );
+      await _finishLogin();
     } catch (e) {
       if (!mounted) return;
       _showMessage(AuthStore.friendlyError(e));
@@ -142,7 +188,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 6),
               const Text(
-                'Telefon numaranızla giriş yapın ve alışverişe başlayın',
+                'Telefon numaranız veya e-posta adresinizle giriş yapın',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: AppColors.subText,
@@ -152,46 +198,79 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
               const SizedBox(height: 22),
-              _fieldLabel('Telefon Numarası'),
+              _fieldLabel('Telefon numarası / e-posta adresi'),
               const SizedBox(height: 6),
               _inputField(
-                controller: _phoneController,
-                hint: '05XX XXX XX XX',
-                icon: Icons.phone_outlined,
-                keyboardType: TextInputType.phone,
-                onChanged: (_) {
+                controller: _identifierController,
+                hint: '05XX XXX XX XX veya e-posta',
+                icon: _isEmailEntry
+                    ? Icons.mail_outline_rounded
+                    : Icons.phone_outlined,
+                keyboardType: TextInputType.emailAddress,
+                onChanged: (_) => setState(() {
                   if (_codeSent) {
-                    setState(() {
-                      _codeSent = false;
-                      _codeController.clear();
-                    });
+                    _codeSent = false;
+                    _codeController.clear();
                   }
-                },
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                  LengthLimitingTextInputFormatter(11),
-                ],
+                }),
               ),
-              const SizedBox(height: 14),
-              _fieldLabel('SMS Doğrulama Kodu'),
-              const SizedBox(height: 6),
-              _inputField(
-                controller: _codeController,
-                hint: _codeSent
-                    ? 'SMS ile gelen 6 haneli kod'
-                    : 'Önce kod gönderin',
-                icon: Icons.sms_outlined,
-                enabled: _codeSent && !_busy,
-                obscureText: false,
-                keyboardType: TextInputType.number,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                  LengthLimitingTextInputFormatter(6),
-                ],
-              ),
+              if (_isEmailEntry) ...[
+                const SizedBox(height: 14),
+                _fieldLabel('Şifre'),
+                const SizedBox(height: 6),
+                _inputField(
+                  controller: _passwordController,
+                  hint: 'Doğrulanmış e-posta şifreniz',
+                  icon: Icons.lock_outline_rounded,
+                  obscureText: _obscurePassword,
+                  keyboardType: TextInputType.visiblePassword,
+                  suffix: IconButton(
+                    onPressed: () {
+                      setState(() => _obscurePassword = !_obscurePassword);
+                    },
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                      color: AppColors.subText,
+                      size: 20,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'E-posta ile giriş için önce telefonla girip e-postanı doğrula ve şifre belirle.',
+                  style: TextStyle(
+                    color: AppColors.subText,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    height: 1.35,
+                  ),
+                ),
+              ] else ...[
+                const SizedBox(height: 14),
+                _fieldLabel('SMS Doğrulama Kodu'),
+                const SizedBox(height: 6),
+                _inputField(
+                  controller: _codeController,
+                  hint: _codeSent
+                      ? 'SMS ile gelen 6 haneli kod'
+                      : 'Önce kod gönderin',
+                  icon: Icons.sms_outlined,
+                  enabled: _codeSent && !_busy,
+                  obscureText: false,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(6),
+                  ],
+                ),
+              ],
               const SizedBox(height: 16),
               AppPressableButton.primary(
-                onTap: _busy ? null : (_codeSent ? _login : _sendCode),
+                onTap: _busy
+                    ? null
+                    : (_isEmailEntry || _codeSent ? _login : _sendCode),
                 enabled: !_busy,
                 width: double.infinity,
                 height: 48,
@@ -205,7 +284,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       )
                     : Text(
-                        _codeSent ? 'Giriş Yap' : 'Kod Gönder',
+                        _isEmailEntry || _codeSent ? 'Giriş Yap' : 'Kod Gönder',
                         style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w900,
@@ -275,14 +354,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildBrand() {
-    return Image.asset(
-      'assets/images/geliyor_splash_logo.png',
-      height: 240,
-      fit: BoxFit.contain,
-      filterQuality: FilterQuality.high,
-      errorBuilder: (context, error, stackTrace) =>
-          const Icon(Icons.pets_rounded, color: AppColors.primary, size: 48),
-    );
+    return const AppBrandLogo(height: 240, errorIconSize: 48);
   }
 
   Widget _fieldLabel(String label) {

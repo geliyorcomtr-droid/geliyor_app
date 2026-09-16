@@ -1,7 +1,12 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:async';
+
+import 'package:flutter/material.dart';
 import 'package:geliyor_app/data/banner_repository.dart';
+import 'package:geliyor_app/data/knowledge_article_repository.dart';
+import 'package:geliyor_app/data/knowledge_content_repository.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/screens/all_topics_screen.dart';
+import 'package:geliyor_app/utils/product_image.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
 import 'package:geliyor_app/screens/article_detail_screen.dart';
 import 'package:geliyor_app/screens/articles_screen.dart';
@@ -60,177 +65,16 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
     _KbCategory(id: 'tumu', title: 'Tümü', color: AppColors.subText),
   ];
 
-  static const _featuredQuestions = <_KbQuestion>[
-    _KbQuestion(
-      text: 'Kedimin iştahı azaldı, ne yapmalıyım?',
-      views: '12,4B',
-      categoryId: 'kilo',
-    ),
-    _KbQuestion(
-      text: 'Kedilerde idrar yolu enfeksiyonunun belirtileri nelerdir?',
-      views: '9,8B',
-      categoryId: 'idrar',
-    ),
-    _KbQuestion(
-      text: 'Kedimin tüyleri çok dökülüyor, normal mi?',
-      views: '8,1B',
-      categoryId: 'alerji',
-    ),
-    _KbQuestion(
-      text: 'Kedime hangi aşıları yaptırmalıyım?',
-      views: '15,2B',
-      categoryId: 'genel',
-    ),
-  ];
-
-  static const _questionsByCategory = <String, List<_KbQuestion>>{
-    'sindirim': [
-      _KbQuestion(
-        text: 'Kedimde ishal olursa ne yapmalıyım?',
-        views: '7,2B',
-        categoryId: 'sindirim',
-      ),
-      _KbQuestion(
-        text: 'Kusma ne zaman acil sayılır?',
-        views: '6,5B',
-        categoryId: 'sindirim',
-      ),
-      _KbQuestion(
-        text: 'Hassas mideli kediler için mama önerisi nedir?',
-        views: '5,9B',
-        categoryId: 'sindirim',
-      ),
-      _KbQuestion(
-        text: 'Gaz ve şişkinlik için ne yapılmalı?',
-        views: '4,3B',
-        categoryId: 'sindirim',
-      ),
-    ],
-    'idrar': [
-      _KbQuestion(
-        text: 'Kedilerde idrar yolu enfeksiyonunun belirtileri nelerdir?',
-        views: '9,8B',
-        categoryId: 'idrar',
-      ),
-      _KbQuestion(
-        text: 'Kum kabı dışında idrar yapıyorsa ne anlama gelir?',
-        views: '6,1B',
-        categoryId: 'idrar',
-      ),
-      _KbQuestion(
-        text: 'İdrar yolu sağlığı için mama seçimi nasıl olmalı?',
-        views: '5,4B',
-        categoryId: 'idrar',
-      ),
-      _KbQuestion(
-        text: 'Su tüketimi nasıl artırılır?',
-        views: '4,8B',
-        categoryId: 'idrar',
-      ),
-    ],
-    'alerji': [
-      _KbQuestion(
-        text: 'Kedimin tüyleri çok dökülüyor, normal mi?',
-        views: '8,1B',
-        categoryId: 'alerji',
-      ),
-      _KbQuestion(
-        text: 'Kaşıntı ve kızarıklık alerji belirtisi midir?',
-        views: '7,0B',
-        categoryId: 'alerji',
-      ),
-      _KbQuestion(
-        text: 'Alerjik deri sorunlarında mama değişimi gerekir mi?',
-        views: '5,6B',
-        categoryId: 'alerji',
-      ),
-      _KbQuestion(
-        text: 'Tüy bakımı alerjiyi nasıl etkiler?',
-        views: '3,9B',
-        categoryId: 'alerji',
-      ),
-    ],
-    'kilo': [
-      _KbQuestion(
-        text: 'Kedimin iştahı azaldı, ne yapmalıyım?',
-        views: '12,4B',
-        categoryId: 'kilo',
-      ),
-      _KbQuestion(
-        text: 'Fazla kilolu kediler için porsiyon nasıl ayarlanır?',
-        views: '6,8B',
-        categoryId: 'kilo',
-      ),
-      _KbQuestion(
-        text: 'Günlük kalori ihtiyacı nasıl hesaplanır?',
-        views: '5,1B',
-        categoryId: 'kilo',
-      ),
-      _KbQuestion(
-        text: 'Ödül mamaları kilo alımına yol açar mı?',
-        views: '4,0B',
-        categoryId: 'kilo',
-      ),
-    ],
-    'genel': [
-      _KbQuestion(
-        text: 'Kedime hangi aşıları yaptırmalıyım?',
-        views: '15,2B',
-        categoryId: 'genel',
-      ),
-      _KbQuestion(
-        text: 'Yıllık veteriner kontrolü ne zaman yapılmalı?',
-        views: '8,7B',
-        categoryId: 'genel',
-      ),
-      _KbQuestion(
-        text: 'İç ve dış parazit koruması nasıl planlanır?',
-        views: '7,3B',
-        categoryId: 'genel',
-      ),
-      _KbQuestion(
-        text: 'Evde sağlık takibi için nelere dikkat etmeliyim?',
-        views: '5,5B',
-        categoryId: 'genel',
-      ),
-    ],
-  };
-
-  static const _articles = <_KbArticle>[
-    _KbArticle(
-      tag: 'Beslenme',
-      tagColor: Color(0xFF00A859),
-      title: 'Kedilerde Doğru Beslenme Rehberi',
-      minutes: 5,
-      imagePath: 'assets/images/bilgi_beslenme.png',
-    ),
-    _KbArticle(
-      tag: 'Sağlık',
-      tagColor: Color(0xFF9B4DCA),
-      title: 'Kedilerde En Sık Görülen Hastalıklar',
-      minutes: 7,
-      imagePath: 'assets/images/bilgi_saglik.png',
-    ),
-    _KbArticle(
-      tag: 'Bakım',
-      tagColor: Color(0xFFFF6600),
-      title: 'Tüy Bakımı Nasıl Yapılmalı?',
-      minutes: 4,
-      imagePath: 'assets/images/bilgi_bakim.png',
-    ),
-    _KbArticle(
-      tag: 'Aşı',
-      tagColor: Color(0xFF1E90FF),
-      title: 'Aşı Takvimi ve Koruyucu Hekimlik',
-      minutes: 6,
-      imagePath: 'assets/images/bilgi_asi_koruma.png',
-    ),
-  ];
-
-  List<_KbQuestion> get _visibleQuestions {
+  List<AppKnowledgeQuestion> _visibleQuestions(
+    List<AppKnowledgeQuestion> all,
+  ) {
     final id = _selectedCategoryId;
-    if (id == null || id == 'tumu') return _featuredQuestions;
-    return _questionsByCategory[id] ?? _featuredQuestions;
+    if (id == null || id == 'tumu') {
+      final featured = all.where((item) => item.featured).toList();
+      if (featured.isNotEmpty) return featured.take(4).toList();
+      return all.take(4).toList();
+    }
+    return all.where((item) => item.topicId == id).take(4).toList();
   }
 
   String get _questionsTitle {
@@ -267,6 +111,13 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
         _selectedCategoryId = id;
       }
     });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(KnowledgeArticleRepository.instance.ensureDefaults());
+    unawaited(KnowledgeContentRepository.instance.ensureDefaults());
   }
 
   @override
@@ -457,75 +308,94 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
   }
 
   Widget _buildQuestionsSection() {
-    final questions = _visibleQuestions;
-    return Column(
-      children: [
-        Row(
+    return StreamBuilder<List<AppKnowledgeQuestion>>(
+      stream: KnowledgeContentRepository.instance.watchActiveQuestions(),
+      builder: (context, snapshot) {
+        final questions = _visibleQuestions(
+          snapshot.data ?? AppKnowledgeQuestion.defaults(),
+        );
+        return Column(
           children: [
-            const Icon(Icons.pets_rounded, color: AppColors.primary, size: 15),
-            const SizedBox(width: 4),
-            Expanded(
-              child: Text(
-                _questionsTitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: AppTextStyles.sectionHeader,
-              ),
+            Row(
+              children: [
+                const Icon(Icons.pets_rounded, color: AppColors.primary, size: 15),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    _questionsTitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.sectionHeader,
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => FeaturedQuestionsScreen(
+                          initialTopicId: _selectedCategoryId ?? 'sindirim',
+                        ),
+                      ),
+                    );
+                  },
+                  child: const Row(
+                    children: [
+                      Text(
+                        'Tümünü Gör',
+                        style: AppTextStyles.seeAllAction,
+                      ),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        color: AppColors.primary,
+                        size: 20,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            GestureDetector(
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const FeaturedQuestionsScreen(),
-                  ),
-                );
-              },
-              child: const Row(
-                children: [
-                  Text(
-                    'Tümünü Gör',
-                    style: AppTextStyles.seeAllAction,
-                  ),
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    color: AppColors.primary,
-                    size: 20,
-                  ),
-                ],
+            const SizedBox(height: 8),
+            Container(
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: AppColors.border),
               ),
+              child: questions.isEmpty
+                  ? const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Text(
+                        'Bu konuda henüz soru yok.',
+                        style: TextStyle(color: AppColors.subText),
+                      ),
+                    )
+                  : Column(
+                      children: [
+                        for (int i = 0; i < questions.length; i++) ...[
+                          _buildQuestionRow(questions[i]),
+                          if (i != questions.length - 1)
+                            const Divider(height: 1, color: AppColors.border),
+                        ],
+                      ],
+                    ),
             ),
           ],
-        ),
-        const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Column(
-            children: [
-              for (int i = 0; i < questions.length; i++) ...[
-                _buildQuestionRow(questions[i]),
-                if (i != questions.length - 1)
-                  const Divider(height: 1, color: AppColors.border),
-              ],
-            ],
-          ),
-        ),
-      ],
+        );
+      },
     );
   }
 
-  Widget _buildQuestionRow(_KbQuestion q) {
+  Widget _buildQuestionRow(AppKnowledgeQuestion q) {
     return GestureDetector(
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => QuestionDetailScreen(
-              question: q.text,
+              question: q.title,
               views: q.views,
-              topicTitle: _questionsTitle,
+              topicTitle: q.topicTitle,
+              answer: q.answer,
+              tips: q.tips,
             ),
           ),
         );
@@ -554,7 +424,7 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    q.text,
+                    q.title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -638,32 +508,36 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
           ],
         ),
         const SizedBox(height: 8),
-        SizedBox(
-          height: 120,
-          child: Row(
-            children: [
-              for (int i = 0; i < _articles.length; i++) ...[
-                if (i > 0) const SizedBox(width: 7),
-                Expanded(child: _buildArticleCard(_articles[i])),
-              ],
-            ],
-          ),
+        StreamBuilder<List<AppKnowledgeArticle>>(
+          stream: KnowledgeArticleRepository.instance.watchActive(),
+          builder: (context, snapshot) {
+            final articles = KnowledgeArticleRepository.hubArticles(
+              snapshot.data ?? AppKnowledgeArticle.defaults(),
+            );
+            if (articles.isEmpty) return const SizedBox.shrink();
+            return SizedBox(
+              height: 120,
+              child: Row(
+                children: [
+                  for (int i = 0; i < articles.length; i++) ...[
+                    if (i > 0) const SizedBox(width: 7),
+                    Expanded(child: _buildArticleCard(articles[i])),
+                  ],
+                ],
+              ),
+            );
+          },
         ),
       ],
     );
   }
 
-  Widget _buildArticleCard(_KbArticle article) {
+  Widget _buildArticleCard(AppKnowledgeArticle article) {
     return GestureDetector(
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => ArticleDetailScreen(
-              title: article.title,
-              category: article.tag,
-              imagePath: article.imagePath,
-              minutes: article.minutes,
-            ),
+            builder: (_) => ArticleDetailScreen.fromArticle(article),
           ),
         );
       },
@@ -681,21 +555,18 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
               child: Stack(
                 children: [
                   Positioned.fill(
-                    child: Image.asset(
-                      article.imagePath,
+                    child: buildProductImage(
+                      article.displayImage,
                       fit: BoxFit.cover,
-                      // Görselin içindeki hazır etiket kırpılsın, pill kod ile çizilir
                       alignment: Alignment.bottomCenter,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          color: AppColors.selected,
-                          alignment: Alignment.center,
-                          child: const Icon(
-                            Icons.image_outlined,
-                            color: AppColors.subText,
-                          ),
-                        );
-                      },
+                      errorWidget: Container(
+                        color: AppColors.selected,
+                        alignment: Alignment.center,
+                        child: const Icon(
+                          Icons.image_outlined,
+                          color: AppColors.subText,
+                        ),
+                      ),
                     ),
                   ),
                   Positioned(
@@ -710,13 +581,13 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
                         color: AppColors.surface,
                         borderRadius: BorderRadius.circular(999),
                         border: Border.all(
-                          color: article.tagColor.withValues(alpha: 0.35),
+                          color: article.categoryColor.withValues(alpha: 0.35),
                         ),
                       ),
                       child: Text(
-                        article.tag,
+                        article.categoryTitle,
                         style: TextStyle(
-                          color: article.tagColor,
+                          color: article.categoryColor,
                           fontSize: 7,
                           fontWeight: FontWeight.w800,
                         ),
@@ -788,30 +659,3 @@ class _KbCategory {
   final String? iconPath;
 }
 
-class _KbQuestion {
-  const _KbQuestion({
-    required this.text,
-    required this.views,
-    required this.categoryId,
-  });
-
-  final String text;
-  final String views;
-  final String categoryId;
-}
-
-class _KbArticle {
-  const _KbArticle({
-    required this.tag,
-    required this.tagColor,
-    required this.title,
-    required this.minutes,
-    required this.imagePath,
-  });
-
-  final String tag;
-  final Color tagColor;
-  final String title;
-  final int minutes;
-  final String imagePath;
-}

@@ -58,6 +58,12 @@ class AuthStore extends ChangeNotifier {
   bool get isEmailVerified =>
       _emailVerified || _auth.currentUser?.emailVerified == true;
 
+  bool get hasPasswordProvider {
+    final user = _auth.currentUser;
+    if (user == null) return false;
+    return user.providerData.any((info) => info.providerId == 'password');
+  }
+
   String get firstName {
     final parts = _fullName.trim().split(RegExp(r'\s+'));
     return parts.isEmpty ? '' : parts.first;
@@ -269,7 +275,7 @@ class AuthStore extends ChangeNotifier {
         'email': email.trim().toLowerCase(),
         'code': code.trim(),
       });
-      _email = email.trim();
+      _email = email.trim().toLowerCase();
       _emailVerified = true;
       notifyListeners();
       await updateProfile(email: _email);
@@ -278,6 +284,96 @@ class AuthStore extends ChangeNotifier {
         code: e.code,
         message: e.message ?? 'E-posta doğrulanamadı.',
       );
+    } finally {
+      _setBusy(false);
+    }
+  }
+
+  Future<void> setAccountPassword(String password) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw FirebaseAuthException(
+        code: 'unauthenticated',
+        message: 'Giriş yapın.',
+      );
+    }
+    final next = password.trim();
+    if (next.length < 6) {
+      throw FirebaseAuthException(
+        code: 'weak-password',
+        message: 'Şifre en az 6 karakter olmalı.',
+      );
+    }
+    if (!isEmailVerified) {
+      throw FirebaseAuthException(
+        code: 'failed-precondition',
+        message: 'Önce e-posta adresinizi doğrulayın.',
+      );
+    }
+    _setBusy(true);
+    try {
+      await _functions.httpsCallable('setEmailPassword').call({
+        'password': next,
+      });
+      await user.reload();
+      notifyListeners();
+    } on FirebaseFunctionsException catch (e) {
+      throw FirebaseAuthException(
+        code: e.code,
+        message: e.message ?? 'Şifre kaydedilemedi.',
+      );
+    } finally {
+      _setBusy(false);
+    }
+  }
+
+  Future<void> signInWithEmail({
+    required String email,
+    required String password,
+  }) async {
+    final normalized = email.trim().toLowerCase();
+    if (normalized.isEmpty || !normalized.contains('@')) {
+      throw FirebaseAuthException(
+        code: 'invalid-email',
+        message: 'Geçerli bir e-posta girin.',
+      );
+    }
+    if (password.trim().length < 6) {
+      throw FirebaseAuthException(
+        code: 'weak-password',
+        message: 'Şifrenizi girin.',
+      );
+    }
+    _setBusy(true);
+    try {
+      final cred = await _auth.signInWithEmailAndPassword(
+        email: normalized,
+        password: password,
+      );
+      final user = cred.user;
+      if (user == null) {
+        throw FirebaseAuthException(
+          code: 'null-user',
+          message: 'Giriş başarısız.',
+        );
+      }
+      _uid = user.uid;
+      _email = user.email ?? normalized;
+      _isLoggedIn = true;
+      _authReady = true;
+      notifyListeners();
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'user-not-found' ||
+          e.code == 'wrong-password' ||
+          e.code == 'invalid-credential' ||
+          e.code == 'invalid-login-credentials') {
+        throw FirebaseAuthException(
+          code: 'invalid-credential',
+          message:
+              'E-posta veya şifre hatalı. E-posta ile giriş için önce telefonla girip e-postanı doğrula ve şifre belirle.',
+        );
+      }
+      rethrow;
     } finally {
       _setBusy(false);
     }
@@ -455,9 +551,20 @@ class AuthStore extends ChangeNotifier {
         case 'user-not-found':
         case 'not-found':
           return 'Bu telefon numarası sistemde kayıtlı değil. Önce kayıt olun.';
-        case 'missing-verification':
+        case 'wrong-password':
+        case 'invalid-credential':
+        case 'invalid-login-credentials':
+          return 'E-posta veya şifre hatalı. E-posta ile giriş için doğrulanmış e-posta ve şifre gerekir.';
+        case 'weak-password':
+          return error.message ?? 'Şifre en az 6 karakter olmalı.';
+        case 'unauthenticated':
+          return error.message ?? 'Giriş yapın.';
         case 'failed-precondition':
-          return 'Önce “Kod Gönder”e basıp SMS kodunu alın.';
+        case 'missing-verification':
+          final preMsg = error.message ?? '';
+          return preMsg.isNotEmpty
+              ? preMsg
+              : 'Önce “Kod Gönder”e basıp SMS kodunu alın.';
         case 'missing-client-identifier':
         case 'app-not-authorized':
           if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {

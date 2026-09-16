@@ -15,6 +15,7 @@ class LastOrderItem {
     required this.oldPrice,
     required this.imagePath,
     this.quantity = 1,
+    this.brand = '',
   });
 
   final String id;
@@ -25,6 +26,7 @@ class LastOrderItem {
   final double oldPrice;
   final String imagePath;
   final int quantity;
+  final String brand;
 
   Map<String, dynamic> toMap() => {
         'id': id,
@@ -35,6 +37,7 @@ class LastOrderItem {
         'oldPrice': oldPrice,
         'imagePath': imagePath,
         'quantity': quantity,
+        'brand': brand,
       };
 
   factory LastOrderItem.fromMap(Map<String, dynamic> data) {
@@ -47,6 +50,7 @@ class LastOrderItem {
       oldPrice: (data['oldPrice'] as num?)?.toDouble() ?? 0,
       imagePath: (data['imagePath'] as String?) ?? '',
       quantity: (data['quantity'] as num?)?.toInt() ?? 1,
+      brand: (data['brand'] as String?) ?? '',
     );
   }
 }
@@ -139,6 +143,7 @@ class OrderStore extends ChangeNotifier {
               oldPrice: item.oldPrice,
               imagePath: item.imagePath,
               quantity: item.quantity,
+              brand: item.brand?.trim() ?? '',
             ),
           )
           .toList(),

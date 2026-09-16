@@ -12,6 +12,7 @@ import 'package:geliyor_app/widgets/app_notification_button.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
 import 'package:geliyor_app/widgets/app_pressable_button.dart';
 import 'package:geliyor_app/widgets/cart_product_card.dart';
+import 'package:geliyor_app/widgets/pet_photo.dart';
 
 enum _FavoriteTab { products, pets, categories }
 
@@ -119,11 +120,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                                 .map(
                                   (pet) => Padding(
                                     padding: const EdgeInsets.only(bottom: 10),
-                                    child: _buildPetCard(
-                                      pet.name,
-                                      pet.species,
-                                      pet.imagePath,
-                                    ),
+                                    child: _buildPetCard(pet),
                                   ),
                                 )
                                 .toList(),
@@ -410,7 +407,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     );
   }
 
-  Widget _buildPetCard(String name, String species, String imagePath) {
+  Widget _buildPetCard(PetData pet) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -427,14 +424,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
               shape: BoxShape.circle,
               border: Border.all(color: AppColors.border, width: 2),
             ),
-            child: ClipOval(
-              child: Image.asset(
-                imagePath,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) =>
-                    const Icon(Icons.pets_rounded, color: AppColors.primary),
-              ),
-            ),
+            clipBehavior: Clip.antiAlias,
+            child: PetPhoto(pet: pet, iconSize: 22),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -442,7 +433,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  name,
+                  pet.name,
                   style: const TextStyle(
                     color: AppColors.text,
                     fontSize: 13,
@@ -450,7 +441,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                   ),
                 ),
                 Text(
-                  species,
+                  pet.species,
                   style: const TextStyle(
                     color: AppColors.subText,
                     fontSize: 10,

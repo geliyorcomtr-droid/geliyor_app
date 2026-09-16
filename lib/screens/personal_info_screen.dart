@@ -157,13 +157,13 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     Navigator.of(context).maybePop();
   }
 
-  void _savePassword() {
+  Future<void> _savePassword() async {
     FocusScope.of(context).unfocus();
-    final current = _currentPasswordController.text.trim();
     final next = _newPasswordController.text.trim();
     final confirm = _confirmPasswordController.text.trim();
+    final hasPassword = AuthStore.instance.hasPasswordProvider;
 
-    if (current.isEmpty || next.isEmpty || confirm.isEmpty) {
+    if (next.isEmpty || confirm.isEmpty || (hasPassword && _currentPasswordController.text.trim().isEmpty)) {
       setState(() => _formError = 'Lütfen tüm şifre alanlarını doldurun.');
       return;
     }
@@ -175,14 +175,34 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
       setState(() => _formError = 'Yeni şifreler birbiriyle eşleşmiyor.');
       return;
     }
+    if (!AuthStore.instance.isEmailVerified) {
+      setState(() => _formError = 'Önce e-posta adresinizi doğrulayın.');
+      return;
+    }
+
+    try {
+      await AuthStore.instance.setAccountPassword(next);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _formError = AuthStore.friendlyError(error));
+      return;
+    }
+    if (!mounted) return;
 
     setState(() {
       _formError = null;
       _securitySection = _SecuritySection.none;
+      _currentPasswordController.clear();
+      _newPasswordController.clear();
+      _confirmPasswordController.clear();
     });
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Şifren güncellendi.'),
+      SnackBar(
+        content: Text(
+          hasPassword
+              ? 'Şifren güncellendi.'
+              : 'Şifren kaydedildi. Artık e-posta ile giriş yapabilirsin.',
+        ),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -344,13 +364,19 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
 
   Widget _buildHeader() {
     final title = switch (_securitySection) {
-      _SecuritySection.password => 'Şifre Güncelle',
+      _SecuritySection.password =>
+        AuthStore.instance.hasPasswordProvider
+            ? 'Şifre Güncelle'
+            : 'Şifre Belirle',
       _SecuritySection.phone => 'Telefon Doğrulama',
       _SecuritySection.email => 'E-posta Doğrulama',
       _SecuritySection.none => 'Kişisel Bilgilerim',
     };
     final subtitle = switch (_securitySection) {
-      _SecuritySection.password => 'Hesabını korumak için şifreni yenile.',
+      _SecuritySection.password =>
+        AuthStore.instance.hasPasswordProvider
+            ? 'Hesabını korumak için şifreni yenile.'
+            : 'E-posta ile giriş için şifre belirle.',
       _SecuritySection.phone => 'Telefon numaranı güncelle ve doğrula.',
       _SecuritySection.email => 'E-posta adresini güncelle ve doğrula.',
       _SecuritySection.none => 'Hesap bilgilerini görüntüle ve düzenle.',
@@ -755,8 +781,25 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
           _buildSecurityRow(
             icon: Icons.lock_outline_rounded,
             title: 'Şifre',
-            subtitle: 'Giriş telefon ve SMS kodu ile yapılır. Şifre kullanılmaz.',
-            enabled: false,
+            subtitle: !_emailVerified
+                ? 'E-posta ile giriş için önce e-postanı doğrula.'
+                : AuthStore.instance.hasPasswordProvider
+                    ? 'E-posta ile giriş şifren kayıtlı.'
+                    : 'E-posta ile giriş için şifre belirle.',
+            onTap: () {
+              if (!_emailVerified) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Şifre belirlemek için önce e-posta adresini doğrula.',
+                    ),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+                return;
+              }
+              _openSecurity(_SecuritySection.password);
+            },
           ),
           _buildSecurityRow(
             icon: Icons.phone_android_outlined,
@@ -864,17 +907,20 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   }
 
   Widget _buildPasswordForm() {
+    final hasPassword = AuthStore.instance.hasPasswordProvider;
     return _buildFormCard(
       children: [
+        if (hasPassword) ...[
+          _buildSecureField(
+            label: 'Mevcut Şifre',
+            controller: _currentPasswordController,
+            obscure: _obscureCurrent,
+            onToggle: () => setState(() => _obscureCurrent = !_obscureCurrent),
+          ),
+          const SizedBox(height: 10),
+        ],
         _buildSecureField(
-          label: 'Mevcut Şifre',
-          controller: _currentPasswordController,
-          obscure: _obscureCurrent,
-          onToggle: () => setState(() => _obscureCurrent = !_obscureCurrent),
-        ),
-        const SizedBox(height: 10),
-        _buildSecureField(
-          label: 'Yeni Şifre',
+          label: hasPassword ? 'Yeni Şifre' : 'Şifre',
           controller: _newPasswordController,
           obscure: _obscureNew,
           onToggle: () => setState(() => _obscureNew = !_obscureNew),
@@ -1003,7 +1049,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                 : () {
                     switch (_securitySection) {
                       case _SecuritySection.password:
-                        _savePassword();
+                        unawaited(_savePassword());
                       case _SecuritySection.phone:
                         if (_otpSent) {
                           unawaited(_verifyOtp(forPhone: true));
@@ -1026,7 +1072,10 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
               busy
                   ? 'Gönderiliyor...'
                   : switch (_securitySection) {
-                      _SecuritySection.password => 'Şifreyi Güncelle',
+                      _SecuritySection.password =>
+                        AuthStore.instance.hasPasswordProvider
+                            ? 'Şifreyi Güncelle'
+                            : 'Şifreyi Kaydet',
                       _SecuritySection.phone ||
                       _SecuritySection.email =>
                         _otpSent ? 'Doğrula' : 'Kod Gönder',

@@ -14,8 +14,10 @@ enum AdminPage {
   coupons,
   broadcasts,
   banners,
+  knowledge,
   support,
   bankTransfer,
+  adoption,
 }
 
 class AdminNavChild {
@@ -24,12 +26,18 @@ class AdminNavChild {
     required this.label,
     this.orderStatus,
     this.newProduct = false,
+    this.bannerGroup,
+    this.knowledgeGroup,
+    this.adoptionStatus,
   });
 
   final AdminPage page;
   final String label;
   final String? orderStatus;
   final bool newProduct;
+  final String? bannerGroup;
+  final String? knowledgeGroup;
+  final String? adoptionStatus;
 }
 
 class AdminNavItem {
@@ -129,6 +137,149 @@ const adminNavItems = <AdminNavItem>[
     label: 'Bannerlar',
     icon: Icons.image_rounded,
     accent: AdminAccents.banners,
+    children: [
+      AdminNavChild(
+        page: AdminPage.banners,
+        label: 'Tüm sayfalar',
+        bannerGroup: 'all',
+      ),
+      AdminNavChild(
+        page: AdminPage.banners,
+        label: 'Ana Sayfa',
+        bannerGroup: 'home',
+      ),
+      AdminNavChild(
+        page: AdminPage.banners,
+        label: 'Dost Ekle',
+        bannerGroup: 'dost_ekle',
+      ),
+      AdminNavChild(
+        page: AdminPage.banners,
+        label: 'Pet Market',
+        bannerGroup: 'pet_market',
+      ),
+      AdminNavChild(
+        page: AdminPage.banners,
+        label: 'Sahiplendirme',
+        bannerGroup: 'sahiplendirme',
+      ),
+      AdminNavChild(
+        page: AdminPage.banners,
+        label: 'Pet E-nabız',
+        bannerGroup: 'health',
+      ),
+      AdminNavChild(
+        page: AdminPage.banners,
+        label: 'Akıllı Plan',
+        bannerGroup: 'smart_plan',
+      ),
+      AdminNavChild(
+        page: AdminPage.banners,
+        label: 'Kolay Sipariş',
+        bannerGroup: 'easy_order',
+      ),
+      AdminNavChild(
+        page: AdminPage.banners,
+        label: 'Mama Takibi',
+        bannerGroup: 'food_tracking',
+      ),
+      AdminNavChild(
+        page: AdminPage.banners,
+        label: 'Kampanya & Puan',
+        bannerGroup: 'campaigns_points',
+      ),
+      AdminNavChild(
+        page: AdminPage.banners,
+        label: 'Asistan',
+        bannerGroup: 'assistant',
+      ),
+      AdminNavChild(
+        page: AdminPage.banners,
+        label: 'Bilgi Bankası',
+        bannerGroup: 'knowledge',
+      ),
+      AdminNavChild(
+        page: AdminPage.banners,
+        label: 'Makaleler',
+        bannerGroup: 'articles',
+      ),
+      AdminNavChild(
+        page: AdminPage.banners,
+        label: 'Dostunu Tanıyalım',
+        bannerGroup: 'meet_pet',
+      ),
+      AdminNavChild(
+        page: AdminPage.banners,
+        label: 'Acil Destek',
+        bannerGroup: 'emergency',
+      ),
+      AdminNavChild(
+        page: AdminPage.banners,
+        label: 'İlaç & Tedavi',
+        bannerGroup: 'medicine',
+      ),
+      AdminNavChild(
+        page: AdminPage.banners,
+        label: 'Aşı Takvimi',
+        bannerGroup: 'vaccine',
+      ),
+      AdminNavChild(
+        page: AdminPage.banners,
+        label: 'Öne Çıkan Sorular',
+        bannerGroup: 'featured_questions',
+      ),
+      AdminNavChild(
+        page: AdminPage.banners,
+        label: 'Tüm Konular',
+        bannerGroup: 'all_topics',
+      ),
+    ],
+  ),
+  AdminNavItem(
+    page: AdminPage.knowledge,
+    label: 'Bilgi Bankası',
+    icon: Icons.menu_book_rounded,
+    accent: AdminAccents.knowledge,
+    children: [
+      AdminNavChild(
+        page: AdminPage.knowledge,
+        label: 'Tüm Konular',
+        knowledgeGroup: 'topics',
+      ),
+      AdminNavChild(
+        page: AdminPage.knowledge,
+        label: 'Öne Çıkan Sorular',
+        knowledgeGroup: 'questions',
+      ),
+      AdminNavChild(
+        page: AdminPage.knowledge,
+        label: 'Makaleler',
+        knowledgeGroup: 'articles',
+      ),
+    ],
+  ),
+  AdminNavItem(
+    page: AdminPage.adoption,
+    label: 'Sahiplendirme',
+    icon: Icons.pets_rounded,
+    accent: AdminAccents.adoption,
+    children: [
+      AdminNavChild(
+        page: AdminPage.adoption,
+        label: 'Bekleyen',
+        adoptionStatus: 'pending',
+      ),
+      AdminNavChild(
+        page: AdminPage.adoption,
+        label: 'Yayında',
+        adoptionStatus: 'approved',
+      ),
+      AdminNavChild(
+        page: AdminPage.adoption,
+        label: 'Reddedilen',
+        adoptionStatus: 'rejected',
+      ),
+    ],
   ),
   AdminNavItem(
     page: AdminPage.support,
@@ -144,7 +295,12 @@ const adminNavItems = <AdminNavItem>[
   ),
 ];
 
-String adminPageTitle(AdminPage page, {String? orderStatus}) {
+String adminPageTitle(
+  AdminPage page, {
+  String? orderStatus,
+  String? knowledgeGroup,
+  String? adoptionStatus,
+}) {
   return switch (page) {
     AdminPage.dashboard => 'Panel',
     AdminPage.orders => switch (orderStatus) {
@@ -164,7 +320,18 @@ String adminPageTitle(AdminPage page, {String? orderStatus}) {
     AdminPage.coupons => 'Kuponlar',
     AdminPage.broadcasts => 'Duyurular',
     AdminPage.banners => 'Sayfa bannerları',
+    AdminPage.knowledge => switch (knowledgeGroup) {
+      'questions' => 'Öne Çıkan Sorular',
+      'articles' => 'Makaleler',
+      _ => 'Tüm Konular',
+    },
     AdminPage.support => 'Müşteri talepleri',
+    AdminPage.adoption => switch (adoptionStatus) {
+      'approved' => 'Yayındaki ilanlar',
+      'rejected' => 'Reddedilen ilanlar',
+      'pending' => 'Onay bekleyen ilanlar',
+      _ => 'Sahiplendirme ilanları',
+    },
     AdminPage.bankTransfer => 'Havale / EFT',
   };
 }

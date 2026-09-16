@@ -3,6 +3,7 @@ import 'package:geliyor_app/admin/admin_auth.dart';
 import 'package:geliyor_app/admin/admin_models.dart';
 import 'package:geliyor_app/admin/admin_nav.dart';
 import 'package:geliyor_app/admin/admin_theme.dart';
+import 'package:geliyor_app/admin/screens/admin_adoption_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_bank_transfer_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_banners_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_brands_screen.dart';
@@ -11,6 +12,7 @@ import 'package:geliyor_app/admin/screens/admin_campaigns_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_categories_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_coupons_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_dashboard_screen.dart';
+import 'package:geliyor_app/admin/screens/admin_knowledge_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_members_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_orders_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_product_advantages_screen.dart';
@@ -30,12 +32,18 @@ class AdminShell extends StatefulWidget {
 class _AdminShellState extends State<AdminShell> {
   AdminPage _page = AdminPage.dashboard;
   String? _orderStatus;
+  String? _bannerGroup;
+  String? _knowledgeGroup;
+  String? _adoptionStatus;
   bool _productFormOpen = false;
   AdminProduct? _editingProduct;
   final Set<AdminPage> _expanded = {
     AdminPage.orders,
     AdminPage.products,
     AdminPage.campaigns,
+    AdminPage.banners,
+    AdminPage.knowledge,
+    AdminPage.adoption,
   };
 
   void _go(
@@ -43,10 +51,22 @@ class _AdminShellState extends State<AdminShell> {
     String? orderStatus,
     bool newProduct = false,
     AdminProduct? product,
+    String? bannerGroup,
+    String? knowledgeGroup,
+    String? adoptionStatus,
   }) {
     setState(() {
       _page = page;
       _orderStatus = page == AdminPage.orders ? orderStatus : null;
+      _bannerGroup = page == AdminPage.banners
+          ? (bannerGroup ?? 'all')
+          : null;
+      _knowledgeGroup = page == AdminPage.knowledge
+          ? (knowledgeGroup ?? 'topics')
+          : null;
+      _adoptionStatus = page == AdminPage.adoption
+          ? (adoptionStatus ?? 'pending')
+          : null;
       if (newProduct) {
         _page = AdminPage.products;
         _productFormOpen = true;
@@ -106,8 +126,19 @@ class _AdminShellState extends State<AdminShell> {
       AdminPage.campaigns => const AdminCampaignsScreen(),
       AdminPage.coupons => const AdminCouponsScreen(),
       AdminPage.broadcasts => const AdminBroadcastsScreen(),
-      AdminPage.banners => const AdminBannersScreen(),
+      AdminPage.banners => AdminBannersScreen(
+        key: ValueKey(_bannerGroup ?? 'all'),
+        initialGroup: _bannerGroup ?? 'all',
+      ),
+      AdminPage.knowledge => AdminKnowledgeScreen(
+        key: ValueKey(_knowledgeGroup ?? 'topics'),
+        initialGroup: _knowledgeGroup ?? 'topics',
+      ),
       AdminPage.support => const AdminSupportScreen(),
+      AdminPage.adoption => AdminAdoptionScreen(
+        key: ValueKey(_adoptionStatus ?? 'pending'),
+        initialStatus: _adoptionStatus ?? 'pending',
+      ),
       AdminPage.bankTransfer => const AdminBankTransferScreen(),
     };
   }
@@ -193,6 +224,18 @@ class _AdminShellState extends State<AdminShell> {
     if (child.newProduct) return _productFormOpen;
     if (child.page == AdminPage.products) {
       return _page == AdminPage.products && !_productFormOpen;
+    }
+    if (child.page == AdminPage.banners) {
+      return _page == AdminPage.banners &&
+          _bannerGroup == (child.bannerGroup ?? 'all');
+    }
+    if (child.page == AdminPage.knowledge) {
+      return _page == AdminPage.knowledge &&
+          _knowledgeGroup == (child.knowledgeGroup ?? 'topics');
+    }
+    if (child.page == AdminPage.adoption) {
+      return _page == AdminPage.adoption &&
+          _adoptionStatus == (child.adoptionStatus ?? 'pending');
     }
     return _page == child.page && _orderStatus == child.orderStatus;
   }
@@ -283,6 +326,9 @@ class _AdminShellState extends State<AdminShell> {
                           child.page,
                           orderStatus: child.orderStatus,
                           newProduct: child.newProduct,
+                          bannerGroup: child.bannerGroup,
+                          knowledgeGroup: child.knowledgeGroup,
+                          adoptionStatus: child.adoptionStatus,
                         ),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(
@@ -323,7 +369,12 @@ class _AdminShellState extends State<AdminShell> {
           Text(
             _productFormOpen
                 ? (_editingProduct == null ? 'Yeni ürün' : 'Ürünü düzenle')
-                : adminPageTitle(_page, orderStatus: _orderStatus),
+                : adminPageTitle(
+                    _page,
+                    orderStatus: _orderStatus,
+                    knowledgeGroup: _knowledgeGroup,
+                    adoptionStatus: _adoptionStatus,
+                  ),
             style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w800,

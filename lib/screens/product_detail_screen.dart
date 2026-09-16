@@ -231,6 +231,66 @@ class ProductDetailScreen extends StatelessWidget {
     return 'cat';
   }
 
+  void _openFullscreenImage(BuildContext context) {
+    InfoGuideSheet.showCentered(
+      context,
+      builder: (sheetContext) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: Column(
+            children: [
+              SizedBox(
+                height: 32,
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: GestureDetector(
+                    onTap: () => Navigator.of(sheetContext).pop(),
+                    behavior: HitTestBehavior.opaque,
+                    child: const SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: Icon(
+                        Icons.close_rounded,
+                        color: AppColors.text,
+                        size: 22,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => Navigator.of(sheetContext).pop(),
+                  behavior: HitTestBehavior.opaque,
+                  child: Center(
+                    child: buildProductImage(
+                      _productImagePath,
+                      fit: BoxFit.contain,
+                      width: double.infinity,
+                      height: double.infinity,
+                      alignment: Alignment.center,
+                      filterQuality: FilterQuality.high,
+                      useHtmlElement: false,
+                      cacheWidth: productPhotoCachePx,
+                      errorWidget: const Center(
+                        child: Icon(
+                          Icons.image_outlined,
+                          size: 72,
+                          color: AppColors.subText,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   void _openFeatureProducts(
     BuildContext context, {
     String? feature,
@@ -339,10 +399,28 @@ class ProductDetailScreen extends StatelessWidget {
           live = items.first;
         }
 
+        if (snapshot.hasData && seedId.isNotEmpty && live == null) {
+          return Scaffold(
+            backgroundColor: AppColors.surface,
+            body: AppPageFrame.standard(
+              backgroundColor: AppColors.surface,
+              header: const AppPageHeader(title: 'Ürün Detay'),
+              content: const Center(
+                child: Text(
+                  'Bu ürün şu an stokta yok.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: AppColors.subText,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+
         return ProductDetailScreen(
-          key: ValueKey(
-            'live-${live?.id ?? seedId}-${live?.skt ?? ''}-${live?.prices.join(',') ?? ''}',
-          ),
           product: live ?? seed,
           listenLive: false,
         );
@@ -983,7 +1061,7 @@ class ProductDetailScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(child: _buildGallery()),
+          Expanded(child: _buildGallery(context)),
           const SizedBox(height: 6),
           SizedBox(height: _titleBlockHeight, child: _buildTitleBlock(context)),
           const SizedBox(height: 8),
@@ -997,7 +1075,7 @@ class ProductDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildGallery() {
+  Widget _buildGallery(BuildContext context) {
     return SizedBox.expand(
       child: ClipRect(
         child: Stack(
@@ -1006,19 +1084,24 @@ class ProductDetailScreen extends StatelessWidget {
             Positioned.fill(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(6, 4, 6, 10),
-                child: buildProductImage(
-                  _productImagePath,
-                  fit: BoxFit.contain,
-                  width: double.infinity,
-                  height: double.infinity,
-                  alignment: Alignment.center,
-                  filterQuality: FilterQuality.high,
-                  useHtmlElement: false,
-                  errorWidget: const Center(
-                    child: Icon(
-                      Icons.image_outlined,
-                      size: 72,
-                      color: AppColors.subText,
+                child: GestureDetector(
+                  onTap: () => _openFullscreenImage(context),
+                  behavior: HitTestBehavior.opaque,
+                  child: buildProductImage(
+                    _productImagePath,
+                    fit: BoxFit.contain,
+                    width: double.infinity,
+                    height: double.infinity,
+                    alignment: Alignment.center,
+                    filterQuality: FilterQuality.medium,
+                    useHtmlElement: false,
+                    cacheWidth: productPhotoCachePx,
+                    errorWidget: const Center(
+                      child: Icon(
+                        Icons.image_outlined,
+                        size: 72,
+                        color: AppColors.subText,
+                      ),
                     ),
                   ),
                 ),

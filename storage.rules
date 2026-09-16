@@ -55,12 +55,44 @@ service firebase.storage {
         && request.resource.contentType.matches('image/.*');
     }
 
+    match /banners/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAdmin()
+        && request.resource.size < 8 * 1024 * 1024;
+    }
+
+    match /knowledge_articles/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAdmin()
+        && request.resource.size < 8 * 1024 * 1024;
+    }
+
+    match /knowledge_topics/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAdmin()
+        && request.resource.size < 8 * 1024 * 1024;
+    }
+
     match /supply_requests/{userId}/{allPaths=**} {
       allow read: if true;
       allow write: if signedIn()
         && request.auth.uid == userId
         && request.resource.size < 8 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
+    }
+
+    match /pet_photos/{userId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.size < 8 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    match /adoption_listings/{userId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if (signedIn() && request.auth.uid == userId)
+        || isAdmin();
     }
   }
 }

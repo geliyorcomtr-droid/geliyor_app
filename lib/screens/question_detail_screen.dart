@@ -14,11 +14,15 @@ class QuestionDetailScreen extends StatelessWidget {
     required this.question,
     required this.views,
     required this.topicTitle,
+    this.answer = '',
+    this.tips = const [],
   });
 
   final String question;
   final String views;
   final String topicTitle;
+  final String answer;
+  final List<String> tips;
 
   bool get _showFeedingTable {
     final q = question.toLowerCase();
@@ -284,29 +288,33 @@ class QuestionDetailScreen extends StatelessWidget {
           SizedBox(height: 8),
           Text(
             _answerLead,
-            style: TextStyle(
+            style: const TextStyle(
               color: AppColors.text,
               fontSize: 12,
               fontWeight: FontWeight.w500,
               height: 1.45,
             ),
           ),
-          SizedBox(height: 8),
-          Text(
-            _answerFollow,
-            style: TextStyle(
-              color: AppColors.text,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              height: 1.45,
+          if (_answerFollow.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              _answerFollow,
+              style: const TextStyle(
+                color: AppColors.text,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                height: 1.45,
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
   }
 
   String get _answerLead {
+    final custom = answer.trim();
+    if (custom.isNotEmpty) return custom;
     if (_showFeedingTable) {
       return 'Yetişkin kedilerde günlük kuru mama ihtiyacı vücut ağırlığına göre değişir. '
           'Örneğin 3 kg bir kedi günde yaklaşık 50 g, 5 kg bir kedi 70 g, 8 kg bir kedi 100 g yer. '
@@ -319,6 +327,7 @@ class QuestionDetailScreen extends StatelessWidget {
   }
 
   String get _answerFollow {
+    if (answer.trim().isNotEmpty) return '';
     if (_showFeedingTable) {
       return 'Değerler ortalama rehberdir; mama kalorisi, kısırlık, aktivite ve '
           'yaş mama/ödül miktarına göre porsiyonu ayarlayın. Ani kilo değişiminde '
@@ -330,12 +339,14 @@ class QuestionDetailScreen extends StatelessWidget {
   }
 
   Widget _buildTipsCard() {
-    const tips = <String>[
-      'Temiz ve taze suya sürekli erişim sağlayın.',
-      'Mama değişimini 5–7 günde kademeli yapın.',
-      'Ani davranış değişikliklerini not edin.',
-      'Şüphede kalırsanız veterinerinize danışın.',
-    ];
+    final tips = this.tips.isNotEmpty
+        ? this.tips
+        : const <String>[
+            'Temiz ve taze suya sürekli erişim sağlayın.',
+            'Mama değişimini 5–7 günde kademeli yapın.',
+            'Ani davranış değişikliklerini not edin.',
+            'Şüphede kalırsanız veterinerinize danışın.',
+          ];
 
     return Container(
       width: double.infinity,

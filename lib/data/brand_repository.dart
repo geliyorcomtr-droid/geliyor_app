@@ -1,4 +1,8 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
+import 'package:geliyor_app/data/brand_feeding_guide.dart';
 import 'package:geliyor_app/data/firestore_collections.dart';
 
 class AppBrand {
@@ -9,6 +13,7 @@ class AppBrand {
     this.assetPath = '',
     this.order = 0,
     this.active = true,
+    this.feeding = BrandFeedingGuide.empty,
   });
 
   final String id;
@@ -17,6 +22,7 @@ class AppBrand {
   final String assetPath;
   final int order;
   final bool active;
+  final BrandFeedingGuide feeding;
 
   factory AppBrand.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? {};
@@ -27,17 +33,27 @@ class AppBrand {
       assetPath: (data[BrandFields.assetPath] as String?) ?? '',
       order: (data[BrandFields.order] as num?)?.toInt() ?? 0,
       active: data[BrandFields.active] as bool? ?? true,
+      feeding: BrandFeedingGuide.fromFirestore(
+        data[BrandFields.feedingCat],
+        data[BrandFields.feedingDog],
+      ),
     );
   }
 
   Map<String, dynamic> toMap() => {
-    BrandFields.name: name.trim(),
-    BrandFields.imageUrl: imageUrl.trim(),
-    BrandFields.assetPath: assetPath.trim(),
-    BrandFields.order: order,
-    BrandFields.active: active,
-    BrandFields.updatedAt: FieldValue.serverTimestamp(),
-  };
+        BrandFields.name: name.trim(),
+        BrandFields.imageUrl: imageUrl.trim(),
+        BrandFields.assetPath: assetPath.trim(),
+        BrandFields.order: order,
+        BrandFields.active: active,
+        BrandFields.updatedAt: FieldValue.serverTimestamp(),
+      };
+
+  Map<String, dynamic> toFeedingMap() => {
+        BrandFields.feedingCat: feeding.toCatMap(),
+        BrandFields.feedingDog: feeding.toDogMap(),
+        BrandFields.updatedAt: FieldValue.serverTimestamp(),
+      };
 
   AppBrand copyWith({
     String? name,
@@ -45,6 +61,7 @@ class AppBrand {
     String? assetPath,
     int? order,
     bool? active,
+    BrandFeedingGuide? feeding,
   }) {
     return AppBrand(
       id: id,
@@ -53,6 +70,7 @@ class AppBrand {
       assetPath: assetPath ?? this.assetPath,
       order: order ?? this.order,
       active: active ?? this.active,
+      feeding: feeding ?? this.feeding,
     );
   }
 }
@@ -150,7 +168,7 @@ const defaultBrands = <AppBrand>[
   ),
 ];
 
-class BrandRepository {
+class BrandRepository extends ChangeNotifier {
   BrandRepository._();
 
   static final instance = BrandRepository._();
@@ -158,9 +176,71 @@ class BrandRepository {
   final CollectionReference<Map<String, dynamic>> _collection =
       FirebaseFirestore.instance.collection(FirestoreCollections.brands);
 
+  List<AppBrand> _cached = List<AppBrand>.unmodifiable(defaultBrands);
+  bool _listening = false;
+
+  List<AppBrand> get cached => _cached;
+
+  void startListening() {
+    if (_listening) return;
+    _listening = true;
+    unawaited(ensureDefaults());
+    _collection.orderBy(BrandFields.order).snapshots().listen((snapshot) {
+      if (snapshot.docs.isEmpty) return;
+      _setCache(snapshot.docs.map(AppBrand.fromDoc).toList());
+    });
+  }
+
+  AppBrand? byId(String id) {
+    final needle = id.trim();
+    if (needle.isEmpty) return null;
+    for (final brand in _cached) {
+      if (brand.id == needle) return brand;
+    }
+    return null;
+  }
+
+  AppBrand? byName(String name) {
+    final needle = _normalize(name);
+    if (needle.isEmpty) return null;
+    for (final brand in _cached) {
+      if (_normalize(brand.name) == needle) return brand;
+    }
+    return null;
+  }
+
+  /// Sipariş / ürün metninden marka id. Eşleşme yoksa `null` (standart tablo).
+  String? idFromProduct({
+    String? brandName,
+    String? title,
+    String? subtitle,
+  }) {
+    final named = byName(brandName ?? '');
+    if (named != null) return named.id;
+
+    final blob = _normalize('$brandName $title $subtitle');
+    if (blob.isEmpty) return null;
+    final compactBlob = _compact(blob);
+    AppBrand? best;
+    for (final brand in _cached) {
+      if (!brand.active) continue;
+      final name = _normalize(brand.name);
+      if (name.length < 3) continue;
+      final compactName = _compact(name);
+      final matched = blob.contains(name) ||
+          (compactName.length >= 4 && compactBlob.contains(compactName));
+      if (!matched) continue;
+      if (best == null || name.length > _normalize(best.name).length) {
+        best = brand;
+      }
+    }
+    return best?.id;
+  }
+
   Stream<List<AppBrand>> watchAll({bool activeOnly = false}) {
     return _collection.orderBy(BrandFields.order).snapshots().map((snapshot) {
       final brands = snapshot.docs.map(AppBrand.fromDoc).toList();
+      if (brands.isNotEmpty) _setCache(brands);
       return activeOnly
           ? brands.where((brand) => brand.active).toList()
           : brands;
@@ -170,6 +250,7 @@ class BrandRepository {
   Future<List<AppBrand>> fetchAll({bool activeOnly = false}) async {
     final snapshot = await _collection.orderBy(BrandFields.order).get();
     final brands = snapshot.docs.map(AppBrand.fromDoc).toList();
+    if (brands.isNotEmpty) _setCache(brands);
     return activeOnly ? brands.where((brand) => brand.active).toList() : brands;
   }
 
@@ -190,5 +271,29 @@ class BrandRepository {
         .set(brand.toMap(), SetOptions(merge: true));
   }
 
+  Future<void> saveFeeding(AppBrand brand) {
+    return _collection
+        .doc(brand.id)
+        .set(brand.toFeedingMap(), SetOptions(merge: true));
+  }
+
   Future<void> delete(String id) => _collection.doc(id).delete();
+
+  void _setCache(List<AppBrand> brands) {
+    _cached = List<AppBrand>.unmodifiable(brands);
+    notifyListeners();
+  }
+
+  static String _compact(String value) {
+    return _normalize(value).replaceAll(RegExp(r'[^a-z0-9]+'), '');
+  }
+
+  static String _normalize(String value) {
+    return value
+        .trim()
+        .toLowerCase()
+        .replaceAll('’', "'")
+        .replaceAll('`', "'")
+        .replaceAll(RegExp(r'\s+'), ' ');
+  }
 }

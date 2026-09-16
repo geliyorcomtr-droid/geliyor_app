@@ -1,5 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:geliyor_app/data/banner_repository.dart';
+import 'package:geliyor_app/data/brand_repository.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/screens/auto_order_settings_screen.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
@@ -11,10 +12,10 @@ import 'package:geliyor_app/state/order_store.dart';
 import 'package:geliyor_app/state/pet_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
-import 'package:geliyor_app/widgets/app_banner_slider.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
 import 'package:geliyor_app/widgets/app_pressable_button.dart';
+import 'package:geliyor_app/widgets/info_guide_sheet.dart';
 
 class SmartPlanScreen extends StatefulWidget {
   const SmartPlanScreen({super.key});
@@ -24,7 +25,6 @@ class SmartPlanScreen extends StatefulWidget {
 }
 
 class _SmartPlanScreenState extends State<SmartPlanScreen> {
-
   /// Ana sayfa servis kartlarıyla aynı tonlar.
   static const _easyOrderColor = Color(0xFF22C55E); // Kolay Sipariş
   static const _knowledgeColor = Color(0xFFF59E0B); // Bilgi Bankası
@@ -36,33 +36,33 @@ class _SmartPlanScreenState extends State<SmartPlanScreen> {
       Color.lerp(color, Colors.white, 0.28) ?? color;
 
   TextStyle _sectionTitle(Color color) => TextStyle(
-        fontFamily: AppTextStyles.fontFamily,
-        color: color,
-        fontSize: 16,
-        fontWeight: FontWeight.w900,
-        height: 1.15,
-        letterSpacing: -0.2,
-      );
+    fontFamily: AppTextStyles.fontFamily,
+    color: color,
+    fontSize: 16,
+    fontWeight: FontWeight.w900,
+    height: 1.15,
+    letterSpacing: -0.2,
+  );
 
   TextStyle _bodyText(Color color) => const TextStyle(
-        color: AppColors.text,
-        fontSize: 12,
-        fontWeight: FontWeight.w800,
-        height: 1.35,
-      );
+    color: AppColors.text,
+    fontSize: 12,
+    fontWeight: FontWeight.w800,
+    height: 1.35,
+  );
 
   TextStyle _accentText(Color color) => TextStyle(
-        color: color,
-        fontSize: 12,
-        fontWeight: FontWeight.w900,
-        height: 1.3,
-      );
+    color: color,
+    fontSize: 12,
+    fontWeight: FontWeight.w900,
+    height: 1.3,
+  );
 
   TextStyle _chipText(Color color, {bool selected = false}) => TextStyle(
-        color: selected ? color : AppColors.text,
-        fontSize: 12,
-        fontWeight: FontWeight.w800,
-      );
+    color: selected ? color : AppColors.text,
+    fontSize: 12,
+    fontWeight: FontWeight.w800,
+  );
 
   Widget _coloredButton({
     required Color color,
@@ -178,6 +178,7 @@ class _SmartPlanScreenState extends State<SmartPlanScreen> {
                   PetStore.instance,
                   OrderStore.instance,
                   FoodTrackingStore.instance,
+                  BrandRepository.instance,
                 ]),
                 builder: (context, _) => _buildFoodTrackingCard(),
               ),
@@ -199,12 +200,13 @@ class _SmartPlanScreenState extends State<SmartPlanScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text(
-                  'Akıllı Planım',
-                  style: AppTextStyles.pageHeader,
-                ),
+                const Text('Akıllı Planım', style: AppTextStyles.pageHeader),
                 const SizedBox(width: 4),
-                const Icon(Icons.pets_rounded, color: AppColors.primary, size: 18),
+                const Icon(
+                  Icons.pets_rounded,
+                  color: AppColors.primary,
+                  size: 18,
+                ),
               ],
             ),
           ),
@@ -215,9 +217,144 @@ class _SmartPlanScreenState extends State<SmartPlanScreen> {
   }
 
   Widget _buildTopBanner() {
-    return const AppBannerSlot(
-      placement: BannerPlacement.smartPlan,
-      fallbackAssets: ['assets/images/akilli_plan_banner.png'],
+    return SizedBox(
+      height: BannerPlacement.smartPlan.height,
+      child: Row(
+        children: [
+          _featureCard(
+            color: _easyOrderColor,
+            icon: Icons.autorenew_rounded,
+            title: 'Otomatik Sipariş',
+            imagePath: 'assets/images/smart_plan_auto_order.jpg',
+            body:
+                'Otomatik sipariş, dostunun maması bitmeden siparişin senin yerine hazırlanmasıdır. Kalan gün azaldığında sistem siparişi oluşturur; ayarına göre senden onay ister veya doğrudan yola çıkar. Böylece mama stoku sıfırlanmaz.',
+          ),
+          const SizedBox(width: 8),
+          _featureCard(
+            color: _knowledgeColor,
+            icon: Icons.notifications_rounded,
+            title: 'Akıllı Hatırlatma',
+            imagePath: 'assets/images/smart_plan_reminder.jpg',
+            body:
+                'Akıllı hatırlatma, mama bitmeden kaç gün önce uyarılacağını senin seçmendir. 1, 3, 5 gün kala veya özel bir günde bildirim alırsın; stok azalınca unutmazsın.',
+          ),
+          const SizedBox(width: 8),
+          _featureCard(
+            color: _hangiMamaColor,
+            icon: Icons.inventory_2_rounded,
+            title: 'Mama Takibi',
+            imagePath: 'assets/images/smart_plan_food_track.jpg',
+            body:
+                'Manuel mama takibi, aldığın paketin kilosunu ve tarihini senin girmenle çalışır. Uygulama günlük tüketime bakarak kaç gün kaldığını hesaplar. Sipariş geçmişin olmasa da stoku kendin takip edebilirsin.',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _featureCard({
+    required Color color,
+    required IconData icon,
+    required String title,
+    required String imagePath,
+    required String body,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => _showWhatIs(
+          title: title,
+          color: color,
+          icon: icon,
+          body: body,
+        ),
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: color, width: 1),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(17),
+            child: Image.asset(
+              imagePath,
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: double.infinity,
+              alignment: Alignment.center,
+              filterQuality: FilterQuality.medium,
+              cacheWidth: 360,
+              errorBuilder: (context, error, stackTrace) => ColoredBox(
+                color: color.withValues(alpha: 0.12),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showWhatIs({
+    required String title,
+    required Color color,
+    required IconData icon,
+    required String body,
+  }) {
+    InfoGuideSheet.showCentered(
+      context,
+      dismissOnContentTap: true,
+      height: 280,
+      builder: (sheetContext) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+          child: Column(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: color.withValues(alpha: 0.45)),
+                ),
+                child: Icon(icon, color: color, size: 26),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                title.replaceAll('\n', ' '),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  height: 1.2,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Expanded(
+                child: Text(
+                  body,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: AppColors.text,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+              const Text(
+                'Kapatmak için tekrar dokunun',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: AppColors.subText,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -229,8 +366,8 @@ class _SmartPlanScreenState extends State<SmartPlanScreen> {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: color.withValues(alpha: 0.45)),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -316,8 +453,8 @@ class _SmartPlanScreenState extends State<SmartPlanScreen> {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: color.withValues(alpha: 0.45)),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -439,22 +576,17 @@ class _SmartPlanScreenState extends State<SmartPlanScreen> {
                   color: selected
                       ? color
                       : (reminderEnabled
-                          ? AppColors.text
-                          : AppColors.subText.withValues(alpha: 0.6)),
+                            ? AppColors.text
+                            : AppColors.subText.withValues(alpha: 0.6)),
                 ),
                 const SizedBox(width: 4),
               ],
               Text(
                 displayLabel,
-                style: _chipText(
-                  color,
-                  selected: selected,
-                ).copyWith(
+                style: _chipText(color, selected: selected).copyWith(
                   color: selected
                       ? color
-                      : (reminderEnabled
-                          ? AppColors.text
-                          : AppColors.subText),
+                      : (reminderEnabled ? AppColors.text : AppColors.subText),
                 ),
               ),
             ],
@@ -477,8 +609,8 @@ class _SmartPlanScreenState extends State<SmartPlanScreen> {
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: color.withValues(alpha: 0.45)),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -487,9 +619,7 @@ class _SmartPlanScreenState extends State<SmartPlanScreen> {
             children: [
               const Icon(Icons.inventory_2_outlined, color: color, size: 17),
               const SizedBox(width: 6),
-              Expanded(
-                child: Text('Mama Takibi', style: _sectionTitle(color)),
-              ),
+              Expanded(child: Text('Mama Takibi', style: _sectionTitle(color))),
               _sourceChip(
                 estimate == null
                     ? 'Beklemede'
@@ -519,7 +649,10 @@ class _SmartPlanScreenState extends State<SmartPlanScreen> {
                 const SizedBox(width: 6),
                 Text(
                   tracking ? 'Takibi Düzenle' : 'Mama Takibi Başlat',
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ],
             ),
@@ -584,16 +717,10 @@ class _SmartPlanScreenState extends State<SmartPlanScreen> {
             ),
             const SizedBox(width: 8),
             Expanded(
-              child: _statTile(
-                'Kalan',
-                '${estimate.remainingDays} gün',
-                theme,
-              ),
+              child: _statTile('Kalan', '${estimate.remainingDays} gün', theme),
             ),
             const SizedBox(width: 8),
-            Expanded(
-              child: _statTile('Stok', '%$percent', theme),
-            ),
+            Expanded(child: _statTile('Stok', '%$percent', theme)),
           ],
         ),
         const SizedBox(height: 10),
@@ -716,25 +843,27 @@ class _SmartPlanScreenState extends State<SmartPlanScreen> {
   }
 
   void _openFoodTracking() {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const FoodTrackingScreen()),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const FoodTrackingScreen()));
   }
 
   Color _stockColor(FoodStockLevel level) {
     return switch (level) {
       FoodStockLevel.safe => AppColors.primary,
       FoodStockLevel.watch => AppColors.warning,
-      FoodStockLevel.low =>
-        Color.lerp(AppColors.warning, AppColors.error, 0.45)!,
+      FoodStockLevel.low => Color.lerp(
+        AppColors.warning,
+        AppColors.error,
+        0.45,
+      )!,
       FoodStockLevel.critical => AppColors.error,
     };
   }
 
   String _stockHint(FoodRemainingEstimate estimate) {
     return switch (estimate.stockLevel) {
-      FoodStockLevel.safe =>
-        '${estimate.remainingDays} gün yetecek stok var.',
+      FoodStockLevel.safe => '${estimate.remainingDays} gün yetecek stok var.',
       FoodStockLevel.watch => 'Stok azalıyor, siparişi planlayın.',
       FoodStockLevel.low => 'Mama yakında bitecek.',
       FoodStockLevel.critical => 'Kritik seviye — hemen yenileyin.',

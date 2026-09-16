@@ -17,6 +17,7 @@ class PetData {
     this.extraFood,
     this.dailyFoodGrams,
     this.allergies = const [],
+    this.photoUrl,
   });
 
   final String name;
@@ -29,10 +30,18 @@ class PetData {
   final String? extraFood;
   final int? dailyFoodGrams;
   final List<String> allergies;
+  final String? photoUrl;
 
-  String get imagePath => species == 'Köpek'
+  String get fallbackAsset => species == 'Köpek'
       ? 'assets/images/luna_kopek.png'
       : 'assets/images/milo_kedi.png';
+
+  String get imagePath => fallbackAsset;
+
+  bool get hasCustomPhoto {
+    final url = photoUrl?.trim() ?? '';
+    return url.isNotEmpty;
+  }
 
   /// Kısa yaş etiketi (ör. "Genç").
   String get shortAge {
@@ -43,6 +52,14 @@ class PetData {
       return range.substring(0, start).trim();
     }
     return range;
+  }
+
+  /// Vücut yapısı: Zayıf, İdeal veya Kilolu.
+  String get shortBodyType {
+    final v = (bodyType ?? '').toLowerCase();
+    if (v.contains('zayıf') || v.contains('zayif')) return 'Zayıf';
+    if (v.contains('kilolu') || v.contains('obez')) return 'Kilolu';
+    return 'İdeal';
   }
 
   Map<String, dynamic> toMap() {
@@ -57,6 +74,7 @@ class PetData {
       PetFields.extraFood: extraFood,
       PetFields.dailyFoodGrams: dailyFoodGrams,
       PetFields.allergies: allergies,
+      PetFields.photoUrl: photoUrl,
     };
   }
 
@@ -75,6 +93,7 @@ class PetData {
       allergies: rawAllergies is List
           ? rawAllergies.map((item) => item.toString()).toList()
           : const [],
+      photoUrl: (data[PetFields.photoUrl] as String?)?.trim(),
     );
   }
 }
@@ -92,6 +111,7 @@ class PetStore extends ChangeNotifier {
       species: 'Kedi',
       ageRange: 'Genç',
       weight: '2-3 kg',
+      bodyType: 'İdeal',
       neutered: 'Evet',
       activityLevel: 'Orta',
       dailyFoodGrams: 40,
@@ -102,6 +122,7 @@ class PetStore extends ChangeNotifier {
       species: 'Köpek',
       ageRange: 'Medium (11-25 kg)',
       weight: '20-30 kg',
+      bodyType: 'İdeal',
       neutered: 'Hayır',
       activityLevel: 'Yüksek',
       dailyFoodGrams: 260,
@@ -139,6 +160,7 @@ class PetStore extends ChangeNotifier {
       return false;
     }
     if (a.dailyFoodGrams != b.dailyFoodGrams) return false;
+    if ((a.photoUrl ?? '') != (b.photoUrl ?? '')) return false;
     if (a.allergies.length != b.allergies.length) return false;
     for (var i = 0; i < a.allergies.length; i++) {
       if (a.allergies[i] != b.allergies[i]) return false;

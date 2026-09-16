@@ -1,5 +1,6 @@
 import 'package:geliyor_app/data/cat_feeding_guide.dart';
 import 'package:geliyor_app/data/dog_feeding_guide.dart';
+import 'package:geliyor_app/data/food_tracking_choices.dart';
 import 'package:geliyor_app/state/food_tracking_store.dart';
 import 'package:geliyor_app/state/order_store.dart';
 import 'package:geliyor_app/state/pet_store.dart';
@@ -62,7 +63,10 @@ abstract final class FoodRemainingEstimator {
       final seed = _manualPet(tracking);
       if (seed == null) return null;
       final pets = sharingPetsFor(seed);
-      final dailyGrams = sharedDailyGrams(pets);
+      final dailyGrams = sharedDailyGrams(
+        pets,
+        foodId: tracking.foodId,
+      );
       if (dailyGrams <= 0) return null;
       return _build(
         pets: pets,
@@ -80,7 +84,7 @@ abstract final class FoodRemainingEstimator {
     if (orderMatch == null) return null;
     final food = orderMatch.$1;
     final pets = sharingPetsFor(orderMatch.$2);
-    final dailyGrams = sharedDailyGrams(pets);
+    final dailyGrams = sharedDailyGrams(pets, foodId: foodIdFromOrder(food));
     if (dailyGrams <= 0) return null;
 
     final bagKg = kgFromLabel(food.weight) * food.quantity;
@@ -142,10 +146,18 @@ abstract final class FoodRemainingEstimator {
     return matched.isEmpty ? [seed] : matched;
   }
 
-  static int sharedDailyGrams(List<PetData> pets) {
+  static String foodIdFromOrder(LastOrderItem food) {
+    return FoodTrackingChoice.resolveFromProduct(
+      brandName: food.brand,
+      title: food.title,
+      subtitle: food.subtitle,
+    );
+  }
+
+  static int sharedDailyGrams(List<PetData> pets, {String foodId = ''}) {
     var total = 0;
     for (final pet in pets) {
-      total += _dailyGramsFor(pet);
+      total += _dailyGramsFor(pet, foodId: foodId);
     }
     return total;
   }
@@ -263,7 +275,12 @@ abstract final class FoodRemainingEstimator {
         (blob.contains('mama') || blob.contains('food') || hasKg);
   }
 
-  static int _dailyGramsFor(PetData pet) {
+  static int _dailyGramsFor(PetData pet, {String foodId = ''}) {
+    final branded = FoodTrackingChoice.brandDailyGrams(
+      foodId: foodId,
+      pet: pet,
+    );
+    if (branded != null && branded > 0) return branded;
     if (pet.dailyFoodGrams != null && pet.dailyFoodGrams! > 0) {
       return pet.dailyFoodGrams!;
     }

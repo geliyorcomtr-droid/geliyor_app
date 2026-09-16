@@ -101,6 +101,9 @@ class OrderRepository {
               'unitPrice': item.unitPrice,
               'weight': item.weight,
               'imageUrl': item.imagePath,
+              'brand': item.brand?.trim().isNotEmpty == true
+                  ? item.brand!.trim()
+                  : (product[ProductFields.brand] as String?)?.trim() ?? '',
               'barcode': barcode,
               'vatRate': vatRate,
             };

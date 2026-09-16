@@ -212,7 +212,7 @@ abstract final class CatFeedingGuide {
 
   /// Dost Ekle kilo etiketinden ("2-3 kg", "4,5 kg") satır üretir.
   static CatFeedingRow? fromWeightLabel(String? label) {
-    final kg = _kgFromLabel(label);
+    final kg = kgFromLabel(label);
     if (kg == null) return null;
     return lookup(kg);
   }
@@ -227,7 +227,7 @@ abstract final class CatFeedingGuide {
     return row.gramsFor(bodyType: bodyType, activityLevel: activityLevel);
   }
 
-  static double? _kgFromLabel(String? label) {
+  static double? kgFromLabel(String? label) {
     if (label == null || label.trim().isEmpty) return null;
     final numbers = RegExp(r'(\d+(?:[.,]\d+)?)')
         .allMatches(label)

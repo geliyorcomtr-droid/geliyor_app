@@ -219,7 +219,10 @@ class _GiftSelectScreenState extends State<GiftSelectScreen> {
               _buildTierSection(),
               const SizedBox(height: 12),
               StreamBuilder<List<AdminProduct>>(
-                stream: ProductRepository.instance.watchAll(activeOnly: true),
+                stream: ProductRepository.instance.watchAll(
+                  activeOnly: true,
+                  inStockOnly: true,
+                ),
                 builder: (context, snapshot) {
                   final products = snapshot.data ?? const <AdminProduct>[];
                   return Column(

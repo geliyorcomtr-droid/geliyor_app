@@ -2,10 +2,12 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geliyor_app/data/firestore_collections.dart';
+import 'package:geliyor_app/data/brand_repository.dart';
 import 'package:geliyor_app/services/food_remaining_estimator.dart';
 import 'package:geliyor_app/state/auth_store.dart';
 import 'package:geliyor_app/state/food_tracking_store.dart';
 import 'package:geliyor_app/state/notification_settings_store.dart';
+import 'package:geliyor_app/state/order_store.dart';
 import 'package:geliyor_app/state/pet_store.dart';
 
 /// Mama bitiş tarihini Firestore’a yazar; günlük Cloud Function buna bakarak bildirir.
@@ -30,6 +32,8 @@ class FoodReminderSync {
     FoodTrackingStore.instance.addListener(schedule);
     NotificationSettingsStore.instance.addListener(schedule);
     PetStore.instance.addListener(schedule);
+    OrderStore.instance.addListener(schedule);
+    BrandRepository.instance.addListener(schedule);
     unawaited(sync());
   }
 

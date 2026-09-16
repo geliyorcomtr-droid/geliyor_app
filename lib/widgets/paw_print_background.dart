@@ -293,27 +293,33 @@ class PawPrintBackground extends StatelessWidget {
       builder: (context, constraints) {
         final w = constraints.maxWidth;
         final h = constraints.maxHeight;
-        return Stack(
-          fit: StackFit.expand,
-          children: [
-            for (final spec in prints)
-              Positioned(
-                left: spec.x * w - spec.size / 2,
-                top: spec.y * h - spec.size / 2,
-                width: spec.size,
-                height: spec.size,
-                child: IgnorePointer(
-                  child: Transform.rotate(
-                    angle: spec.rotation,
-                    child: Icon(
-                      Icons.pets_rounded,
-                      size: spec.size,
-                      color: spec.color.withValues(alpha: spec.opacity),
-                    ),
+        final printLayer = <Widget>[
+          for (final spec in prints)
+            Positioned(
+              left: spec.x * w - spec.size / 2,
+              top: spec.y * h - spec.size / 2,
+              width: spec.size,
+              height: spec.size,
+              child: IgnorePointer(
+                child: Transform.rotate(
+                  angle: spec.rotation,
+                  child: Icon(
+                    Icons.pets_rounded,
+                    size: spec.size,
+                    color: spec.color.withValues(alpha: spec.opacity),
                   ),
                 ),
               ),
+            ),
+        ];
+
+        return Stack(
+          fit: StackFit.expand,
+          clipBehavior: Clip.none,
+          children: [
+            if (style != PawPrintStyle.splash) ...printLayer,
             child,
+            if (style == PawPrintStyle.splash) ...printLayer,
           ],
         );
       },

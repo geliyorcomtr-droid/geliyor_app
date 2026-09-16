@@ -1,18 +1,22 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:geliyor_app/data/banner_repository.dart';
-import 'package:geliyor_app/theme/app_text_styles.dart';
+import 'package:geliyor_app/data/brand_repository.dart';
 import 'package:geliyor_app/data/cat_feeding_guide.dart';
 import 'package:geliyor_app/data/dog_feeding_guide.dart';
+import 'package:geliyor_app/data/food_tracking_choices.dart';
+import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/services/food_remaining_estimator.dart';
 import 'package:geliyor_app/state/food_tracking_store.dart';
 import 'package:geliyor_app/state/pet_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:geliyor_app/theme/app_icons.dart';
 import 'package:geliyor_app/utils/login_gate.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
 import 'package:geliyor_app/widgets/app_banner_slider.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
 import 'package:geliyor_app/widgets/app_pressable_button.dart';
+import 'package:geliyor_app/widgets/brand_feeding_table.dart';
 import 'package:geliyor_app/widgets/cat_feeding_table.dart';
 import 'package:geliyor_app/widgets/dog_feeding_table.dart';
 
@@ -26,7 +30,8 @@ class FoodTrackingScreen extends StatefulWidget {
 class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
   int _weightKg = 10;
   DateTime _purchaseDate = DateTime.now();
-  final TextEditingController _foodController = TextEditingController();
+  String _foodId = FoodTrackingChoice.standardId;
+  String _foodLabel = FoodTrackingChoice.standardLabel;
   String? _selectedPetName;
 
   static const int _minKg = 1;
@@ -59,16 +64,15 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
         PetStore.instance.activePet?.name ??
         (pets.isNotEmpty ? pets.first.name : null);
     if (!tracking.isActive) return;
-    _foodController.text = tracking.foodName;
+    _foodLabel = tracking.foodName.isEmpty
+        ? FoodTrackingChoice.standardLabel
+        : tracking.foodName;
+    _foodId = tracking.foodId.isNotEmpty
+        ? tracking.foodId
+        : FoodTrackingChoice.idFromName(tracking.foodName);
     _purchaseDate = tracking.purchaseDate;
     final kg = tracking.bagKg.round().clamp(_minKg, _maxKg);
     _weightKg = kg;
-  }
-
-  @override
-  void dispose() {
-    _foodController.dispose();
-    super.dispose();
   }
 
   Future<void> _startTracking() async {
@@ -88,7 +92,8 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
     );
     if (!ok || !mounted) return;
     FoodTrackingStore.instance.start(
-      foodName: _foodController.text,
+      foodName: _foodLabel,
+      foodId: _foodId,
       bagKg: bagKg,
       purchaseDate: _purchaseDate,
       petName: _guidePet?.name,
@@ -131,6 +136,50 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
     return DogFeedingGuide.fromSizeLabel(_guidePet?.ageRange);
   }
 
+  AppBrand? get _selectedBrand {
+    if (FoodTrackingChoice.isStandard(_foodId)) return null;
+    return BrandRepository.instance.byId(_foodId);
+  }
+
+  List<Widget> _buildFeedingTables() {
+    final brand = _selectedBrand;
+    final feeding = brand?.feeding;
+    if (brand != null && feeding != null) {
+      if (_isDog && feeding.hasDog) {
+        return [
+          BrandFeedingTableCard(
+            brandName: brand.name,
+            feeding: feeding,
+            isDog: true,
+            highlightSize: _guidePet?.ageRange,
+          ),
+        ];
+      }
+      if (!_isDog && feeding.hasCat) {
+        return [
+          BrandFeedingTableCard(
+            brandName: brand.name,
+            feeding: feeding,
+            isDog: false,
+            highlightWeight: _guidePet?.weight,
+          ),
+        ];
+      }
+    }
+    return [
+      CatFeedingTableCard(
+        highlighted: _isDog ? null : _feedingRow,
+        bodyType: _isDog ? null : _guidePet?.bodyType,
+        activityLevel: _isDog ? null : _guidePet?.activityLevel,
+      ),
+      const SizedBox(height: 10),
+      DogFeedingTableCard(
+        highlighted: _isDog ? _dogFeedingRow : null,
+        activityLevel: _isDog ? _guidePet?.activityLevel : null,
+      ),
+    ];
+  }
+
   double get _bagKg => _weightKg.toDouble();
 
   int get _profileDailyGrams {
@@ -138,6 +187,7 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
     if (pet == null) return 0;
     return FoodRemainingEstimator.sharedDailyGrams(
       FoodRemainingEstimator.sharingPetsFor(pet),
+      foodId: _foodId,
     );
   }
 
@@ -209,7 +259,10 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
         backgroundColor: AppColors.background,
         header: _buildHeader(),
         content: ListenableBuilder(
-          listenable: PetStore.instance,
+          listenable: Listenable.merge([
+            PetStore.instance,
+            BrandRepository.instance,
+          ]),
           builder: (context, _) {
             return SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
@@ -238,16 +291,7 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
                   const SizedBox(height: 14),
                   _buildEstimateCard(),
                   const SizedBox(height: 12),
-                  CatFeedingTableCard(
-                    highlighted: _isDog ? null : _feedingRow,
-                    bodyType: _isDog ? null : _guidePet?.bodyType,
-                    activityLevel: _isDog ? null : _guidePet?.activityLevel,
-                  ),
-                  const SizedBox(height: 10),
-                  DogFeedingTableCard(
-                    highlighted: _isDog ? _dogFeedingRow : null,
-                    activityLevel: _isDog ? _guidePet?.activityLevel : null,
-                  ),
+                  ..._buildFeedingTables(),
                   const SizedBox(height: 12),
                   AppPressableButton(
                     onTap: () {
@@ -452,89 +496,170 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
     );
   }
 
+  Future<void> _pickFood() async {
+    List<AppBrand> brands = defaultBrands;
+    try {
+      await BrandRepository.instance.ensureDefaults();
+      brands = await BrandRepository.instance.fetchAll(activeOnly: true);
+      if (brands.isEmpty) brands = defaultBrands;
+    } catch (_) {
+      brands = defaultBrands;
+    }
+    if (!mounted) return;
+    final selected = await showModalBottomSheet<({String id, String label})>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.fromLTRB(8, 12, 8, 16),
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(12, 4, 12, 8),
+                child: Text(
+                  'Mama seçin',
+                  style: TextStyle(
+                    color: AppColors.text,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              _foodOptionTile(
+                ctx,
+                id: FoodTrackingChoice.standardId,
+                label: FoodTrackingChoice.standardLabel,
+                subtitle: 'Sistemdeki kedi / köpek tüketim tablosu',
+              ),
+              const Divider(height: 16),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(12, 0, 12, 8),
+                child: Text(
+                  'Markalar',
+                  style: TextStyle(
+                    color: AppColors.subText,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              for (final brand in brands)
+                _foodOptionTile(
+                  ctx,
+                  id: brand.id,
+                  label: brand.name,
+                  subtitle: brand.feeding.isEmpty
+                      ? 'Gramaj yoksa standart tablo kullanılır'
+                      : 'Bu markanın tüketim tablosu',
+                ),
+            ],
+          ),
+        );
+      },
+    );
+    if (selected == null || !mounted) return;
+    setState(() {
+      _foodId = selected.id;
+      _foodLabel = selected.label;
+    });
+  }
+
+  Widget _foodOptionTile(
+    BuildContext ctx, {
+    required String id,
+    required String label,
+    required String subtitle,
+  }) {
+    final selected = _foodId == id;
+    return ListTile(
+      onTap: () => Navigator.pop(ctx, (id: id, label: label)),
+      leading: id == FoodTrackingChoice.standardId
+          ? const _BowlSpoonIcon(size: 28)
+          : Icon(
+              Icons.storefront_rounded,
+              color: selected ? _accent : AppColors.subText,
+            ),
+      title: Text(
+        label,
+        style: TextStyle(
+          fontWeight: FontWeight.w800,
+          color: selected ? _accent : AppColors.text,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+      ),
+      trailing: selected
+          ? const Icon(Icons.check_rounded, color: _accent)
+          : null,
+    );
+  }
+
   Widget _buildFoodSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _sectionTitle(1, 'Kullandığınız mama hangisi?'),
         const SizedBox(height: 8),
-        Container(
-          height: 44,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: _lineSoft),
-          ),
-          child: Row(
-            children: [
-              const Icon(
-                Icons.search_rounded,
-                color: _accent,
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextField(
-                  controller: _foodController,
-                  cursorColor: _accent,
-                  decoration: const InputDecoration(
-                    hintText: 'Mama markası veya adı yazın',
-                    hintStyle: TextStyle(
-                      color: AppColors.subText,
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w500,
+        GestureDetector(
+          onTap: _pickFood,
+          behavior: HitTestBehavior.opaque,
+          child: Container(
+            height: 44,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: _lineSoft),
+            ),
+            child: Row(
+              children: [
+                FoodTrackingChoice.isStandard(_foodId)
+                    ? const _BowlSpoonIcon(size: 26)
+                    : const Icon(
+                        Icons.storefront_rounded,
+                        color: _accent,
+                        size: 20,
+                      ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _foodLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.text,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
                     ),
-                    border: InputBorder.none,
-                    isDense: true,
-                  ),
-                  style: const TextStyle(
-                    color: AppColors.text,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
                   ),
                 ),
-              ),
-              const Icon(
-                Icons.qr_code_scanner_rounded,
-                color: _accent,
-                size: 20,
-              ),
-            ],
+                const Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: _accent,
+                  size: 22,
+                ),
+              ],
+            ),
           ),
         ),
-        const SizedBox(height: 8),
-        AppPressableButton(
-          onTap: () {},
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          backgroundColor: _soft,
-          pressedBackgroundColor: _accent,
-          foregroundColor: _accent,
-          pressedForegroundColor: AppColors.surface,
-          borderColor: _lineSoft,
-          pressedBorderColor: _accent,
-          builder: (pressed) => DefaultTextStyle.merge(
-            style: TextStyle(
-              color: pressed ? AppColors.surface : _accent,
-              fontWeight: FontWeight.w800,
-            ),
-            child: IconTheme.merge(
-              data: IconThemeData(
-                color: pressed ? AppColors.surface : _accent,
-              ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.photo_camera_outlined, size: 18),
-                  SizedBox(width: 8),
-                  Text(
-                    'Mama paketini fotoğraflayın',
-                    style: TextStyle(fontSize: 12.5),
-                  ),
-                ],
-              ),
-            ),
+        const SizedBox(height: 6),
+        Text(
+          FoodTrackingChoice.isStandard(_foodId)
+              ? 'Tüketim, sistemdeki standart mama tablosuna göre hesaplanır.'
+              : (_selectedBrand?.feeding.isEmpty ?? true)
+                  ? 'Bu marka için henüz gramaj girilmedi; standart tablo kullanılır.'
+                  : 'Tüketim, ${_selectedBrand!.name} için girilen gramaja göre hesaplanır.',
+          style: const TextStyle(
+            color: AppColors.subText,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            height: 1.3,
           ),
         ),
       ],
@@ -918,4 +1043,69 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
       ),
     );
   }
+}
+
+class _BowlSpoonIcon extends StatelessWidget {
+  const _BowlSpoonIcon({this.size = 26});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size * 1.38,
+      height: size,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Image.asset(
+            AppIcons.mamaKabi,
+            width: size,
+            height: size,
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.medium,
+          ),
+          CustomPaint(
+            size: Size(size * 0.34, size * 0.88),
+            painter: const _SpoonPainter(AppColors.violet),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SpoonPainter extends CustomPainter {
+  const _SpoonPainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.save();
+    canvas.translate(size.width * 0.15, size.height * 0.02);
+    canvas.rotate(-0.38);
+    final fill = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill
+      ..strokeCap = StrokeCap.round;
+    final w = size.width;
+    final h = size.height;
+    canvas.drawOval(Rect.fromLTWH(0, 0, w * 0.95, h * 0.40), fill);
+    canvas.drawRRect(
+      RRect.fromLTRBR(
+        w * 0.32,
+        h * 0.28,
+        w * 0.62,
+        h * 0.98,
+        Radius.circular(w),
+      ),
+      fill,
+    );
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _SpoonPainter oldDelegate) =>
+      oldDelegate.color != color;
 }

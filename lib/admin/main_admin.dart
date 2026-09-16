@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:geliyor_app/admin/admin_auth.dart';
 import 'package:geliyor_app/admin/screens/admin_login_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_shell.dart';
+import 'package:geliyor_app/data/brand_repository.dart';
 import 'package:geliyor_app/firebase_options.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 
@@ -10,6 +11,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await AdminAuth.instance.init();
+  BrandRepository.instance.startListening();
   runApp(const GeliyorAdminApp());
 }
 

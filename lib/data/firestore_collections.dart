@@ -7,6 +7,9 @@ class FirestoreCollections {
   static const orders = 'orders';
   static const reviews = 'reviews';
   static const banners = 'banners';
+  static const knowledgeArticles = 'knowledge_articles';
+  static const knowledgeTopics = 'knowledge_topics';
+  static const knowledgeQuestions = 'knowledge_questions';
   static const campaigns = 'campaigns';
   static const broadcasts = 'broadcasts';
   static const supportTickets = 'support_tickets';
@@ -17,6 +20,7 @@ class FirestoreCollections {
   static const settings = 'settings';
   static const coupons = 'coupons';
   static const foodCouponQueue = 'food_coupon_queue';
+  static const adoptionListings = 'adoption_listings';
 }
 
 /// `users/{uid}` alanları
@@ -121,6 +125,7 @@ class FoodTrackingFields {
 
   static const active = 'active';
   static const foodName = 'foodName';
+  static const foodId = 'foodId';
   static const bagKg = 'bagKg';
   static const purchaseDate = 'purchaseDate';
   static const petName = 'petName';
@@ -140,6 +145,7 @@ class PetFields {
   static const extraFood = 'extraFood';
   static const dailyFoodGrams = 'dailyFoodGrams';
   static const allergies = 'allergies';
+  static const photoUrl = 'photoUrl';
 }
 
 /// `products/{id}` alanları
@@ -241,6 +247,9 @@ class OrderFields {
   static const statusMessage = 'statusMessage';
   static const smsCreatedAt = 'smsCreatedAt';
   static const smsCreatedJobId = 'smsCreatedJobId';
+  static const smsAdminCreatedAt = 'smsAdminCreatedAt';
+  static const smsAdminCreatedJobId = 'smsAdminCreatedJobId';
+  static const smsAdminLastError = 'smsAdminLastError';
   static const smsShippingAt = 'smsShippingAt';
   static const smsShippingJobId = 'smsShippingJobId';
   static const smsCancelledAt = 'smsCancelledAt';
@@ -285,6 +294,8 @@ class BrandFields {
   static const assetPath = 'assetPath';
   static const order = 'order';
   static const active = 'active';
+  static const feedingCat = 'feedingCat';
+  static const feedingDog = 'feedingDog';
   static const updatedAt = 'updatedAt';
 }
 
@@ -323,6 +334,56 @@ class BannerFields {
   static const imageUrl = 'imageUrl';
   static const assetPath = 'assetPath';
   static const placement = 'placement';
+  static const order = 'order';
+  static const active = 'active';
+  static const updatedAt = 'updatedAt';
+  static const linkType = 'linkType';
+  static const linkId = 'linkId';
+  static const linkLabel = 'linkLabel';
+}
+
+/// `knowledge_articles/{id}` alanları
+class KnowledgeArticleFields {
+  KnowledgeArticleFields._();
+
+  static const title = 'title';
+  static const categoryId = 'categoryId';
+  static const summary = 'summary';
+  static const minutes = 'minutes';
+  static const imageUrl = 'imageUrl';
+  static const assetPath = 'assetPath';
+  static const body = 'body';
+  static const keyPoints = 'keyPoints';
+  static const order = 'order';
+  static const active = 'active';
+  static const updatedAt = 'updatedAt';
+}
+
+/// `knowledge_topics/{id}` — Tüm Konular kartları
+class KnowledgeTopicFields {
+  KnowledgeTopicFields._();
+
+  static const title = 'title';
+  static const subtitle = 'subtitle';
+  static const iconUrl = 'iconUrl';
+  static const assetPath = 'assetPath';
+  static const colorValue = 'colorValue';
+  static const questionTopicId = 'questionTopicId';
+  static const order = 'order';
+  static const active = 'active';
+  static const updatedAt = 'updatedAt';
+}
+
+/// `knowledge_questions/{id}` — Öne çıkan / konu soruları
+class KnowledgeQuestionFields {
+  KnowledgeQuestionFields._();
+
+  static const title = 'title';
+  static const topicId = 'topicId';
+  static const views = 'views';
+  static const answer = 'answer';
+  static const tips = 'tips';
+  static const featured = 'featured';
   static const order = 'order';
   static const active = 'active';
   static const updatedAt = 'updatedAt';
@@ -456,4 +517,74 @@ class FoodCouponQueueStatuses {
   static const pending = 'pending';
   static const assigned = 'assigned';
   static const skipped = 'skipped';
+}
+
+class AdoptionListingFields {
+  AdoptionListingFields._();
+
+  static const userId = 'userId';
+  static const category = 'category';
+  static const name = 'name';
+  static const species = 'species';
+  static const breed = 'breed';
+  static const gender = 'gender';
+  static const age = 'age';
+  static const weight = 'weight';
+  static const city = 'city';
+  static const description = 'description';
+  static const imageUrls = 'imageUrls';
+  static const videoUrls = 'videoUrls';
+  static const phone = 'phone';
+  static const contactName = 'contactName';
+  static const contactPreference = 'contactPreference';
+  static const vaccinated = 'vaccinated';
+  static const neutered = 'neutered';
+  static const hasHealthIssue = 'hasHealthIssue';
+  static const indoorOnly = 'indoorOnly';
+  static const status = 'status';
+  static const rejectReason = 'rejectReason';
+  static const createdAt = 'createdAt';
+  static const updatedAt = 'updatedAt';
+}
+
+class AdoptionCategories {
+  AdoptionCategories._();
+
+  static const adopt = 'adopt';
+  static const lost = 'lost';
+  static const found = 'found';
+
+  static const values = <String>[adopt, lost, found];
+
+  static String label(String value) => switch (value) {
+    lost => 'Aranıyor',
+    found => 'Bulundu',
+    _ => 'Sahiplendirme',
+  };
+
+  static String subtitle(String value) => switch (value) {
+    lost => 'Kayıp dostlarımız',
+    found => 'Sahibini arıyor',
+    _ => 'Yeni bir yuva bekliyor',
+  };
+
+  static String badge(String value) => switch (value) {
+    lost => 'Kayıp',
+    found => 'Bulundu',
+    _ => 'Yuva Arıyor',
+  };
+}
+
+class AdoptionStatuses {
+  AdoptionStatuses._();
+
+  static const pending = 'pending';
+  static const approved = 'approved';
+  static const rejected = 'rejected';
+
+  static String label(String value) => switch (value) {
+    approved => 'Yayında',
+    rejected => 'Reddedildi',
+    _ => 'Onay bekliyor',
+  };
 }

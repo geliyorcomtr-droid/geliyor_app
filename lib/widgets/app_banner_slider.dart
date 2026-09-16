@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geliyor_app/data/banner_repository.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:geliyor_app/utils/product_image.dart';
 import 'package:geliyor_app/widgets/banner_image_preview.dart';
 
 /// Ortak kaydırmalı banner yapısı; yükseklik sayfanın kendi ölçüsüne göre.
@@ -32,23 +33,88 @@ class AppBannerSlot extends StatelessWidget {
         final items = banners.isNotEmpty
             ? banners
             : [
-                if (!snapshot.hasData)
-                  for (var i = 0; i < fallbackAssets.length; i++)
-                    AppBanner(
-                      id: 'fallback-$i',
-                      title: '',
-                      assetPath: fallbackAssets[i],
-                      placement: placement.id,
-                      order: i,
-                    ),
+                for (var i = 0; i < fallbackAssets.length; i++)
+                  AppBanner(
+                    id: 'fallback-$i',
+                    title: '',
+                    assetPath: fallbackAssets[i],
+                    placement: placement.id,
+                    order: i,
+                  ),
               ];
         if (items.isEmpty) return const SizedBox.shrink();
         return AppBannerSlider(
           banners: items,
           height: placement.height,
+          radius: placement.boxRadius,
           autoPlay: autoPlay,
           autoPlayInterval: autoPlayInterval,
           openOnTap: openOnTap,
+        );
+      },
+    );
+  }
+}
+
+/// Tek görsellik şerit (Pet Market / Dost Ekle). CMS boşsa yerel görsele düşer.
+class AppBannerStrip extends StatelessWidget {
+  const AppBannerStrip({
+    super.key,
+    required this.placement,
+    this.fallbackAsset = '',
+    this.onTap,
+  });
+
+  final BannerPlacement placement;
+  final String fallbackAsset;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<AppBanner>>(
+      stream: BannerRepository.instance.watchActive(placement: placement.id),
+      builder: (context, snapshot) {
+        final remote = snapshot.data ?? const <AppBanner>[];
+        final path = remote.isNotEmpty
+            ? remote.first.displayImage
+            : fallbackAsset;
+        if (path.trim().isEmpty) return const SizedBox.shrink();
+        final fallbackImage = fallbackAsset.trim().isNotEmpty
+            ? Image.asset(
+                fallbackAsset,
+                fit: BoxFit.cover,
+                width: double.infinity,
+                height: double.infinity,
+                alignment: Alignment.center,
+                filterQuality: FilterQuality.high,
+                errorBuilder: (context, error, stackTrace) =>
+                    const SizedBox.expand(),
+              )
+            : null;
+        final strip = SizedBox(
+          width: double.infinity,
+          height: placement.height,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(placement.boxRadius),
+            child: SizedBox.expand(
+              child: buildProductImage(
+                path,
+                fit: BoxFit.cover,
+                width: double.infinity,
+                height: double.infinity,
+                alignment: Alignment.center,
+                filterQuality: FilterQuality.high,
+                cacheWidth: 1080,
+                errorWidget: fallbackImage,
+              ),
+            ),
+          ),
+        );
+        if (onTap == null) return strip;
+        return GestureDetector(
+          onTap: onTap,
+          behavior: HitTestBehavior.opaque,
+          child: strip,
         );
       },
     );
@@ -60,6 +126,7 @@ class AppBannerSlider extends StatefulWidget {
     super.key,
     required this.banners,
     this.height = 132,
+    this.radius = BannerPlacement.radius,
     this.autoPlay = false,
     this.autoPlayInterval = const Duration(seconds: 3),
     this.openOnTap = true,
@@ -67,6 +134,7 @@ class AppBannerSlider extends StatefulWidget {
 
   final List<AppBanner> banners;
   final double height;
+  final double radius;
   final bool autoPlay;
   final Duration autoPlayInterval;
   final bool openOnTap;
@@ -150,7 +218,7 @@ class _AppBannerSliderState extends State<AppBannerSlider> {
             alignment: Alignment.center,
             children: [
               ClipRRect(
-                borderRadius: BorderRadius.circular(BannerPlacement.radius),
+                borderRadius: BorderRadius.circular(widget.radius),
                 child: PageView.builder(
                   controller: _controller,
                   itemCount: banners.length,

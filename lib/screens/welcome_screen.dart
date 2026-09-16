@@ -4,8 +4,10 @@ import 'package:geliyor_app/screens/register_screen.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
+import 'package:geliyor_app/widgets/app_brand_logo.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
 import 'package:geliyor_app/widgets/app_pressable_button.dart';
+import 'package:geliyor_app/widgets/welcome_feature_circles.dart';
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
@@ -29,6 +31,8 @@ class WelcomeScreen extends StatelessWidget {
           child: Column(
             children: [
               _buildLogo(),
+              const SizedBox(height: 8),
+              const WelcomePhoneLine(),
               const SizedBox(height: 18),
               const Text(
                 'Hoş geldiniz!',
@@ -146,13 +150,6 @@ class WelcomeScreen extends StatelessWidget {
   }
 
   Widget _buildLogo() {
-    return Image.asset(
-      'assets/images/geliyor_splash_logo.png',
-      height: 240,
-      fit: BoxFit.contain,
-      filterQuality: FilterQuality.high,
-      errorBuilder: (context, error, stackTrace) =>
-          const Icon(Icons.pets_rounded, color: AppColors.primary, size: 56),
-    );
+    return const AppBrandLogo(height: 240);
   }
 }

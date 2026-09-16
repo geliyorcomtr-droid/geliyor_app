@@ -12,6 +12,7 @@ import 'package:geliyor_app/data/firestore_collections.dart';
 import 'package:geliyor_app/data/product_advantage_repository.dart';
 import 'package:geliyor_app/data/trust_badge_repository.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:geliyor_app/utils/compress_upload_image.dart';
 import 'package:geliyor_app/utils/product_image.dart';
 import 'package:geliyor_app/utils/product_skt.dart';
 import 'package:geliyor_app/widgets/preferred_rank_medal.dart';
@@ -1802,24 +1803,15 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
     String fileName,
     String folder,
   ) async {
-    final safeName = fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+    final prepared = prepareUploadImage(bytes, fileName);
     final ref = FirebaseStorage.instance.ref(
-      '$folder/${DateTime.now().microsecondsSinceEpoch}_$safeName',
+      '$folder/${DateTime.now().microsecondsSinceEpoch}_${prepared.fileName}',
     );
     await ref.putData(
-      bytes,
-      SettableMetadata(contentType: _contentTypeFor(fileName)),
+      prepared.bytes,
+      SettableMetadata(contentType: prepared.contentType),
     );
     return ref.getDownloadURL();
-  }
-
-  String _contentTypeFor(String fileName) {
-    final lower = fileName.toLowerCase();
-    if (lower.endsWith('.png')) return 'image/png';
-    if (lower.endsWith('.webp')) return 'image/webp';
-    if (lower.endsWith('.gif')) return 'image/gif';
-    if (lower.endsWith('.svg')) return 'image/svg+xml';
-    return 'image/jpeg';
   }
 
   Future<void> _showFeatureDialog({

@@ -286,6 +286,7 @@ class UserProfileSync {
               oldPrice: 0,
               imagePath: (item['imageUrl'] as String?) ?? '',
               quantity: (item['quantity'] as num?)?.toInt() ?? 1,
+              brand: (item['brand'] as String?) ?? '',
             ),
           )
           .where((item) => item.title.isNotEmpty)

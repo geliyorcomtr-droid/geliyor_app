@@ -13,14 +13,22 @@ class ProductRepository {
   CollectionReference<Map<String, dynamic>> get _col =>
       FirebaseFirestore.instance.collection(FirestoreCollections.products);
 
-  Stream<List<AdminProduct>> watchAll({bool activeOnly = true}) {
+  Stream<List<AdminProduct>> watchAll({
+    bool activeOnly = true,
+    bool inStockOnly = false,
+  }) {
     return _col
         .orderBy(ProductFields.updatedAt, descending: true)
         .snapshots()
         .map((snap) {
-          final items = snap.docs.map(AdminProduct.fromDoc).toList();
-          if (!activeOnly) return items;
-          return items.where((p) => p.active).toList();
+          var items = snap.docs.map(AdminProduct.fromDoc).toList();
+          if (activeOnly) {
+            items = items.where((p) => p.active).toList();
+          }
+          if (inStockOnly) {
+            items = items.where((p) => p.isInStock).toList();
+          }
+          return items;
         });
   }
 
@@ -29,7 +37,7 @@ class ProductRepository {
     String? subCategory,
     String? searchQuery,
   }) {
-    return watchAll(activeOnly: true).map((products) {
+    return watchAll(activeOnly: true, inStockOnly: true).map((products) {
       var filtered = products;
 
       if (mainCategory != null && mainCategory.isNotEmpty) {
@@ -64,6 +72,16 @@ class ProductRepository {
 
       return list;
     });
+  }
+
+  Future<MarketProductData?> getMarketProduct(String id) async {
+    final trimmed = id.trim();
+    if (trimmed.isEmpty) return null;
+    final doc = await _col.doc(trimmed).get();
+    if (!doc.exists) return null;
+    final product = AdminProduct.fromDoc(doc);
+    if (!product.active) return null;
+    return toMarketProduct(product);
   }
 
   static bool _matchesSubCategory(AdminProduct product, String subLower) {
