@@ -27,6 +27,7 @@ class _AdminBannersScreenState extends State<AdminBannersScreen> {
   late String _group = widget.initialGroup;
 
   bool _matches(BannerPlacement slot) {
+    if (slot.id.startsWith('home_ad_')) return false;
     if (_group == 'all') return true;
     if (_group == 'ads') return slot.pageId == 'home';
     return slot.pageId == _group;
@@ -41,6 +42,7 @@ class _AdminBannersScreenState extends State<AdminBannersScreen> {
   Future<void> _seed() async {
     try {
       await BannerRepository.instance.ensureDefaults();
+      await BannerRepository.instance.pruneStaleStripBanners();
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -77,6 +79,7 @@ class _AdminBannersScreenState extends State<AdminBannersScreen> {
       ),
     );
     if (ok != true) return;
+    await BannerRepository.deleteStorageUrl(banner.imageUrl);
     await FirebaseFirestore.instance
         .collection(FirestoreCollections.banners)
         .doc(banner.id)
@@ -357,14 +360,16 @@ class _AdminBannersScreenState extends State<AdminBannersScreen> {
         : title.text.trim();
     title.dispose();
     try {
+      final previousUrl = existing?.imageUrl.trim() ?? '';
+      final nextUrl = imageUrl.trim();
       await _save(
         AppBanner(
           id:
               existing?.id ??
               FirebaseFirestore.instance.collection('banners').doc().id,
           title: resolvedTitle,
-          imageUrl: imageUrl,
-          assetPath: existing?.assetPath ?? '',
+          imageUrl: nextUrl,
+          assetPath: nextUrl.isNotEmpty ? '' : (existing?.assetPath ?? ''),
           placement: selectedPlacement,
           order: existing?.order ?? nextOrder,
           active: active,
@@ -372,6 +377,10 @@ class _AdminBannersScreenState extends State<AdminBannersScreen> {
           linkId: linkType == BannerLinkType.none ? '' : linkId,
         ),
       );
+      if (previousUrl.isNotEmpty && previousUrl != nextUrl) {
+        await BannerRepository.deleteStorageUrl(previousUrl);
+      }
+      await BannerRepository.instance.pruneStaleStripBanners();
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

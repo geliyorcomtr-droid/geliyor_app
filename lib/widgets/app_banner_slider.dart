@@ -56,8 +56,8 @@ class AppBannerSlot extends StatelessWidget {
   }
 }
 
-/// Tek görsellik şerit (Pet Market / Dost Ekle). CMS boşsa yerel görsele düşer.
-class AppBannerStrip extends StatelessWidget {
+/// Tek görsellik şerit. İlk kare yalnızca sunucudaki en yeni `imageUrl`.
+class AppBannerStrip extends StatefulWidget {
   const AppBannerStrip({
     super.key,
     required this.placement,
@@ -70,53 +70,143 @@ class AppBannerStrip extends StatelessWidget {
   final VoidCallback? onTap;
 
   @override
+  State<AppBannerStrip> createState() => _AppBannerStripState();
+}
+
+class _AppBannerStripState extends State<AppBannerStrip> {
+  StreamSubscription<({List<AppBanner> banners, bool fromCache})>? _sub;
+  String? _path;
+  var _ready = false;
+  var _stamp = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _start();
+  }
+
+  @override
+  void didUpdateWidget(covariant AppBannerStrip oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.placement.id != widget.placement.id ||
+        oldWidget.fallbackAsset != widget.fallbackAsset) {
+      _start();
+    }
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _start() async {
+    await _sub?.cancel();
+    _sub = null;
+    if (mounted) {
+      setState(() {
+        _ready = false;
+        _path = null;
+        _stamp = 0;
+      });
+    }
+    try {
+      final banners = await BannerRepository.instance.fetchActiveFromServer(
+        placement: widget.placement.id,
+      );
+      _apply(banners, fromServer: true);
+    } catch (_) {
+      if (mounted) setState(() => _ready = true);
+    }
+    if (!mounted) return;
+    _sub = BannerRepository.instance
+        .watchActiveMeta(placement: widget.placement.id)
+        .listen((meta) {
+          if (meta.fromCache) return;
+          _apply(meta.banners, fromServer: true);
+        });
+  }
+
+  void _apply(List<AppBanner> banners, {required bool fromServer}) {
+    if (!mounted) return;
+    var list = banners;
+    if (widget.placement.id == BannerPlacement.homeDostEkle.id) {
+      list = banners
+          .where((banner) {
+            final asset = banner.assetPath.toLowerCase();
+            if (asset.contains('dostunu_taniyalim')) return false;
+            final title = banner.title.toLowerCase();
+            if (title.contains('tanıyalım') || title.contains('taniyalim')) {
+              return false;
+            }
+            return true;
+          })
+          .toList();
+    }
+    final next = AppBanner.liveNetworkPath(list);
+    final live = AppBanner.latestLive(list);
+    final nextStamp = live == null
+        ? 0
+        : AppBanner.storageUploadStamp(live.imageUrl);
+    if (_stamp > 0 && nextStamp > 0 && nextStamp < _stamp) {
+      return;
+    }
+    final path = next.isNotEmpty
+        ? next
+        : (fromServer ? widget.fallbackAsset.trim() : '');
+    if (path.isEmpty && !fromServer) return;
+    if (_path != null &&
+        _path!.startsWith('http') &&
+        path.isNotEmpty &&
+        !path.startsWith('http')) {
+      return;
+    }
+    if (_path == path && _ready) return;
+    final previous = _path;
+    if (previous != null && previous != path) {
+      final provider = productImageProvider(previous, cacheWidth: 1080);
+      if (provider != null) {
+        imageCache.evict(provider);
+      }
+    }
+    setState(() {
+      _ready = true;
+      _path = path.isEmpty ? null : path;
+      if (nextStamp > 0) _stamp = nextStamp;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return StreamBuilder<List<AppBanner>>(
-      stream: BannerRepository.instance.watchActive(placement: placement.id),
-      builder: (context, snapshot) {
-        final remote = snapshot.data ?? const <AppBanner>[];
-        final path = remote.isNotEmpty
-            ? remote.first.displayImage
-            : fallbackAsset;
-        if (path.trim().isEmpty) return const SizedBox.shrink();
-        final fallbackImage = fallbackAsset.trim().isNotEmpty
-            ? Image.asset(
-                fallbackAsset,
-                fit: BoxFit.cover,
-                width: double.infinity,
-                height: double.infinity,
-                alignment: Alignment.center,
-                filterQuality: FilterQuality.high,
-                errorBuilder: (context, error, stackTrace) =>
-                    const SizedBox.expand(),
-              )
-            : null;
-        final strip = SizedBox(
-          width: double.infinity,
-          height: placement.height,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(placement.boxRadius),
-            child: SizedBox.expand(
-              child: buildProductImage(
-                path,
-                fit: BoxFit.cover,
-                width: double.infinity,
-                height: double.infinity,
-                alignment: Alignment.center,
-                filterQuality: FilterQuality.high,
-                cacheWidth: 1080,
-                errorWidget: fallbackImage,
-              ),
+    if (!_ready || _path == null) {
+      return SizedBox(height: widget.placement.height);
+    }
+    final strip = SizedBox(
+      width: double.infinity,
+      height: widget.placement.height,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(widget.placement.boxRadius),
+        child: SizedBox.expand(
+          child: KeyedSubtree(
+            key: ValueKey(_path),
+            child: buildProductImage(
+              _path!,
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: double.infinity,
+              alignment: Alignment.center,
+              filterQuality: FilterQuality.high,
+              cacheWidth: 1080,
             ),
           ),
-        );
-        if (onTap == null) return strip;
-        return GestureDetector(
-          onTap: onTap,
-          behavior: HitTestBehavior.opaque,
-          child: strip,
-        );
-      },
+        ),
+      ),
+    );
+    if (widget.onTap == null) return strip;
+    return GestureDetector(
+      onTap: widget.onTap,
+      behavior: HitTestBehavior.opaque,
+      child: strip,
     );
   }
 }

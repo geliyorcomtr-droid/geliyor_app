@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:geliyor_app/data/firestore_collections.dart';
 
 /// Sayfa bannerleri: ortak carousel yapısı, her bölümün kendi yüksekliği.
@@ -218,7 +219,10 @@ class BannerPlacement {
     pageId: 'meet_pet',
     pageLabel: 'Dostunu Tanıyalım',
     slotLabel: 'Sayfa bannerı',
-    height: 120,
+    height: 82,
+    boxWidth: 361,
+    boxRadius: 24,
+    description: '361×82 · Dostlarım sayfa bannerı',
   );
   static const emergency = BannerPlacement(
     id: 'emergency',
@@ -264,10 +268,6 @@ class BannerPlacement {
   static const values = <BannerPlacement>[
     home,
     homeBottom,
-    homeAd1,
-    homeAd2,
-    homeAd3,
-    homeAd4,
     homeDostEkle,
     homePetMarket,
     homeSahiplendirme,
@@ -328,6 +328,7 @@ class AppBanner {
     this.linkType = BannerLinkType.none,
     this.linkId = '',
     this.linkLabel = '',
+    this.updatedAt,
   });
 
   final String id;
@@ -340,6 +341,7 @@ class AppBanner {
   final String linkType;
   final String linkId;
   final String linkLabel;
+  final DateTime? updatedAt;
 
   String get displayImage => imageUrl.trim().isNotEmpty ? imageUrl : assetPath;
 
@@ -370,6 +372,9 @@ class AppBanner {
       linkType: (data[BannerFields.linkType] as String?) ?? BannerLinkType.none,
       linkId: (data[BannerFields.linkId] as String?) ?? '',
       linkLabel: (data[BannerFields.linkLabel] as String?) ?? '',
+      updatedAt: data[BannerFields.updatedAt] is Timestamp
+          ? (data[BannerFields.updatedAt] as Timestamp).toDate()
+          : null,
     );
   }
 
@@ -398,6 +403,7 @@ class AppBanner {
     String? linkType,
     String? linkId,
     String? linkLabel,
+    DateTime? updatedAt,
   }) {
     return AppBanner(
       id: id,
@@ -410,23 +416,50 @@ class AppBanner {
       linkType: linkType ?? this.linkType,
       linkId: linkId ?? this.linkId,
       linkLabel: linkLabel ?? this.linkLabel,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
+  }
+
+  static int storageUploadStamp(String imageUrl) {
+    final decoded = Uri.decodeComponent(imageUrl.trim());
+    final match = RegExp(r'banners/(\d+)_').firstMatch(decoded);
+    return int.tryParse(match?.group(1) ?? '') ?? 0;
+  }
+
+  static AppBanner? latestLive(List<AppBanner> banners) {
+    if (banners.isEmpty) return null;
+    final ranked = [...banners]..sort((a, b) {
+      final byUrl = (b.imageUrl.trim().isNotEmpty ? 1 : 0).compareTo(
+        a.imageUrl.trim().isNotEmpty ? 1 : 0,
+      );
+      if (byUrl != 0) return byUrl;
+      final byStamp = storageUploadStamp(
+        b.imageUrl,
+      ).compareTo(storageUploadStamp(a.imageUrl));
+      if (byStamp != 0) return byStamp;
+      final left = a.updatedAt;
+      final right = b.updatedAt;
+      if (left != null || right != null) {
+        return (right ?? DateTime.fromMillisecondsSinceEpoch(0)).compareTo(
+          left ?? DateTime.fromMillisecondsSinceEpoch(0),
+        );
+      }
+      return b.order.compareTo(a.order);
+    });
+    return ranked.first;
+  }
+
+  static String liveNetworkPath(List<AppBanner> banners) {
+    final live = latestLive(banners);
+    final url = live?.imageUrl.trim() ?? '';
+    if (url.isEmpty) return '';
+    final stamp = live!.updatedAt?.millisecondsSinceEpoch;
+    if (stamp == null) return url;
+    return url.contains('?') ? '$url&v=$stamp' : '$url?v=$stamp';
   }
 }
 
 const defaultBanners = <AppBanner>[
-  AppBanner(
-    id: 'home-dost-ekle',
-    title: 'Dost Ekle',
-    assetPath: 'assets/images/home_dost_ekle.jpg',
-    placement: 'home_dost_ekle',
-  ),
-  AppBanner(
-    id: 'home-pet-market',
-    title: 'Pet Market',
-    assetPath: 'assets/images/home_pet_market.png',
-    placement: 'home_pet_market',
-  ),
   AppBanner(
     id: 'home-sahiplendirme',
     title: 'Sahiplendirme',
@@ -554,6 +587,23 @@ class BannerRepository {
         batch.set(_col.doc(banner.id), banner.toMap());
         writes++;
       }
+      // Dostlarım bannerı: yeni varsayılan görsele geç (eski Storage yüklemesini düşür).
+      const meetPetId = 'meet-pet';
+      const meetPetRev = 2;
+      if (existingIds.contains(meetPetId)) {
+        final meetDoc = snap.docs.firstWhere((doc) => doc.id == meetPetId);
+        final rev = (meetDoc.data()['bannerRev'] as num?)?.toInt() ?? 0;
+        if (rev < meetPetRev) {
+          batch.set(_col.doc(meetPetId), {
+            BannerFields.assetPath:
+                'assets/images/dostunu_taniyalim_banner.png',
+            BannerFields.imageUrl: '',
+            'bannerRev': meetPetRev,
+            BannerFields.updatedAt: FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+          writes++;
+        }
+      }
       if (!existingIds.contains(seededDocId)) {
         batch.set(_col.doc(seededDocId), {
           'seeded': true,
@@ -562,13 +612,166 @@ class BannerRepository {
         writes++;
       }
       if (writes > 0) await batch.commit();
+      await pruneStaleStripBanners();
+      await restoreHomeDostEkleIfMeetPetLeaked();
     } catch (_) {
       // Mobil istemci yazma yetkisine sahip olmayabilir.
     }
   }
 
+  /// Ana sayfa Dost Ekle şeridine Dostlarım bannerı yazıldıysa geri al.
+  Future<void> restoreHomeDostEkleIfMeetPetLeaked() async {
+    try {
+      final snap = await _col.get(const GetOptions(source: Source.server));
+      final banners = snap.docs
+          .where(_isBannerDoc)
+          .map(AppBanner.fromDoc)
+          .toList();
+      final home = banners
+          .where((item) => item.placement == 'home_dost_ekle')
+          .toList();
+      final meetUrls = banners
+          .where((item) => item.placement == 'meet_pet')
+          .map((item) => item.imageUrl.trim())
+          .where((url) => url.isNotEmpty)
+          .toSet();
+
+      bool isMeetPetGraphic(AppBanner banner) {
+        final asset = banner.assetPath.toLowerCase();
+        if (asset.contains('dostunu_taniyalim')) return true;
+        final title = banner.title.toLowerCase();
+        if (title.contains('tanıyalım') || title.contains('taniyalim')) {
+          return true;
+        }
+        final url = banner.imageUrl.trim();
+        if (url.isNotEmpty && meetUrls.contains(url)) return true;
+        return false;
+      }
+
+      var changed = false;
+      final cutoff = DateTime(2026, 9, 17);
+      for (final banner in home.where((item) => item.active)) {
+        final leaked = isMeetPetGraphic(banner);
+        final stamp = AppBanner.storageUploadStamp(banner.imageUrl);
+        final when = stamp > 0
+            ? DateTime.fromMillisecondsSinceEpoch(stamp)
+            : banner.updatedAt;
+        final uploadedToday =
+            when != null && !when.isBefore(cutoff) && banner.imageUrl.trim().isNotEmpty;
+        if (!leaked && !uploadedToday) continue;
+        if (!leaked && uploadedToday) {
+          final hasPrevious = home.any(
+            (item) =>
+                item.id != banner.id && item.imageUrl.trim().isNotEmpty,
+          );
+          if (!hasPrevious) continue;
+        }
+        await _col.doc(banner.id).set({
+          BannerFields.active: false,
+          if (leaked) BannerFields.assetPath: '',
+          BannerFields.updatedAt: FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+        changed = true;
+      }
+
+      final remaining = home.where(
+        (item) =>
+            item.active &&
+            !isMeetPetGraphic(item) &&
+            item.displayImage.trim().isNotEmpty,
+      );
+      if (remaining.isNotEmpty) return;
+      if (!changed && home.where((item) => item.active).isNotEmpty) return;
+
+      final previous = home
+          .where(
+            (item) =>
+                !isMeetPetGraphic(item) && item.imageUrl.trim().isNotEmpty,
+          )
+          .toList()
+        ..sort((a, b) {
+          final byStamp = AppBanner.storageUploadStamp(
+            b.imageUrl,
+          ).compareTo(AppBanner.storageUploadStamp(a.imageUrl));
+          if (byStamp != 0) return byStamp;
+          return (b.updatedAt ?? DateTime.fromMillisecondsSinceEpoch(0))
+              .compareTo(a.updatedAt ?? DateTime.fromMillisecondsSinceEpoch(0));
+        });
+      if (previous.isEmpty) return;
+      await _col.doc(previous.first.id).set({
+        BannerFields.active: true,
+        BannerFields.updatedAt: FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (_) {}
+  }
+
+  /// Aynı slottaki eski bannerleri kapatır ve Storage dosyalarını siler.
+  Future<void> pruneStaleStripBanners() async {
+    const placements = {
+      'home_pet_market',
+      'home_dost_ekle',
+      'home_sahiplendirme',
+    };
+    try {
+      final snap = await _col.get(const GetOptions(source: Source.server));
+      final banners = snap.docs
+          .where(_isBannerDoc)
+          .map(AppBanner.fromDoc)
+          .toList();
+      for (final placement in placements) {
+        final group = banners
+            .where((item) => item.placement == placement && item.active)
+            .toList();
+        final keep = AppBanner.latestLive(group);
+        if (keep == null) continue;
+        if (keep.imageUrl.trim().isNotEmpty && keep.assetPath.trim().isNotEmpty) {
+          await _col.doc(keep.id).set({
+            BannerFields.assetPath: '',
+          }, SetOptions(merge: true));
+        }
+        for (final banner in group) {
+          if (banner.id == keep.id) continue;
+          if (banner.imageUrl.trim().isNotEmpty) {
+            await deleteStorageUrl(banner.imageUrl);
+          }
+          await _col.doc(banner.id).set({
+            BannerFields.active: false,
+            BannerFields.assetPath: '',
+            BannerFields.updatedAt: FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+        }
+      }
+      await pruneOrphanBannerFiles();
+    } catch (_) {}
+  }
+
+  Future<void> pruneOrphanBannerFiles() async {
+    try {
+      final snap = await _col.get(const GetOptions(source: Source.server));
+      final used = <String>{};
+      for (final doc in snap.docs.where(_isBannerDoc)) {
+        final url = AppBanner.fromDoc(doc).imageUrl.trim();
+        if (url.isEmpty || !url.startsWith('http')) continue;
+        try {
+          used.add(FirebaseStorage.instance.refFromURL(url).fullPath);
+        } catch (_) {}
+      }
+      final listed = await FirebaseStorage.instance.ref('banners').listAll();
+      for (final item in listed.items) {
+        if (used.contains(item.fullPath)) continue;
+        try {
+          await item.delete();
+        } catch (_) {}
+      }
+    } catch (_) {}
+  }
+
   Stream<List<AppBanner>> watchAll() {
-    return _col.snapshots().map((snap) {
+    return watchAllMeta().map((item) => item.banners);
+  }
+
+  Stream<({List<AppBanner> banners, bool fromCache})> watchAllMeta() {
+    return _col.snapshots(includeMetadataChanges: true).map((snap) {
       final list = snap.docs
           .where(_isBannerDoc)
           .map(AppBanner.fromDoc)
@@ -578,7 +781,7 @@ class BannerRepository {
           if (byPlacement != 0) return byPlacement;
           return a.order.compareTo(b.order);
         });
-      return list;
+      return (banners: list, fromCache: snap.metadata.isFromCache);
     });
   }
 
@@ -593,5 +796,43 @@ class BannerRepository {
           )
           .toList();
     });
+  }
+
+  Stream<({List<AppBanner> banners, bool fromCache})> watchActiveMeta({
+    String? placement,
+  }) {
+    return watchAllMeta().map((item) {
+      final banners = item.banners
+          .where(
+            (banner) =>
+                banner.active &&
+                banner.displayImage.isNotEmpty &&
+                (placement == null || banner.placement == placement),
+          )
+          .toList();
+      return (banners: banners, fromCache: item.fromCache);
+    });
+  }
+
+  Future<List<AppBanner>> fetchActiveFromServer({String? placement}) async {
+    final snap = await _col.get(const GetOptions(source: Source.server));
+    return snap.docs
+        .where(_isBannerDoc)
+        .map(AppBanner.fromDoc)
+        .where(
+          (item) =>
+              item.active &&
+              item.displayImage.isNotEmpty &&
+              (placement == null || item.placement == placement),
+        )
+        .toList();
+  }
+
+  static Future<void> deleteStorageUrl(String url) async {
+    final trimmed = url.trim();
+    if (trimmed.isEmpty || !trimmed.startsWith('http')) return;
+    try {
+      await FirebaseStorage.instance.refFromURL(trimmed).delete();
+    } catch (_) {}
   }
 }

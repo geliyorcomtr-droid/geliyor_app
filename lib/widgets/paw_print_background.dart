@@ -33,10 +33,12 @@ class PawPrintBackground extends StatelessWidget {
     super.key,
     required this.child,
     this.style = PawPrintStyle.page,
+    this.tint,
   });
 
   final Widget child;
   final PawPrintStyle style;
+  final Color? tint;
 
   static const _splashPrints = <_PawSpec>[
     _PawSpec(
@@ -306,7 +308,7 @@ class PawPrintBackground extends StatelessWidget {
                   child: Icon(
                     Icons.pets_rounded,
                     size: spec.size,
-                    color: spec.color.withValues(alpha: spec.opacity),
+                    color: (tint ?? spec.color).withValues(alpha: spec.opacity),
                   ),
                 ),
               ),

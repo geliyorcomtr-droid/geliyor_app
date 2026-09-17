@@ -36,6 +36,7 @@ class _AddPetScreenState extends State<AddPetScreen> {
   String? _bodyType = 'İdeal';
   String? _activityLevel = 'Orta';
   String? _extraFood;
+  String? _gender;
   Uint8List? _photoBytes;
   String? _photoUrl;
   bool _saving = false;
@@ -105,6 +106,7 @@ class _AddPetScreenState extends State<AddPetScreen> {
       _bodyType = pet.bodyType ?? 'İdeal';
       _activityLevel = pet.activityLevel;
       _extraFood = pet.extraFood;
+      _gender = pet.gender;
       _photoUrl = pet.photoUrl;
     }
   }
@@ -328,6 +330,7 @@ class _AddPetScreenState extends State<AddPetScreen> {
             dailyFoodGrams: dailyFoodGrams,
             allergies: existing.allergies,
             photoUrl: photoUrl ?? existing.photoUrl,
+            gender: _gender,
           ),
         );
       } else {
@@ -345,6 +348,7 @@ class _AddPetScreenState extends State<AddPetScreen> {
             extraFood: _extraFood,
             dailyFoodGrams: dailyFoodGrams,
             photoUrl: photoUrl,
+            gender: _gender,
           ),
         );
       }
@@ -386,6 +390,11 @@ class _AddPetScreenState extends State<AddPetScreen> {
                 number: '1',
                 title: 'Türü nedir?',
                 child: _buildSpeciesRow(),
+              ),
+              const SizedBox(height: 10),
+              _buildQuestion(
+                title: 'Cinsiyeti nedir?',
+                child: _buildGenderRow(),
               ),
               const SizedBox(height: 10),
               _buildQuestion(
@@ -622,6 +631,26 @@ class _AddPetScreenState extends State<AddPetScreen> {
           selected: _species == 'Kedi',
           compact: true,
           onTap: () => _selectSpecies('Kedi'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGenderRow() {
+    return Row(
+      children: [
+        _OptionChip(
+          label: 'Dişi',
+          selected: _gender == 'Dişi',
+          compact: true,
+          onTap: () => setState(() => _gender = 'Dişi'),
+        ),
+        const SizedBox(width: 6),
+        _OptionChip(
+          label: 'Erkek',
+          selected: _gender == 'Erkek',
+          compact: true,
+          onTap: () => setState(() => _gender = 'Erkek'),
         ),
       ],
     );

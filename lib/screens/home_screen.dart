@@ -1,7 +1,8 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:async';
+
+import 'package:flutter/material.dart';
 import 'package:geliyor_app/data/banner_repository.dart';
 import 'package:geliyor_app/data/brand_repository.dart';
-import 'package:geliyor_app/data/product_repository.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/screens/easy_order_screen.dart';
 import 'package:geliyor_app/screens/filter_screen.dart';
@@ -12,7 +13,6 @@ import 'package:geliyor_app/screens/meet_pet_screen.dart';
 import 'package:geliyor_app/screens/adoption_screen.dart';
 import 'package:geliyor_app/screens/pet_market_products_screen.dart';
 import 'package:geliyor_app/screens/pet_market_screen.dart';
-import 'package:geliyor_app/screens/product_detail_screen.dart';
 import 'package:geliyor_app/screens/smart_plan_screen.dart';
 import 'package:geliyor_app/services/food_remaining_estimator.dart';
 import 'package:geliyor_app/state/food_tracking_store.dart';
@@ -20,12 +20,10 @@ import 'package:geliyor_app/state/order_store.dart';
 import 'package:geliyor_app/state/pet_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/utils/advantage_search.dart';
-import 'package:geliyor_app/utils/product_image.dart';
 import 'package:geliyor_app/widgets/app_banner_slider.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
-import 'package:geliyor_app/widgets/banner_image_preview.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -58,30 +56,6 @@ class _HomeScreenState extends State<HomeScreen> {
   static const double _serviceCardHeight = 118;
   static const double _serviceCardGap = 8;
   static const double _serviceCardRadius = 18;
-  static const double _homeBrandBox = 84;
-  static const _homeAdSlots =
-      <({BannerPlacement placement, String brand, String fallbackAsset})>[
-        (
-          placement: BannerPlacement.homeAd1,
-          brand: "Hill's",
-          fallbackAsset: 'assets/images/brands/hills.png',
-        ),
-        (
-          placement: BannerPlacement.homeAd2,
-          brand: 'Royal Canin',
-          fallbackAsset: 'assets/images/brands/royal_canin.png',
-        ),
-        (
-          placement: BannerPlacement.homeAd3,
-          brand: 'N&D',
-          fallbackAsset: 'assets/images/brands/nd.png',
-        ),
-        (
-          placement: BannerPlacement.homeAd4,
-          brand: 'Pro Plan',
-          fallbackAsset: 'assets/images/brands/proplan.png',
-        ),
-      ];
 
   final _searchController = TextEditingController();
   static const double _actionBarHeight = 48;
@@ -89,6 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    unawaited(BannerRepository.instance.restoreHomeDostEkleIfMeetPetLeaked());
   }
 
   @override
@@ -149,15 +124,27 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 12),
               _buildSpecialServices(),
               const SizedBox(height: 12),
-              _buildPetMarket(),
-              const SizedBox(height: 12),
-              _buildDostEkle(),
+              _ovalFramedStrip(
+                color: AppColors.success,
+                child: _buildPetMarket(),
+              ),
+              const SizedBox(height: _serviceCardGap),
+              _ovalFramedStrip(
+                color: AppColors.error,
+                child: _buildDostEkle(),
+              ),
               const SizedBox(height: 12),
               _buildHomeAdRow(),
               const SizedBox(height: 12),
-              _buildAdoption(),
+              _ovalFramedStrip(
+                color: AppColors.warning,
+                child: _buildAdoption(),
+              ),
               const SizedBox(height: 12),
-              _buildHomeHalfBanner(),
+              _ovalFramedStrip(
+                color: AppColors.violet,
+                child: _buildHomeHalfBanner(),
+              ),
               const SizedBox(height: 12),
             ],
           ),
@@ -358,9 +345,11 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               Image.asset(
                 'assets/images/home_akilli_plan.jpg',
+                key: const ValueKey('home-akilli-plan-original'),
                 fit: BoxFit.cover,
                 alignment: Alignment.center,
                 filterQuality: FilterQuality.high,
+                gaplessPlayback: false,
               ),
               Positioned(
                 left: 8,
@@ -571,10 +560,28 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
 
+  Widget _ovalFramedStrip({
+    required Color color,
+    required Widget child,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(999),
+        child: child,
+      ),
+    );
+  }
+
   Widget _buildDostEkle() {
     return AppBannerStrip(
       placement: BannerPlacement.homeDostEkle,
-      fallbackAsset: 'assets/images/home_dost_ekle.jpg',
+      fallbackAsset: '',
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const MeetPetScreen()),
@@ -586,7 +593,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildPetMarket() {
     return AppBannerStrip(
       placement: BannerPlacement.homePetMarket,
-      fallbackAsset: 'assets/images/home_pet_market.png',
+      fallbackAsset: '',
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const PetMarketScreen()),
@@ -596,98 +603,87 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHomeAdRow() {
-    return StreamBuilder<List<AppBanner>>(
-      stream: BannerRepository.instance.watchActive(),
-      builder: (context, snapshot) {
-        final banners = snapshot.data ?? const <AppBanner>[];
-        return SizedBox(
-          height: _homeBrandBox,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              for (final slot in _homeAdSlots)
-                _homeAdCard(
-                  slot: slot,
-                  banner: _adBannerFor(slot.placement.id, banners),
-                ),
-            ],
-          ),
+    return ListenableBuilder(
+      listenable: BrandRepository.instance,
+      builder: (context, _) {
+        final brands = BrandRepository.instance.cached
+            .where((brand) => brand.active)
+            .toList();
+        if (brands.isEmpty) return const SizedBox.shrink();
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            const gap = _serviceCardGap;
+            final box = (constraints.maxWidth - gap * 3) / 4;
+            return SizedBox(
+              height: box,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                itemCount: brands.length,
+                separatorBuilder: (context, index) => const SizedBox(width: gap),
+                itemBuilder: (context, index) {
+                  return SizedBox(
+                    width: box,
+                    height: box,
+                    child: _homeBrandCard(brands[index]),
+                  );
+                },
+              ),
+            );
+          },
         );
       },
     );
   }
 
-  AppBanner? _adBannerFor(String placement, List<AppBanner> banners) {
-    for (final item in banners) {
-      if (item.placement == placement && item.displayImage.isNotEmpty) {
-        return item;
-      }
-    }
-    return null;
-  }
-
-  Future<void> _openHomeAd({
-    required AppBanner? banner,
-    required String brand,
-  }) async {
-    if (banner != null &&
-        banner.linkType == BannerLinkType.product &&
-        banner.linkId.trim().isNotEmpty) {
-      final product = await ProductRepository.instance.getMarketProduct(
-        banner.linkId,
-      );
-      if (!mounted) return;
-      if (product != null) {
-        await Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => ProductDetailScreen(product: product),
-          ),
-        );
-        return;
-      }
-    }
-    if (banner != null &&
-        banner.linkType == BannerLinkType.article &&
-        banner.linkId.trim().isNotEmpty) {
-      await BannerImagePreview.show(context, banner);
-      return;
-    }
-    if (!mounted) return;
-    await Navigator.of(context).push(
+  void _openBrand(AppBrand brand) {
+    Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => PetMarketProductsScreen(initialBrand: brand),
+        builder: (_) => PetMarketProductsScreen(initialBrand: brand.name),
       ),
     );
   }
 
-  Widget _homeAdCard({
-    required ({BannerPlacement placement, String brand, String fallbackAsset})
-        slot,
-    required AppBanner? banner,
-  }) {
-    final path = slot.fallbackAsset;
+  Widget _homeBrandCard(AppBrand brand) {
+    final fallback = Center(
+      child: Text(
+        brand.name,
+        textAlign: TextAlign.center,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          color: AppColors.primary,
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+    Widget image = fallback;
+    if (brand.imageUrl.isNotEmpty) {
+      image = Image.network(
+        brand.imageUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => fallback,
+      );
+    } else if (brand.assetPath.isNotEmpty) {
+      image = Image.asset(
+        brand.assetPath,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => fallback,
+      );
+    }
     return GestureDetector(
-      onTap: () => _openHomeAd(banner: banner, brand: slot.brand),
+      onTap: () => _openBrand(brand),
       child: Container(
-        width: _homeBrandBox,
-        height: _homeBrandBox,
-        padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(_serviceCardRadius),
           border: Border.all(color: AppColors.border),
         ),
+        padding: const EdgeInsets.all(8),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
-          child: buildProductImage(
-            path,
-            fit: BoxFit.contain,
-            width: double.infinity,
-            height: double.infinity,
-            alignment: Alignment.center,
-            filterQuality: FilterQuality.medium,
-            cacheWidth: 400,
-          ),
+          child: Transform.scale(scale: 1.08, child: image),
         ),
       ),
     );

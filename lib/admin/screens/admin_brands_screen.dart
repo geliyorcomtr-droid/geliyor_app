@@ -171,7 +171,7 @@ class _AdminBrandsScreenState extends State<AdminBrandsScreen> {
         id: id,
         name: brandName,
         imageUrl: uploadedImage,
-        assetPath: existing?.assetPath ?? '',
+        assetPath: uploadedImage.isNotEmpty ? '' : (existing?.assetPath ?? ''),
         order: brandOrder,
         active: active,
         feeding: existing?.feeding ?? BrandFeedingGuide.empty,
@@ -190,7 +190,16 @@ class _AdminBrandsScreenState extends State<AdminBrandsScreen> {
   Future<void> _changeImage(AppBrand brand) async {
     final url = await _pickAndUploadImage();
     if (url == null) return;
-    await BrandRepository.instance.save(brand.copyWith(imageUrl: url));
+    await BrandRepository.instance.save(
+      AppBrand(
+        id: brand.id,
+        name: brand.name,
+        imageUrl: url,
+        order: brand.order,
+        active: brand.active,
+        feeding: brand.feeding,
+      ),
+    );
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('${brand.name} görseli güncellendi.')),
@@ -525,7 +534,9 @@ class _AdminBrandsScreenState extends State<AdminBrandsScreen> {
     final image = imageUrl.isNotEmpty
         ? Image.network(
             imageUrl,
+            key: ValueKey(imageUrl),
             fit: BoxFit.contain,
+            gaplessPlayback: false,
             errorBuilder: (_, _, _) => fallback,
           )
         : assetPath.isNotEmpty

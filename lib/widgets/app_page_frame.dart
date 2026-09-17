@@ -17,6 +17,7 @@ class AppPageFrame extends StatelessWidget {
     this.backgroundColor = AppColors.background,
     this.showPawPrints = true,
     this.pawPrintStyle = PawPrintStyle.page,
+    this.pawPrintColor,
   });
 
   /// Standart dikey yerleşimli sayfa.
@@ -30,12 +31,14 @@ class AppPageFrame extends StatelessWidget {
     Widget? navbar,
     bool showPawPrints = true,
     PawPrintStyle pawPrintStyle = PawPrintStyle.page,
+    Color? pawPrintColor,
   }) {
     return AppPageFrame(
       key: key,
       backgroundColor: backgroundColor,
       showPawPrints: showPawPrints,
       pawPrintStyle: pawPrintStyle,
+      pawPrintColor: pawPrintColor,
       child: Builder(
         builder: (context) {
           final padding = MediaQuery.paddingOf(context);
@@ -99,12 +102,17 @@ class AppPageFrame extends StatelessWidget {
   final Color backgroundColor;
   final bool showPawPrints;
   final PawPrintStyle pawPrintStyle;
+  final Color? pawPrintColor;
 
   @override
   Widget build(BuildContext context) {
     Widget body = SizedBox.expand(child: child);
     if (showPawPrints) {
-      body = PawPrintBackground(style: pawPrintStyle, child: body);
+      body = PawPrintBackground(
+        style: pawPrintStyle,
+        tint: pawPrintColor,
+        child: body,
+      );
     }
     return ColoredBox(color: backgroundColor, child: body);
   }

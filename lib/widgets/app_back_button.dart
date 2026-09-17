@@ -9,11 +9,13 @@ class AppBackButton extends StatelessWidget {
     this.onPressed,
     this.size = 34,
     this.iconSize = 16,
+    this.color = AppColors.primary,
   });
 
   final VoidCallback? onPressed;
   final double size;
   final double iconSize;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
@@ -27,11 +29,11 @@ class AppBackButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: color.withValues(alpha: 0.35)),
         ),
         child: Icon(
           Icons.arrow_back_ios_new_rounded,
-          color: AppColors.primary,
+          color: color,
           size: iconSize,
         ),
       ),

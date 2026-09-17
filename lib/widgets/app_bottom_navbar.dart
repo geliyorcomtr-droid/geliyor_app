@@ -17,10 +17,12 @@ class AppBottomNavbar extends StatelessWidget {
     super.key,
     this.activeTab = AppNavTab.home,
     this.height = AppPageFrame.bottomNavHeight,
+    this.homeColor = AppColors.primary,
   });
 
   final AppNavTab activeTab;
   final double height;
+  final Color homeColor;
 
   static const double _iconSize = 22;
   static const double _labelGap = 3;
@@ -180,11 +182,11 @@ class AppBottomNavbar extends StatelessWidget {
               width: _homeButtonSize,
               height: _homeButtonSize,
               decoration: BoxDecoration(
-                color: AppColors.primary,
+                color: homeColor,
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.35),
+                    color: homeColor.withValues(alpha: 0.35),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),

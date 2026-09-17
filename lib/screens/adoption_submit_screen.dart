@@ -632,44 +632,35 @@ class _AdoptionSubmitScreenState extends State<AdoptionSubmitScreen> {
             ],
             _sectionTitle(1, 'İlan Türü'),
             const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: _choiceChip(
-                    icon: Icons.home_rounded,
-                    label: 'Sahiplendirme',
-                    selected: _category == AdoptionCategories.adopt,
-                    onTap: () => setState(
-                      () => _category = AdoptionCategories.adopt,
+            SizedBox(
+              height: 118,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _typeCard(
+                      id: AdoptionCategories.adopt,
+                      icon: Icons.home_rounded,
+                      color: AppColors.warning,
                     ),
-                    expanded: true,
                   ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _choiceChip(
-                    icon: Icons.search_rounded,
-                    label: 'Aranıyor',
-                    selected: _category == AdoptionCategories.lost,
-                    onTap: () => setState(
-                      () => _category = AdoptionCategories.lost,
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _typeCard(
+                      id: AdoptionCategories.lost,
+                      icon: Icons.search_rounded,
+                      color: AppColors.primary,
                     ),
-                    expanded: true,
                   ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _choiceChip(
-                    icon: Icons.verified_rounded,
-                    label: 'Bulundu',
-                    selected: _category == AdoptionCategories.found,
-                    onTap: () => setState(
-                      () => _category = AdoptionCategories.found,
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _typeCard(
+                      id: AdoptionCategories.found,
+                      icon: Icons.pets_rounded,
+                      color: AppColors.success,
                     ),
-                    expanded: true,
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
             const SizedBox(height: 16),
             _sectionTitle(2, 'Dostunun Bilgileri'),
@@ -1102,6 +1093,84 @@ class _AdoptionSubmitScreenState extends State<AdoptionSubmitScreen> {
         const SizedBox(width: 8),
         Expanded(child: Text(title, style: AppTextStyles.sectionHeader)),
       ],
+    );
+  }
+
+  Widget _typeCard({
+    required String id,
+    required IconData icon,
+    required Color color,
+  }) {
+    final selected = _category == id;
+    return GestureDetector(
+      onTap: () => setState(() => _category = id),
+      child: Container(
+        height: 118,
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: selected ? color : color.withValues(alpha: 0.22),
+            width: selected ? 1.6 : 1,
+          ),
+        ),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            children: [
+              Expanded(
+                child: FittedBox(
+                  fit: BoxFit.contain,
+                  child: Icon(icon, color: color, size: 48),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                AdoptionCategories.label(id),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  height: 1.1,
+                ),
+              ),
+              Text(
+                AdoptionCategories.subtitle(id),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.subText,
+                  fontSize: 8.5,
+                  fontWeight: FontWeight.w600,
+                  height: 1.1,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Icon(
+                  selected ? Icons.check_rounded : Icons.circle_outlined,
+                  size: 12,
+                  color: AppColors.surface,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

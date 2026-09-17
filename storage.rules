@@ -57,8 +57,9 @@ service firebase.storage {
 
     match /banners/{allPaths=**} {
       allow read: if true;
-      allow write: if isAdmin()
+      allow create, update: if isAdmin()
         && request.resource.size < 8 * 1024 * 1024;
+      allow delete: if isAdmin();
     }
 
     match /knowledge_articles/{allPaths=**} {

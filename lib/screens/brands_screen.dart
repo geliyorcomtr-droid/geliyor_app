@@ -86,8 +86,11 @@ class BrandsScreen extends StatelessWidget {
             borderRadius: BorderRadius.circular(18),
             border: Border.all(color: AppColors.border),
           ),
-          padding: const EdgeInsets.all(8),
-          child: _brandImage(brand),
+          padding: const EdgeInsets.all(10),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: _brandImage(brand),
+          ),
         ),
       ),
     );
@@ -108,17 +111,23 @@ class BrandsScreen extends StatelessWidget {
       ),
     );
     if (brand.imageUrl.isNotEmpty) {
-      return Image.network(
-        brand.imageUrl,
-        fit: BoxFit.contain,
-        errorBuilder: (_, _, _) => fallback,
+      return Transform.scale(
+        scale: 1.08,
+        child: Image.network(
+          brand.imageUrl,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => fallback,
+        ),
       );
     }
     if (brand.assetPath.isNotEmpty) {
-      return Image.asset(
-        brand.assetPath,
-        fit: BoxFit.contain,
-        errorBuilder: (_, _, _) => fallback,
+      return Transform.scale(
+        scale: 1.08,
+        child: Image.asset(
+          brand.assetPath,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => fallback,
+        ),
       );
     }
     return fallback;

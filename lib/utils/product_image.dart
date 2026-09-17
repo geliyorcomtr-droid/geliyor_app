@@ -158,7 +158,7 @@ class _FittedDecodeImage extends StatelessWidget {
           height: height,
           alignment: alignment,
           filterQuality: filterQuality,
-          gaplessPlayback: true,
+          gaplessPlayback: false,
           errorBuilder: (_, _, _) => fallback,
         );
       },

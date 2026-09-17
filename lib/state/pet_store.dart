@@ -18,6 +18,7 @@ class PetData {
     this.dailyFoodGrams,
     this.allergies = const [],
     this.photoUrl,
+    this.gender,
   });
 
   final String name;
@@ -31,6 +32,7 @@ class PetData {
   final int? dailyFoodGrams;
   final List<String> allergies;
   final String? photoUrl;
+  final String? gender;
 
   String get fallbackAsset => species == 'Köpek'
       ? 'assets/images/luna_kopek.png'
@@ -75,6 +77,7 @@ class PetData {
       PetFields.dailyFoodGrams: dailyFoodGrams,
       PetFields.allergies: allergies,
       PetFields.photoUrl: photoUrl,
+      PetFields.gender: gender,
     };
   }
 
@@ -94,6 +97,7 @@ class PetData {
           ? rawAllergies.map((item) => item.toString()).toList()
           : const [],
       photoUrl: (data[PetFields.photoUrl] as String?)?.trim(),
+      gender: (data[PetFields.gender] as String?)?.trim(),
     );
   }
 }
@@ -109,24 +113,38 @@ class PetStore extends ChangeNotifier {
     PetData(
       name: 'Misket',
       species: 'Kedi',
-      ageRange: 'Genç',
+      ageRange: '2 yaş',
       weight: '2-3 kg',
       bodyType: 'İdeal',
       neutered: 'Evet',
       activityLevel: 'Orta',
       dailyFoodGrams: 40,
       allergies: ['Besin'],
+      gender: 'Dişi',
     ),
     PetData(
       name: 'Luna',
       species: 'Köpek',
-      ageRange: 'Medium (11-25 kg)',
+      ageRange: '1,5 yaş',
       weight: '20-30 kg',
       bodyType: 'İdeal',
       neutered: 'Hayır',
       activityLevel: 'Yüksek',
       dailyFoodGrams: 260,
       allergies: ['Çevre'],
+      gender: 'Dişi',
+    ),
+    PetData(
+      name: 'Pamuk',
+      species: 'Kedi',
+      ageRange: '4 yaş',
+      weight: '4-5 kg',
+      bodyType: 'İdeal',
+      neutered: 'Evet',
+      activityLevel: 'Düşük',
+      dailyFoodGrams: 45,
+      allergies: const [],
+      gender: 'Erkek',
     ),
   ];
 
@@ -139,8 +157,17 @@ class PetStore extends ChangeNotifier {
   String? get boundUid => _boundUid;
 
   List<PetData> get pets => List.unmodifiable(_pets);
+  int get activePetIndex => _activePetIndex;
   PetData? get activePet =>
       _pets.isEmpty ? null : _pets[_activePetIndex.clamp(0, _pets.length - 1)];
+
+  void selectPet(int index) {
+    if (index < 0 || index >= _pets.length) return;
+    if (_activePetIndex == index) return;
+    _activePetIndex = index;
+    notifyListeners();
+    _schedulePersist();
+  }
 
   bool isBoundTo(String? uid) => _boundUid == uid;
 
@@ -161,6 +188,7 @@ class PetStore extends ChangeNotifier {
     }
     if (a.dailyFoodGrams != b.dailyFoodGrams) return false;
     if ((a.photoUrl ?? '') != (b.photoUrl ?? '')) return false;
+    if ((a.gender ?? '') != (b.gender ?? '')) return false;
     if (a.allergies.length != b.allergies.length) return false;
     for (var i = 0; i < a.allergies.length; i++) {
       if (a.allergies[i] != b.allergies[i]) return false;

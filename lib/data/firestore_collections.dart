@@ -146,6 +146,7 @@ class PetFields {
   static const dailyFoodGrams = 'dailyFoodGrams';
   static const allergies = 'allergies';
   static const photoUrl = 'photoUrl';
+  static const gender = 'gender';
 }
 
 /// `products/{id}` alanları
