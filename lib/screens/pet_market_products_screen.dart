@@ -9,6 +9,7 @@ import 'package:geliyor_app/screens/product_detail_screen.dart';
 import 'package:geliyor_app/state/cart_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
+import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
 import 'package:geliyor_app/widgets/app_pressable_button.dart';
 import 'package:geliyor_app/widgets/market_product_card.dart';
@@ -439,8 +440,10 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
           backgroundColor: AppColors.background,
           body: AppPageFrame.standard(
             backgroundColor: AppColors.background,
+            pawPrintColor: AppColors.success,
             header: _buildHeader(),
             content: _buildScrollBody(products),
+            navbar: const AppBottomNavbar(homeColor: AppColors.success),
           ),
         );
       },
@@ -457,7 +460,7 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
             padding: EdgeInsets.zero,
             icon: const Icon(
               Icons.arrow_back_ios_new_rounded,
-              color: AppColors.primary,
+              color: AppColors.success,
               size: 18,
             ),
           ),
@@ -466,7 +469,9 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
               child: Text(
                 'Ürünler',
                 textAlign: TextAlign.center,
-                style: AppTextStyles.pageHeader,
+                style: AppTextStyles.pageHeader.copyWith(
+                  color: AppColors.success,
+                ),
               ),
             ),
           ),
@@ -543,6 +548,7 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
                         : '';
                     return MarketCompactProductCard(
                       product: product,
+                      accent: AppColors.success,
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
@@ -571,7 +577,7 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
             decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: AppColors.success.withValues(alpha: 0.28)),
             ),
             child: Row(
               children: [
@@ -579,7 +585,7 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
                   onTap: _applySearch,
                   child: const Icon(
                     Icons.search_rounded,
-                    color: AppColors.primary,
+                    color: AppColors.success,
                     size: 18,
                   ),
                 ),
@@ -644,11 +650,11 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
             decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: AppColors.success.withValues(alpha: 0.28)),
             ),
             child: const Icon(
               Icons.tune_rounded,
-              color: AppColors.primary,
+              color: AppColors.success,
               size: 18,
             ),
           ),
@@ -696,7 +702,7 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
                 color: AppColors.surface,
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: selected ? AppColors.primaryLight : AppColors.border,
+                  color: selected ? AppColors.success : AppColors.success.withValues(alpha: 0.28),
                   width: selected ? 0.8 : 1,
                 ),
               ),
@@ -710,7 +716,7 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
                         : category.id == 'bird'
                         ? Icons.flutter_dash_rounded
                         : Icons.pets_rounded,
-                    color: AppColors.primary,
+                    color: AppColors.success,
                     size: 22,
                   ),
                 ),
@@ -723,7 +729,7 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: selected ? AppColors.primary : AppColors.text,
+                color: selected ? AppColors.success : AppColors.text,
                 fontSize: 10,
                 fontWeight: FontWeight.w800,
               ),
@@ -788,14 +794,14 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
     required bool selected,
     required VoidCallback onTap,
     bool showArrow = false,
-    Color accent = AppColors.primary,
+    Color accent = AppColors.success,
   }) {
     final bg = selected
         ? accent.withValues(alpha: accent == AppColors.error ? 0.14 : 0.12)
         : AppColors.surface;
     final border = selected
         ? accent.withValues(alpha: accent == AppColors.error ? 0.35 : 0.45)
-        : AppColors.border;
+        : AppColors.success.withValues(alpha: 0.28);
     final fg = selected ? accent : AppColors.text;
 
     return GestureDetector(
@@ -881,7 +887,7 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
               decoration: BoxDecoration(
                 color: AppColors.surface,
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: AppColors.border),
+                border: Border.all(color: AppColors.success.withValues(alpha: 0.28)),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.08),
@@ -914,7 +920,7 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
                           child: const Text(
                             'Temizle',
                             style: TextStyle(
-                              color: AppColors.primary,
+                              color: AppColors.success,
                               fontSize: 11,
                               fontWeight: FontWeight.w800,
                             ),
@@ -937,10 +943,10 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
                       shrinkWrap: true,
                       padding: EdgeInsets.zero,
                       itemCount: options.length,
-                      separatorBuilder: (_, _) => const Divider(
+                      separatorBuilder: (_, _) => Divider(
                         height: 1,
                         thickness: 1,
-                        color: AppColors.border,
+                        color: AppColors.success.withValues(alpha: 0.28),
                       ),
                       itemBuilder: (context, index) {
                         final option = options[index];
@@ -959,7 +965,7 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
                                     option,
                                     style: TextStyle(
                                       color: isSelected
-                                          ? AppColors.primary
+                                          ? AppColors.success
                                           : AppColors.text,
                                       fontSize: 12,
                                       fontWeight: isSelected
@@ -971,7 +977,7 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
                                 if (isSelected)
                                   const Icon(
                                     Icons.check_rounded,
-                                    color: AppColors.primary,
+                                    color: AppColors.success,
                                     size: 16,
                                   ),
                               ],
@@ -1030,7 +1036,7 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
               decoration: BoxDecoration(
                 color: AppColors.surface,
                 borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: AppColors.border),
+                border: Border.all(color: AppColors.success.withValues(alpha: 0.28)),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.08),

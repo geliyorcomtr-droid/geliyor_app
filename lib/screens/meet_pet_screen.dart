@@ -16,9 +16,6 @@ import 'package:geliyor_app/widgets/pet_photo.dart';
 class MeetPetScreen extends StatelessWidget {
   const MeetPetScreen({super.key});
 
-  static Color get _pageBg =>
-      Color.lerp(AppColors.background, AppColors.error, 0.06)!;
-
   static Color get _addPressed =>
       Color.lerp(AppColors.error, AppColors.text, 0.12)!;
 
@@ -98,12 +95,10 @@ class MeetPetScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final pageBg = _pageBg;
-
     return Scaffold(
-      backgroundColor: pageBg,
+      backgroundColor: AppColors.surface,
       body: AppPageFrame.standard(
-        backgroundColor: pageBg,
+        backgroundColor: AppColors.surface,
         pawPrintColor: AppColors.error,
         header: const _MeetPetHeader(),
         content: ListenableBuilder(
@@ -113,7 +108,7 @@ class MeetPetScreen extends StatelessWidget {
             final activeIndex = PetStore.instance.activePetIndex;
             return LayoutBuilder(
               builder: (context, constraints) {
-                const bannerH = 82.0;
+                const bannerH = 132.0;
                 const addH = 36.0;
                 const sectionH = 22.0;
                 const gap = 8.0;
@@ -234,7 +229,11 @@ class MeetPetScreen extends StatelessWidget {
                           _PetSummaryCard(
                             pet: pets[i],
                             height: cardH,
-                            fill: _cardFill(i),
+                            fill: Color.lerp(
+                              AppColors.surface,
+                              AppColors.error,
+                              0.08,
+                            )!,
                             isDefault: i == activeIndex,
                             onEdit: () => _openEdit(context, i, pets[i]),
                             onDelete: () => _deletePet(context, i, pets[i]),
@@ -253,17 +252,6 @@ class MeetPetScreen extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  static Color _cardFill(int index) {
-    switch (index % 3) {
-      case 0:
-        return Color.lerp(AppColors.surface, AppColors.error, 0.08)!;
-      case 1:
-        return Color.lerp(AppColors.surface, AppColors.error, 0.035)!;
-      default:
-        return Color.lerp(AppColors.surface, AppColors.success, 0.10)!;
-    }
   }
 }
 
@@ -343,14 +331,20 @@ class _PetSummaryCard extends StatelessWidget {
       onTap: onEdit,
       behavior: HitTestBehavior.opaque,
       child: Container(
-      height: height,
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: fill,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.error.withValues(alpha: 0.16)),
-      ),
-      child: Stack(
+        height: height,
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: AppColors.error.withValues(alpha: 0.25)),
+        ),
+        child: Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: fill,
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Stack(
         children: [
           Positioned(
             right: 46,
@@ -514,7 +508,8 @@ class _PetSummaryCard extends StatelessWidget {
           ),
         ],
       ),
-    ),
+        ),
+      ),
     );
   }
 }

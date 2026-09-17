@@ -9,6 +9,7 @@ import 'package:geliyor_app/state/pet_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/utils/login_gate.dart';
+import 'package:geliyor_app/widgets/app_back_button.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
 import 'package:geliyor_app/widgets/app_pressable_button.dart';
@@ -28,6 +29,11 @@ class AddPetScreen extends StatefulWidget {
 }
 
 class _AddPetScreenState extends State<AddPetScreen> {
+  static const _accent = AppColors.error;
+  static final _accentSoft = _accent.withValues(alpha: 0.08);
+  static final _accentLine = _accent.withValues(alpha: 0.28);
+  static final _accentPressed = Color.lerp(_accent, AppColors.text, 0.12)!;
+
   final TextEditingController _nameController = TextEditingController();
   String? _species = 'Kedi';
   String? _ageRange = 'Yavru';
@@ -156,7 +162,7 @@ class _AddPetScreenState extends State<AddPetScreen> {
                       width: 36,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: AppColors.border,
+                        color: _accentLine,
                         borderRadius: BorderRadius.circular(999),
                       ),
                     ),
@@ -216,13 +222,13 @@ class _AddPetScreenState extends State<AddPetScreen> {
       width: double.infinity,
       height: 42,
       padding: const EdgeInsets.symmetric(horizontal: 14),
-      backgroundColor: AppColors.background,
-      pressedBackgroundColor: AppColors.selected,
-      borderColor: AppColors.border,
-      pressedBorderColor: AppColors.primaryLight,
+      backgroundColor: AppColors.surface,
+      pressedBackgroundColor: _accentSoft,
+      borderColor: _accentLine,
+      pressedBorderColor: _accent,
       child: Row(
         children: [
-          Icon(icon, color: AppColors.primary, size: 20),
+          Icon(icon, color: _accent, size: 20),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -357,7 +363,7 @@ class _AddPetScreenState extends State<AddPetScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Dost kaydedildi. Görsel yüklenemedi.'),
-            backgroundColor: AppColors.primary,
+            backgroundColor: _accent,
           ),
         );
       }
@@ -370,11 +376,14 @@ class _AddPetScreenState extends State<AddPetScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.surface,
       body: AppPageFrame.standard(
-        backgroundColor: AppColors.background,
+        backgroundColor: AppColors.surface,
+        pawPrintColor: _accent,
         header: AppPageHeader(
           title: widget.isEditing ? 'Dostu Düzenle' : 'Yeni Dost Ekle',
+          titleColor: _accent,
+          leading: const AppBackButton(color: _accent),
         ),
         content: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
@@ -410,6 +419,7 @@ class _AddPetScreenState extends State<AddPetScreen> {
                   child: _buildSelectDropdown(
                     value: _ageRange,
                     placeholder: 'Boyut seç',
+                    compact: true,
                     onTap: () => _openSelectSheet(
                       title: 'Boyuta Göre',
                       options: _dogSizeOptions,
@@ -425,6 +435,7 @@ class _AddPetScreenState extends State<AddPetScreen> {
                   child: _buildSelectDropdown(
                     value: _ageRange,
                     placeholder: 'Yaş seç',
+                    compact: true,
                     onTap: () => _openSelectSheet(
                       title: 'Yaş Aralığı',
                       options: _ageOptions,
@@ -440,6 +451,7 @@ class _AddPetScreenState extends State<AddPetScreen> {
                   child: _buildSelectDropdown(
                     value: _weight,
                     placeholder: 'Kilo seç',
+                    compact: true,
                     onTap: () => _openSelectSheet(
                       title: 'Kilo',
                       options: _weightOptions,
@@ -480,12 +492,19 @@ class _AddPetScreenState extends State<AddPetScreen> {
                 ),
               ),
               const SizedBox(height: 14),
-              AppPressableButton.primary(
+              AppPressableButton(
                 onTap: _saving ? null : _savePet,
                 enabled: !_saving,
                 width: double.infinity,
                 height: 42,
-                child: _saving
+                padding: EdgeInsets.zero,
+                backgroundColor: _accent,
+                pressedBackgroundColor: _accentPressed,
+                foregroundColor: AppColors.surface,
+                pressedForegroundColor: AppColors.surface,
+                borderColor: _accent,
+                pressedBorderColor: _accentPressed,
+                builder: (_) => _saving
                     ? const SizedBox(
                         width: 20,
                         height: 20,
@@ -497,11 +516,16 @@ class _AddPetScreenState extends State<AddPetScreen> {
                     : const Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.check_rounded, size: 18),
+                          Icon(
+                            Icons.check_rounded,
+                            size: 18,
+                            color: AppColors.surface,
+                          ),
                           SizedBox(width: 6),
                           Text(
                             'Kaydet',
                             style: TextStyle(
+                              color: AppColors.surface,
                               fontSize: 13,
                               fontWeight: FontWeight.w900,
                             ),
@@ -513,7 +537,10 @@ class _AddPetScreenState extends State<AddPetScreen> {
             ],
           ),
         ),
-        navbar: const AppBottomNavbar(activeTab: AppNavTab.home),
+        navbar: const AppBottomNavbar(
+          activeTab: AppNavTab.home,
+          homeColor: _accent,
+        ),
       ),
     );
   }
@@ -531,9 +558,9 @@ class _AddPetScreenState extends State<AddPetScreen> {
                   width: 96,
                   height: 96,
                   decoration: BoxDecoration(
-                    color: AppColors.selected,
+                    color: _accentSoft,
                     borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: AppColors.border),
+                    border: Border.all(color: _accentLine),
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: PetPhoto(
@@ -548,10 +575,12 @@ class _AddPetScreenState extends State<AddPetScreen> {
                   child: Container(
                     width: 32,
                     height: 32,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
+                    decoration: const BoxDecoration(
+                      color: _accent,
                       shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.surface, width: 2),
+                      border: Border.fromBorderSide(
+                        BorderSide(color: AppColors.surface, width: 2),
+                      ),
                     ),
                     child: const Icon(
                       Icons.photo_camera_rounded,
@@ -592,7 +621,7 @@ class _AddPetScreenState extends State<AddPetScreen> {
                 width: 26,
                 height: 26,
                 decoration: const BoxDecoration(
-                  color: AppColors.primaryLight,
+                  color: _accent,
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
@@ -607,7 +636,12 @@ class _AddPetScreenState extends State<AddPetScreen> {
               ),
               const SizedBox(width: 8),
             ],
-            Expanded(child: Text(title, style: AppTextStyles.questionHeader)),
+            Expanded(
+              child: Text(
+                title,
+                style: AppTextStyles.questionHeader.copyWith(color: _accent),
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 8),
@@ -680,45 +714,49 @@ class _AddPetScreenState extends State<AddPetScreen> {
     required String? value,
     required String placeholder,
     required VoidCallback onTap,
+    bool compact = false,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 36,
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: AppColors.border),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                value ?? placeholder,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: value == null ? AppColors.subText : AppColors.text,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          height: compact ? 32 : 36,
+          width: compact ? 168 : double.infinity,
+          padding: EdgeInsets.symmetric(horizontal: compact ? 12 : 14),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: _accentLine),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  value ?? placeholder,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: value == null ? AppColors.subText : AppColors.text,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
-            ),
-            const Icon(
-              Icons.keyboard_arrow_down_rounded,
-              color: AppColors.primary,
-              size: 22,
-            ),
-          ],
+              const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: _accent,
+                size: 22,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -744,7 +782,7 @@ class _AddPetScreenState extends State<AddPetScreen> {
               shadowColor: Colors.black.withValues(alpha: 0.18),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(18),
-                side: const BorderSide(color: AppColors.border),
+                side: BorderSide(color: _accentLine),
               ),
               clipBehavior: Clip.antiAlias,
               child: ConstrainedBox(
@@ -785,10 +823,10 @@ class _AddPetScreenState extends State<AddPetScreen> {
                           shrinkWrap: true,
                           padding: EdgeInsets.zero,
                           itemCount: options.length,
-                          separatorBuilder: (_, _) => const Divider(
+                          separatorBuilder: (_, _) => Divider(
                             height: 1,
                             thickness: 1,
-                            color: AppColors.border,
+                            color: _accentLine,
                           ),
                           itemBuilder: (context, index) {
                             final option = options[index];
@@ -811,7 +849,7 @@ class _AddPetScreenState extends State<AddPetScreen> {
                                           option,
                                           style: TextStyle(
                                             color: isSelected
-                                                ? AppColors.primary
+                                                ? _accent
                                                 : AppColors.text,
                                             fontSize: 12.5,
                                             fontWeight: FontWeight.w800,
@@ -823,8 +861,8 @@ class _AddPetScreenState extends State<AddPetScreen> {
                                             ? Icons.radio_button_checked
                                             : Icons.radio_button_unchecked,
                                         color: isSelected
-                                            ? AppColors.primary
-                                            : AppColors.border,
+                                            ? _accent
+                                            : _accentLine,
                                         size: 18,
                                       ),
                                     ],
@@ -874,7 +912,7 @@ class _AddPetScreenState extends State<AddPetScreen> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: _accentLine),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
@@ -931,11 +969,11 @@ class _OptionChip extends StatelessWidget {
         padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 6),
         decoration: BoxDecoration(
           color: selected
-              ? AppColors.primary.withValues(alpha: 0.04)
+              ? AppColors.error.withValues(alpha: 0.08)
               : AppColors.surface,
           borderRadius: BorderRadius.circular(999),
           border: Border.all(
-            color: selected ? AppColors.primaryLight : AppColors.border,
+            color: selected ? AppColors.error : AppColors.error.withValues(alpha: 0.28),
             width: 0.8,
           ),
           boxShadow: [
@@ -953,7 +991,7 @@ class _OptionChip extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            color: selected ? AppColors.primaryLight : AppColors.text,
+            color: selected ? AppColors.error : AppColors.text,
             fontSize: compact ? 11 : 11.5,
             fontWeight: FontWeight.w800,
           ),

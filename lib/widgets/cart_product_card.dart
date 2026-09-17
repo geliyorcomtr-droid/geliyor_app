@@ -17,6 +17,7 @@ class CartProductCard extends StatefulWidget {
     this.onQuantityChanged,
     this.onRemove,
     this.onAddToCart,
+    this.accent = AppColors.primary,
   });
 
   final CartItem item;
@@ -24,6 +25,7 @@ class CartProductCard extends StatefulWidget {
   final ValueChanged<int>? onQuantityChanged;
   final VoidCallback? onRemove;
   final VoidCallback? onAddToCart;
+  final Color accent;
 
   static const double cardHeight = MarketProductCard.listCardHeight;
 
@@ -87,7 +89,7 @@ class _CartProductCardState extends State<CartProductCard> {
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: widget.accent.withValues(alpha: 0.28)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.04),
@@ -283,8 +285,8 @@ class _CartProductCardState extends State<CartProductCard> {
         Text(
           formatProductPrice(item.unitPrice, withDecimals: true),
           maxLines: 1,
-          style: const TextStyle(
-            color: AppColors.primary,
+          style: TextStyle(
+            color: widget.accent,
             fontSize: 13,
             fontWeight: FontWeight.w900,
             height: 1,
@@ -302,7 +304,7 @@ class _CartProductCardState extends State<CartProductCard> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: widget.accent.withValues(alpha: 0.28)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -315,8 +317,8 @@ class _CartProductCardState extends State<CartProductCard> {
             padding: const EdgeInsets.symmetric(horizontal: 6),
             child: Text(
               '${item.quantity}',
-              style: const TextStyle(
-                color: AppColors.primary,
+              style: TextStyle(
+                color: widget.accent,
                 fontSize: 12,
                 fontWeight: FontWeight.w900,
                 height: 1,
@@ -339,7 +341,7 @@ class _CartProductCardState extends State<CartProductCard> {
       child: SizedBox(
         width: 26,
         height: 28,
-        child: Icon(icon, color: AppColors.primary, size: 16),
+        child: Icon(icon, color: widget.accent, size: 16),
       ),
     );
   }
@@ -360,7 +362,7 @@ class _CartProductCardState extends State<CartProductCard> {
         decoration: BoxDecoration(
           color: widget.onRemove != null
               ? AppColors.error.withValues(alpha: 0.12)
-              : AppColors.primary,
+              : widget.accent,
           borderRadius: BorderRadius.circular(999),
         ),
         child: Icon(
@@ -397,8 +399,8 @@ class _CartProductCardState extends State<CartProductCard> {
           value,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: AppColors.primary,
+          style: TextStyle(
+            color: widget.accent,
             fontSize: 11.5,
             fontWeight: FontWeight.w900,
             height: 1.2,

@@ -19,67 +19,67 @@ class KnowledgeQuestionTopic {
   static const sindirim = KnowledgeQuestionTopic(
     id: 'sindirim',
     title: 'Sindirim Sistemi',
-    color: Color(0xFF1E90FF),
+    color: AppColors.warning,
     iconPath: 'assets/images/app_ikonlar/sindirim.png',
     icon: Icons.restaurant_rounded,
   );
   static const idrar = KnowledgeQuestionTopic(
     id: 'idrar',
     title: 'İdrar Yolu Sağlığı',
-    color: Color(0xFFEC4899),
+    color: AppColors.warning,
     iconPath: 'assets/images/app_ikonlar/bobrek.png',
     icon: Icons.water_drop_outlined,
   );
   static const alerji = KnowledgeQuestionTopic(
     id: 'alerji',
     title: 'Alerji & Deri',
-    color: Color(0xFF9B4DCA),
+    color: AppColors.warning,
     iconPath: 'assets/images/app_ikonlar/tuy_deri.png',
     icon: Icons.spa_outlined,
   );
   static const kilo = KnowledgeQuestionTopic(
     id: 'kilo',
     title: 'Kilo & Beslenme',
-    color: Color(0xFFFF6600),
+    color: AppColors.warning,
     iconPath: 'assets/images/app_ikonlar/kilo_kontrol.png',
     icon: Icons.monitor_weight_outlined,
   );
   static const genel = KnowledgeQuestionTopic(
     id: 'genel',
     title: 'Genel Sağlık',
-    color: Color(0xFF22C55E),
+    color: AppColors.warning,
     iconPath: 'assets/images/app_ikonlar/bagisiklik.png',
     icon: Icons.favorite_outline_rounded,
   );
   static const dis = KnowledgeQuestionTopic(
     id: 'dis',
     title: 'Ağız & Diş Sağlığı',
-    color: Color(0xFF0EA5E9),
+    color: AppColors.warning,
     iconPath: 'assets/images/app_ikonlar/dis.png',
     icon: Icons.sentiment_satisfied_alt_outlined,
   );
   static const goz = KnowledgeQuestionTopic(
     id: 'goz',
     title: 'Göz Hastalıkları',
-    color: Color(0xFF16A34A),
+    color: AppColors.warning,
     icon: Icons.visibility_outlined,
   );
   static const kulak = KnowledgeQuestionTopic(
     id: 'kulak',
     title: 'Kulak Hastalıkları',
-    color: Color(0xFF8B5CF6),
+    color: AppColors.warning,
     icon: Icons.hearing_outlined,
   );
   static const solunum = KnowledgeQuestionTopic(
     id: 'solunum',
     title: 'Solunum Sistemi',
-    color: Color(0xFFF97316),
+    color: AppColors.warning,
     icon: Icons.air_rounded,
   );
   static const parazit = KnowledgeQuestionTopic(
     id: 'parazit',
     title: 'Parazitler',
-    color: Color(0xFF2563EB),
+    color: AppColors.warning,
     icon: Icons.bug_report_outlined,
   );
 
@@ -411,6 +411,6 @@ const defaultKnowledgeQuestions = <DefaultKnowledgeQuestion>[
 ];
 
 Color knowledgeColor(int value) {
-  if (value == 0) return AppColors.primary;
+  if (value == 0) return AppColors.warning;
   return Color(value);
 }

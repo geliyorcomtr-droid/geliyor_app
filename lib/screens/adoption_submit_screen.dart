@@ -555,6 +555,7 @@ class _AdoptionSubmitScreenState extends State<AdoptionSubmitScreen> {
       backgroundColor: AppColors.background,
       body: AppPageFrame.standard(
         backgroundColor: AppColors.background,
+        pawPrintColor: AppColors.warning,
         activeTab: AppNavTab.profile,
         header: AppPageHeader(
           title: _editing == null ? 'İlan Ekle' : 'İlanı düzenle',
@@ -969,7 +970,10 @@ class _AdoptionSubmitScreenState extends State<AdoptionSubmitScreen> {
             ),
           ],
         ),
-        navbar: const AppBottomNavbar(activeTab: AppNavTab.profile),
+        navbar: const AppBottomNavbar(
+          activeTab: AppNavTab.profile,
+          homeColor: AppColors.warning,
+        ),
       ),
     );
   }

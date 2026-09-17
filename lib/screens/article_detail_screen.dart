@@ -41,18 +41,7 @@ class ArticleDetailScreen extends StatelessWidget {
   final String? body;
   final List<String> keyPoints;
 
-  Color get _categoryColor {
-    switch (category.toLowerCase()) {
-      case 'beslenme':
-        return AppColors.success;
-      case 'sağlık':
-        return const Color(0xFF9B4DCA);
-      case 'bakım':
-        return AppColors.warning;
-      default:
-        return AppColors.primary;
-    }
-  }
+  Color get _categoryColor => AppColors.warning;
 
   List<String> get _keyPoints {
     if (keyPoints.isNotEmpty) return keyPoints;
@@ -91,6 +80,7 @@ class ArticleDetailScreen extends StatelessWidget {
       backgroundColor: AppColors.background,
       body: AppPageFrame.standard(
         backgroundColor: AppColors.background,
+        pawPrintColor: AppColors.warning,
         header: _buildHeader(context),
         content: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
@@ -112,7 +102,7 @@ class ArticleDetailScreen extends StatelessWidget {
             ],
           ),
         ),
-        navbar: const AppBottomNavbar(),
+        navbar: const AppBottomNavbar(homeColor: AppColors.warning),
       ),
     );
   }
@@ -122,13 +112,13 @@ class ArticleDetailScreen extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: Row(
         children: [
-          const AppBackButton(),
+          const AppBackButton(color: AppColors.warning),
           Expanded(
             child: IgnorePointer(
               child: Text(
                 'Makale Ayrıntısı',
                 textAlign: TextAlign.center,
-                style: AppTextStyles.pageHeader,
+                style: AppTextStyles.pageHeader.copyWith(color: AppColors.warning),
               ),
             ),
           ),
@@ -145,7 +135,7 @@ class ArticleDetailScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.28)),
       ),
       clipBehavior: Clip.antiAlias,
       child: Stack(
@@ -155,11 +145,11 @@ class ArticleDetailScreen extends StatelessWidget {
             imagePath,
             fit: BoxFit.cover,
             errorWidget: Container(
-              color: AppColors.selected,
+              color: AppColors.warning.withValues(alpha: 0.10),
               alignment: Alignment.center,
               child: const Icon(
                 Icons.article_outlined,
-                color: AppColors.primary,
+                color: AppColors.warning,
                 size: 48,
               ),
             ),
@@ -202,13 +192,16 @@ class ArticleDetailScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: AppTextStyles.sectionHeader),
+        Text(
+          title,
+          style: AppTextStyles.sectionHeader.copyWith(color: AppColors.warning),
+        ),
         const SizedBox(height: 8),
         Row(
           children: [
             const Icon(
               Icons.verified_rounded,
-              color: AppColors.primary,
+              color: AppColors.warning,
               size: 14,
             ),
             const SizedBox(width: 4),
@@ -238,7 +231,7 @@ class ArticleDetailScreen extends StatelessWidget {
             const Spacer(),
             const Icon(
               Icons.bookmark_border_rounded,
-              color: AppColors.primary,
+              color: AppColors.warning,
               size: 20,
             ),
           ],
@@ -345,7 +338,7 @@ class ArticleDetailScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.28)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -357,7 +350,7 @@ class ArticleDetailScreen extends StatelessWidget {
               Text(
                 title,
                 style: const TextStyle(
-                  color: AppColors.text,
+                  color: AppColors.warning,
                   fontSize: 13,
                   fontWeight: FontWeight.w900,
                 ),

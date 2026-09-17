@@ -10,7 +10,7 @@ class AppKnowledgeTopic {
     this.subtitle = '',
     this.iconUrl = '',
     this.assetPath = '',
-    this.colorValue = 0xFF1E90FF,
+    this.colorValue = 0xFFF59E0B,
     this.questionTopicId = 'sindirim',
     this.order = 0,
     this.active = true,
@@ -46,7 +46,7 @@ class AppKnowledgeTopic {
       assetPath: (data[KnowledgeTopicFields.assetPath] as String?) ?? '',
       colorValue:
           (data[KnowledgeTopicFields.colorValue] as num?)?.toInt() ??
-          0xFF1E90FF,
+          0xFFF59E0B,
       questionTopicId:
           (data[KnowledgeTopicFields.questionTopicId] as String?) ??
           'sindirim',

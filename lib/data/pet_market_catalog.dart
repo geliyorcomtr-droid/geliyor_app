@@ -5,8 +5,8 @@ import 'package:geliyor_app/widgets/market_product_card.dart';
 const petMarketCatFeatures = [
   MarketProductFeature(
     icon: Icons.health_and_safety_outlined,
-    iconColor: AppColors.primary,
-    bgColor: AppColors.selected,
+    iconColor: AppColors.success,
+    bgColor: Color(0xFFE8F9EE),
   ),
   MarketProductFeature(
     icon: Icons.water_drop_outlined,
@@ -33,8 +33,8 @@ const petMarketCatFeatures = [
 const petMarketDogFeatures = [
   MarketProductFeature(
     icon: Icons.pets_rounded,
-    iconColor: AppColors.primary,
-    bgColor: AppColors.selected,
+    iconColor: AppColors.success,
+    bgColor: Color(0xFFE8F9EE),
   ),
   MarketProductFeature(
     icon: Icons.spa_outlined,
@@ -61,8 +61,8 @@ const petMarketDogFeatures = [
 const petMarketSmartFeatures = [
   MarketProductFeature(
     icon: Icons.schedule_rounded,
-    iconColor: AppColors.primary,
-    bgColor: AppColors.selected,
+    iconColor: AppColors.success,
+    bgColor: Color(0xFFE8F9EE),
   ),
   MarketProductFeature(
     icon: Icons.phone_android_rounded,

@@ -274,7 +274,7 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
                 width: 36,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: AppColors.border,
+                  color: AppColors.violet.withValues(alpha: 0.28),
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
@@ -284,7 +284,7 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
                 child: Text(
                   'Görsel ekle',
                   style: TextStyle(
-                    color: AppColors.text,
+                    color: AppColors.violet,
                     fontSize: 14,
                     fontWeight: FontWeight.w900,
                   ),
@@ -338,12 +338,12 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
       height: 42,
       padding: const EdgeInsets.symmetric(horizontal: 14),
       backgroundColor: AppColors.background,
-      pressedBackgroundColor: AppColors.selected,
-      borderColor: AppColors.border,
-      pressedBorderColor: AppColors.primaryLight,
+      pressedBackgroundColor: AppColors.violet.withValues(alpha: 0.10),
+      borderColor: AppColors.violet.withValues(alpha: 0.28),
+      pressedBorderColor: AppColors.violet,
       child: Row(
         children: [
-          Icon(icon, color: AppColors.primary, size: 20),
+          Icon(icon, color: AppColors.violet, size: 20),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -455,6 +455,7 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
       backgroundColor: AppColors.background,
       body: AppPageFrame.standard(
         backgroundColor: AppColors.background,
+        pawPrintColor: AppColors.violet,
         header: _buildHeader(context),
         content: Stack(
           children: [
@@ -490,7 +491,7 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
             if (_supplyOpen) _buildSupplyOverlay(),
           ],
         ),
-        navbar: const AppBottomNavbar(),
+        navbar: const AppBottomNavbar(homeColor: AppColors.violet),
       ),
     );
   }
@@ -500,17 +501,17 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: Row(
         children: [
-          const AppBackButton(),
-          const Expanded(
+          const AppBackButton(color: AppColors.violet),
+          Expanded(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
                   'Hangi Mama?',
                   textAlign: TextAlign.center,
-                  style: AppTextStyles.pageHeader,
+                  style: AppTextStyles.pageHeader.copyWith(color: AppColors.violet),
                 ),
-                Text(
+                const Text(
                   'Dostuna en uygun mamayı bul',
                   textAlign: TextAlign.center,
                   style: TextStyle(
@@ -564,7 +565,7 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(999),
           border: Border.all(
-            color: selected ? AppColors.primary : AppColors.border,
+            color: selected ? AppColors.violet : AppColors.violet.withValues(alpha: 0.28),
             width: selected ? 1.6 : 1,
           ),
         ),
@@ -579,14 +580,14 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
               errorBuilder: (context, error, stackTrace) => Icon(
                 Icons.pets_rounded,
                 size: 18,
-                color: selected ? AppColors.primary : AppColors.subText,
+                color: selected ? AppColors.violet : AppColors.subText,
               ),
             ),
             const SizedBox(width: 6),
             Text(
               label,
               style: TextStyle(
-                color: selected ? AppColors.primary : AppColors.subText,
+                color: selected ? AppColors.violet : AppColors.subText,
                 fontSize: 13,
                 fontWeight: FontWeight.w800,
               ),
@@ -606,10 +607,10 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.border, width: 1),
+        border: Border.all(color: AppColors.violet.withValues(alpha: 0.28), width: 1),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.06),
+            color: AppColors.violet.withValues(alpha: 0.06),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -638,7 +639,7 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
                               width: 28,
                               height: 28,
                               decoration: const BoxDecoration(
-                                color: AppColors.primary,
+                                color: AppColors.violet,
                                 shape: BoxShape.circle,
                               ),
                               child: const Icon(
@@ -654,7 +655,7 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  color: AppColors.text,
+                                  color: AppColors.violet,
                                   fontSize: 15,
                                   fontWeight: FontWeight.w900,
                                 ),
@@ -663,7 +664,7 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
                             const SizedBox(width: 4),
                             const Icon(
                               Icons.inventory_2_outlined,
-                              color: AppColors.primary,
+                              color: AppColors.violet,
                               size: 16,
                             ),
                           ],
@@ -708,6 +709,7 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
                         const Spacer(),
                         AppPressableButton.primary(
                           onTap: _openSupplySheet,
+                          accent: AppColors.violet,
                           width: double.infinity,
                           height: 36,
                           padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -742,9 +744,9 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
                             height: 118,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: AppColors.primary.withValues(alpha: 0.12),
+                              color: AppColors.violet.withValues(alpha: 0.12),
                               border: Border.all(
-                                color: AppColors.primary.withValues(alpha: 0.2),
+                                color: AppColors.violet.withValues(alpha: 0.2),
                                 width: 2,
                               ),
                             ),
@@ -760,7 +762,7 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
                               errorBuilder: (context, error, stackTrace) =>
                                   const Icon(
                                 Icons.pets_rounded,
-                                color: AppColors.primary,
+                                color: AppColors.violet,
                                 size: 64,
                               ),
                             ),
@@ -777,10 +779,10 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
                             decoration: BoxDecoration(
                               color: AppColors.surface,
                               borderRadius: BorderRadius.circular(999),
-                              border: Border.all(color: AppColors.border),
+                              border: Border.all(color: AppColors.violet.withValues(alpha: 0.28)),
                               boxShadow: [
                                 BoxShadow(
-                                  color: AppColors.primary.withValues(alpha: 0.08),
+                                  color: AppColors.violet.withValues(alpha: 0.08),
                                   blurRadius: 6,
                                   offset: const Offset(0, 2),
                                 ),
@@ -792,13 +794,13 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
                                 Icon(
                                   Icons.pets_rounded,
                                   size: 10,
-                                  color: AppColors.primary,
+                                  color: AppColors.violet,
                                 ),
                                 SizedBox(width: 3),
                                 Text(
                                   'Patine En İyisi\nGelsin!',
                                   style: TextStyle(
-                                    color: AppColors.primary,
+                                    color: AppColors.violet,
                                     fontSize: 7.5,
                                     fontWeight: FontWeight.w800,
                                     height: 1.1,
@@ -830,9 +832,9 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
           decoration: BoxDecoration(
             color: AppColors.surface,
             shape: BoxShape.circle,
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: AppColors.violet.withValues(alpha: 0.28)),
           ),
-          child: Icon(icon, size: 12, color: AppColors.primary),
+          child: Icon(icon, size: 12, color: AppColors.violet),
         ),
         const SizedBox(width: 4),
         Expanded(
@@ -841,7 +843,7 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              color: AppColors.text,
+              color: AppColors.violet,
               fontSize: 8,
               fontWeight: FontWeight.w700,
               height: 1.15,
@@ -865,10 +867,10 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.surface,
         border: Border(
-          top: BorderSide(color: AppColors.border),
+          top: BorderSide(color: AppColors.violet.withValues(alpha: 0.28)),
         ),
       ),
       child: Row(
@@ -876,13 +878,13 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
           const Icon(
             Icons.campaign_outlined,
             size: 14,
-            color: AppColors.primary,
+            color: AppColors.violet,
           ),
           const SizedBox(width: 4),
           const Text(
             'Nasıl Çalışır?',
             style: TextStyle(
-              color: AppColors.primary,
+              color: AppColors.violet,
               fontSize: 10,
               fontWeight: FontWeight.w800,
             ),
@@ -928,7 +930,7 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
       height: 2,
       child: CustomPaint(
         painter: _DashedLinePainter(
-          color: active ? AppColors.primary : AppColors.border,
+          color: active ? AppColors.violet : AppColors.violet.withValues(alpha: 0.28),
         ),
       ),
     );
@@ -946,8 +948,8 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
           height: 18,
           decoration: BoxDecoration(
             color: done
-                ? AppColors.success
-                : AppColors.primary.withValues(alpha: 0.12),
+                ? AppColors.violet
+                : AppColors.violet.withValues(alpha: 0.12),
             shape: BoxShape.circle,
           ),
           alignment: Alignment.center,
@@ -960,7 +962,7 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
               : Text(
                   '$number',
                   style: const TextStyle(
-                    color: AppColors.primary,
+                    color: AppColors.violet,
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
                     height: 1,
@@ -973,8 +975,8 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: done ? AppColors.success : AppColors.text,
+            style: const TextStyle(
+              color: AppColors.violet,
               fontSize: 8.5,
               fontWeight: FontWeight.w700,
             ),
@@ -1013,7 +1015,7 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
                           width: 42,
                           height: 4,
                           decoration: BoxDecoration(
-                            color: AppColors.border,
+                            color: AppColors.violet.withValues(alpha: 0.28),
                             borderRadius: BorderRadius.circular(999),
                           ),
                         ),
@@ -1028,7 +1030,7 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
                                 Text(
                                   'Mama Talebi Oluştur',
                                   style: TextStyle(
-                                    color: AppColors.text,
+                                    color: AppColors.violet,
                                     fontSize: 15,
                                     fontWeight: FontWeight.w900,
                                   ),
@@ -1062,7 +1064,7 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
                       const Text(
                         'Ürün adı',
                         style: TextStyle(
-                          color: AppColors.text,
+                          color: AppColors.violet,
                           fontSize: 12,
                           fontWeight: FontWeight.w800,
                         ),
@@ -1074,7 +1076,7 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
                         decoration: BoxDecoration(
                           color: AppColors.background,
                           borderRadius: BorderRadius.circular(999),
-                          border: Border.all(color: AppColors.border),
+                          border: Border.all(color: AppColors.violet.withValues(alpha: 0.28)),
                         ),
                         child: TextField(
                           controller: _requestNameController,
@@ -1099,7 +1101,7 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
                       const Text(
                         'Ürün görseli',
                         style: TextStyle(
-                          color: AppColors.text,
+                          color: AppColors.violet,
                           fontSize: 12,
                           fontWeight: FontWeight.w800,
                         ),
@@ -1114,7 +1116,7 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
                             color: AppColors.background,
                             borderRadius: BorderRadius.circular(18),
                             border: Border.all(
-                              color: AppColors.border,
+                              color: AppColors.violet.withValues(alpha: 0.28),
                               width: 1.2,
                             ),
                           ),
@@ -1124,7 +1126,7 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
                                   children: [
                                     Icon(
                                       Icons.add_photo_alternate_outlined,
-                                      color: AppColors.primary,
+                                      color: AppColors.violet,
                                       size: 26,
                                     ),
                                     SizedBox(width: 8),
@@ -1181,7 +1183,7 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
                       const Text(
                         'Açıklama',
                         style: TextStyle(
-                          color: AppColors.text,
+                          color: AppColors.violet,
                           fontSize: 12,
                           fontWeight: FontWeight.w800,
                         ),
@@ -1193,7 +1195,7 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
                         decoration: BoxDecoration(
                           color: AppColors.background,
                           borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: AppColors.border),
+                          border: Border.all(color: AppColors.violet.withValues(alpha: 0.28)),
                         ),
                         child: TextField(
                           controller: _requestNoteController,
@@ -1219,6 +1221,7 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
                       const SizedBox(height: 12),
                       AppPressableButton.primary(
                         onTap: _saveSupplyRequest,
+                        accent: AppColors.violet,
                         enabled: !_savingRequest,
                         width: double.infinity,
                         height: 42,
@@ -1239,21 +1242,23 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
   }
 
   Widget _buildNeedsHeader() {
-    return const Column(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
             Text(
               'İhtiyacını Seç',
-              style: AppTextStyles.sectionHeader,
+              style: AppTextStyles.sectionHeader.copyWith(
+                color: AppColors.violet,
+              ),
             ),
-            SizedBox(width: 4),
-            Icon(Icons.eco_rounded, color: AppColors.success, size: 16),
+            const SizedBox(width: 4),
+            const Icon(Icons.eco_rounded, color: AppColors.violet, size: 16),
           ],
         ),
-        SizedBox(height: 2),
-        Text(
+        const SizedBox(height: 2),
+        const Text(
           'Birden fazla özellik seçebilirsin',
           style: TextStyle(
             color: AppColors.subText,
@@ -1302,7 +1307,7 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: selected ? AppColors.primaryLight : AppColors.border,
+            color: selected ? AppColors.violet : AppColors.violet.withValues(alpha: 0.28),
             width: selected ? 0.8 : 1,
           ),
         ),
@@ -1321,7 +1326,7 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
                       filterQuality: FilterQuality.high,
                       errorBuilder: (context, error, stackTrace) => const Icon(
                         Icons.health_and_safety_outlined,
-                        color: AppColors.primary,
+                        color: AppColors.violet,
                         size: 28,
                       ),
                     ),
@@ -1333,7 +1338,7 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: selected ? AppColors.primary : AppColors.text,
+                    color: AppColors.violet,
                     fontSize: 7.5,
                     fontWeight: FontWeight.w800,
                     height: 1.1,
@@ -1349,7 +1354,7 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
                   width: 13,
                   height: 13,
                   decoration: const BoxDecoration(
-                    color: AppColors.primary,
+                    color: AppColors.violet,
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
@@ -1370,7 +1375,7 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
       _listTitle,
       maxLines: 2,
       overflow: TextOverflow.ellipsis,
-      style: AppTextStyles.sectionHeader,
+      style: AppTextStyles.sectionHeader.copyWith(color: AppColors.violet),
     );
   }
 
@@ -1440,6 +1445,7 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
 
     return MarketCompactProductCard(
       product: marketProduct,
+      accent: AppColors.violet,
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => ProductDetailScreen(product: marketProduct),

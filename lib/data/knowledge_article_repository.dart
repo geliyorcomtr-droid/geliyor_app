@@ -22,13 +22,16 @@ class KnowledgeArticleCategories {
     _ => 'Makale',
   };
 
-  static Color colorOf(String id) => switch (id) {
-    beslenme => const Color(0xFF00A859),
-    saglik => const Color(0xFF9B4DCA),
-    bakim => const Color(0xFFFF6600),
-    asi => const Color(0xFF1E90FF),
-    _ => AppColors.primary,
-  };
+  static Color colorOf(String id) {
+    switch (id) {
+      case beslenme:
+      case saglik:
+      case bakim:
+      case asi:
+      default:
+        return AppColors.warning;
+    }
+  }
 }
 
 class AppKnowledgeArticle {

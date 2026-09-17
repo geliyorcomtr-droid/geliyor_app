@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:geliyor_app/screens/pet_market_products_screen.dart';
+import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/widgets/filter_subpage_layout.dart';
 
 class DogCategoryScreen extends StatelessWidget {
@@ -20,6 +21,7 @@ class DogCategoryScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return FilterSubpageLayout(
       title: 'Köpek',
+      accent: AppColors.success,
       items: [
         FilterSubpageItem(
           title: 'Mama',

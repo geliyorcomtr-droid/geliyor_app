@@ -58,6 +58,7 @@ class _FeaturedQuestionsScreenState extends State<FeaturedQuestionsScreen> {
       backgroundColor: AppColors.background,
       body: AppPageFrame.standard(
         backgroundColor: AppColors.background,
+        pawPrintColor: AppColors.warning,
         header: _buildHeader(context),
         content: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
@@ -106,7 +107,7 @@ class _FeaturedQuestionsScreenState extends State<FeaturedQuestionsScreen> {
             ],
           ),
         ),
-        navbar: const AppBottomNavbar(),
+        navbar: const AppBottomNavbar(homeColor: AppColors.warning),
       ),
     );
   }
@@ -116,13 +117,13 @@ class _FeaturedQuestionsScreenState extends State<FeaturedQuestionsScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: Row(
         children: [
-          const AppBackButton(),
+          const AppBackButton(color: AppColors.warning),
           Expanded(
             child: IgnorePointer(
               child: Text(
                 'Öne Çıkan Sorular',
                 textAlign: TextAlign.center,
-                style: AppTextStyles.pageHeader,
+                style: AppTextStyles.pageHeader.copyWith(color: AppColors.warning),
               ),
             ),
           ),
@@ -148,13 +149,13 @@ class _FeaturedQuestionsScreenState extends State<FeaturedQuestionsScreen> {
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: AppColors.primary, width: 1.4),
+          border: Border.all(color: AppColors.warning, width: 1.4),
         ),
         child: Row(
           children: [
             const Icon(
               Icons.folder_open_rounded,
-              color: AppColors.primary,
+              color: AppColors.warning,
               size: 20,
             ),
             const SizedBox(width: 8),
@@ -176,7 +177,7 @@ class _FeaturedQuestionsScreenState extends State<FeaturedQuestionsScreen> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color: AppColors.primary,
+                      color: AppColors.warning,
                       fontSize: 13,
                       fontWeight: FontWeight.w800,
                     ),
@@ -186,7 +187,7 @@ class _FeaturedQuestionsScreenState extends State<FeaturedQuestionsScreen> {
             ),
             const Icon(
               Icons.keyboard_arrow_down_rounded,
-              color: AppColors.primary,
+              color: AppColors.warning,
               size: 24,
             ),
           ],
@@ -203,19 +204,21 @@ class _FeaturedQuestionsScreenState extends State<FeaturedQuestionsScreen> {
             '${_selectedTopic.title} ile ilgili sorular',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: AppTextStyles.sectionHeader,
+            style: AppTextStyles.sectionHeader.copyWith(
+              color: AppColors.warning,
+            ),
           ),
         ),
         GestureDetector(
           onTap: _openTopicSearch,
           child: const Row(
             children: [
-              Icon(Icons.sync_rounded, color: AppColors.primary, size: 15),
+              Icon(Icons.sync_rounded, color: AppColors.warning, size: 15),
               SizedBox(width: 3),
               Text(
                 'Konuyu Değiştir',
                 style: TextStyle(
-                  color: AppColors.primary,
+                  color: AppColors.warning,
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
                 ),
@@ -247,7 +250,7 @@ class _FeaturedQuestionsScreenState extends State<FeaturedQuestionsScreen> {
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: AppColors.warning.withValues(alpha: 0.28)),
         ),
         child: Row(
           children: [
@@ -256,11 +259,11 @@ class _FeaturedQuestionsScreenState extends State<FeaturedQuestionsScreen> {
               height: 26,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(color: AppColors.primary, width: 1.4),
+                border: Border.all(color: AppColors.warning, width: 1.4),
               ),
               child: const Icon(
                 Icons.help_outline_rounded,
-                color: AppColors.primary,
+                color: AppColors.warning,
                 size: 14,
               ),
             ),
@@ -271,7 +274,7 @@ class _FeaturedQuestionsScreenState extends State<FeaturedQuestionsScreen> {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  color: AppColors.text,
+                  color: AppColors.warning,
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
                   height: 1.25,
@@ -296,7 +299,7 @@ class _FeaturedQuestionsScreenState extends State<FeaturedQuestionsScreen> {
             const SizedBox(width: 2),
             const Icon(
               Icons.chevron_right_rounded,
-              color: AppColors.primary,
+              color: AppColors.warning,
               size: 18,
             ),
           ],

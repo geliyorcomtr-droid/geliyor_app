@@ -16,16 +16,16 @@ class KnowledgeDisclaimer extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(11),
       decoration: BoxDecoration(
-        color: AppColors.selected,
+        color: AppColors.warning.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.28)),
       ),
       child: const Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(
             Icons.info_outline_rounded,
-            color: AppColors.primary,
+            color: AppColors.warning,
             size: 17,
           ),
           SizedBox(width: 8),

@@ -10,6 +10,7 @@ class BestSellersScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return FilterSubpageLayout(
       title: 'Çok Satanlar',
+      accent: AppColors.success,
       items: [
         FilterSubpageItem(
           title: 'En Çok Satan Kedi Ürünleri',

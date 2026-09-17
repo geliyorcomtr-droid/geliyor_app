@@ -215,14 +215,14 @@ class BannerPlacement {
   );
   static const meetPet = BannerPlacement(
     id: 'meet_pet',
-    title: 'Dostunu Tanıyalım',
+    title: 'Dostlarım',
     pageId: 'meet_pet',
-    pageLabel: 'Dostunu Tanıyalım',
+    pageLabel: 'Dostlarım',
     slotLabel: 'Sayfa bannerı',
-    height: 82,
+    height: 132,
     boxWidth: 361,
     boxRadius: 24,
-    description: '361×82 · Dostlarım sayfa bannerı',
+    description: '361×132 · Dostlarım sayfa bannerı',
   );
   static const emergency = BannerPlacement(
     id: 'emergency',
@@ -528,7 +528,7 @@ const defaultBanners = <AppBanner>[
   ),
   AppBanner(
     id: 'meet-pet',
-    title: 'Dostunu Tanıyalım',
+    title: 'Dostlarım',
     assetPath: 'assets/images/dostunu_taniyalim_banner.png',
     placement: 'meet_pet',
   ),

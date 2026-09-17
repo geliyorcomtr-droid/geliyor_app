@@ -36,31 +36,31 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
       id: 'sindirim',
       title: 'Sindirim\nSistemi',
       iconPath: 'assets/images/app_ikonlar/sindirim.png',
-      color: Color(0xFF22C55E),
+      color: AppColors.warning,
     ),
     _KbCategory(
       id: 'idrar',
       title: 'İdrar Yolu\nSağlığı',
       iconPath: 'assets/images/app_ikonlar/idrar.png',
-      color: Color(0xFFEC4899),
+      color: AppColors.warning,
     ),
     _KbCategory(
       id: 'alerji',
       title: 'Alerji\n& Deri',
       iconPath: 'assets/images/app_ikonlar/tuy_deri.png',
-      color: Color(0xFF9B4DCA),
+      color: AppColors.warning,
     ),
     _KbCategory(
       id: 'kilo',
       title: 'Kilo &\nBeslenme',
       iconPath: 'assets/images/app_ikonlar/kilo_kontrol.png',
-      color: Color(0xFFFF6600),
+      color: AppColors.warning,
     ),
     _KbCategory(
       id: 'genel',
       title: 'Genel\nSağlık',
       iconPath: 'assets/images/app_ikonlar/bagisiklik.png',
-      color: Color(0xFF00A859),
+      color: AppColors.warning,
     ),
     _KbCategory(id: 'tumu', title: 'Tümü', color: AppColors.subText),
   ];
@@ -132,6 +132,7 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
       backgroundColor: AppColors.background,
       body: AppPageFrame.standard(
         backgroundColor: AppColors.background,
+        pawPrintColor: AppColors.warning,
         header: _buildHeader(context),
         content: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
@@ -164,7 +165,7 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
             ],
           ),
         ),
-        navbar: const AppBottomNavbar(),
+        navbar: const AppBottomNavbar(homeColor: AppColors.warning),
       ),
     );
   }
@@ -174,13 +175,13 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: Row(
         children: [
-          const AppBackButton(),
+          const AppBackButton(color: AppColors.warning),
           Expanded(
             child: IgnorePointer(
               child: Text(
                 'Bilgi Bankası',
                 textAlign: TextAlign.center,
-                style: AppTextStyles.pageHeader,
+                style: AppTextStyles.pageHeader.copyWith(color: AppColors.warning),
               ),
             ),
           ),
@@ -197,11 +198,11 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.28)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.search_rounded, color: AppColors.subText, size: 20),
+          const Icon(Icons.search_rounded, color: AppColors.warning, size: 20),
           const SizedBox(width: 8),
           Expanded(
             child: TextField(
@@ -263,7 +264,7 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
               color: AppColors.surface,
               shape: BoxShape.circle,
               border: Border.all(
-                color: selected ? cat.color : AppColors.border,
+                color: selected ? cat.color : AppColors.warning.withValues(alpha: 0.28),
                 width: selected ? 2 : 1.2,
               ),
             ),
@@ -282,7 +283,7 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
                       errorBuilder: (context, error, stackTrace) {
                         return const Icon(
                           Icons.health_and_safety_outlined,
-                          color: AppColors.primary,
+                          color: AppColors.warning,
                           size: 20,
                         );
                       },
@@ -296,7 +297,7 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: selected ? cat.color : AppColors.text,
+              color: AppColors.warning,
               fontSize: 8,
               fontWeight: FontWeight.w800,
               height: 1.1,
@@ -318,14 +319,16 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
           children: [
             Row(
               children: [
-                const Icon(Icons.pets_rounded, color: AppColors.primary, size: 15),
+                const Icon(Icons.pets_rounded, color: AppColors.warning, size: 15),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
                     _questionsTitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.sectionHeader,
+                    style: AppTextStyles.sectionHeader.copyWith(
+                      color: AppColors.warning,
+                    ),
                   ),
                 ),
                 GestureDetector(
@@ -338,15 +341,17 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
                       ),
                     );
                   },
-                  child: const Row(
+                  child: Row(
                     children: [
                       Text(
                         'Tümünü Gör',
-                        style: AppTextStyles.seeAllAction,
+                        style: AppTextStyles.seeAllAction.copyWith(
+                          color: AppColors.warning,
+                        ),
                       ),
                       Icon(
                         Icons.chevron_right_rounded,
-                        color: AppColors.primary,
+                        color: AppColors.warning,
                         size: 20,
                       ),
                     ],
@@ -359,7 +364,7 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
               decoration: BoxDecoration(
                 color: AppColors.surface,
                 borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: AppColors.border),
+                border: Border.all(color: AppColors.warning.withValues(alpha: 0.28)),
               ),
               child: questions.isEmpty
                   ? const Padding(
@@ -374,7 +379,7 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
                         for (int i = 0; i < questions.length; i++) ...[
                           _buildQuestionRow(questions[i]),
                           if (i != questions.length - 1)
-                            const Divider(height: 1, color: AppColors.border),
+                            Divider(height: 1, color: AppColors.warning.withValues(alpha: 0.28)),
                         ],
                       ],
                     ),
@@ -408,13 +413,13 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
             Container(
               width: 22,
               height: 22,
-              decoration: const BoxDecoration(
-                color: AppColors.selected,
+              decoration: BoxDecoration(
+                color: AppColors.warning.withValues(alpha: 0.10),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.help_outline_rounded,
-                color: AppColors.primary,
+                color: AppColors.warning,
                 size: 13,
               ),
             ),
@@ -428,7 +433,7 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color: AppColors.text,
+                      color: AppColors.warning,
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
                       height: 1.2,
@@ -481,25 +486,29 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
       children: [
         Row(
           children: [
-            const Icon(Icons.pets_rounded, color: AppColors.primary, size: 15),
+            const Icon(Icons.pets_rounded, color: AppColors.warning, size: 15),
             const SizedBox(width: 4),
-            const Expanded(
+            Expanded(
               child: Text(
                 'Makaleler',
-                style: AppTextStyles.sectionHeader,
+                style: AppTextStyles.sectionHeader.copyWith(
+                  color: AppColors.warning,
+                ),
               ),
             ),
             GestureDetector(
               onTap: () => _openArticles(),
-              child: const Row(
+              child: Row(
                 children: [
                   Text(
                     'Tüm Makaleler',
-                    style: AppTextStyles.seeAllAction,
+                    style: AppTextStyles.seeAllAction.copyWith(
+                      color: AppColors.warning,
+                    ),
                   ),
                   Icon(
                     Icons.chevron_right_rounded,
-                    color: AppColors.primary,
+                    color: AppColors.warning,
                     size: 20,
                   ),
                 ],
@@ -545,7 +554,7 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: AppColors.warning.withValues(alpha: 0.28)),
         ),
         clipBehavior: Clip.antiAlias,
         child: Column(
@@ -560,7 +569,7 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
                       fit: BoxFit.cover,
                       alignment: Alignment.bottomCenter,
                       errorWidget: Container(
-                        color: AppColors.selected,
+                        color: AppColors.warning.withValues(alpha: 0.10),
                         alignment: Alignment.center,
                         child: const Icon(
                           Icons.image_outlined,
@@ -609,7 +618,7 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: AppColors.text,
+                        color: AppColors.warning,
                         fontSize: 8.5,
                         fontWeight: FontWeight.w800,
                         height: 1.2,

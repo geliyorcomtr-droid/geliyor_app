@@ -74,6 +74,7 @@ class _EasyOrderScreenState extends State<EasyOrderScreen> {
       backgroundColor: AppColors.background,
       body: AppPageFrame.standard(
         backgroundColor: AppColors.background,
+        pawPrintColor: AppColors.success,
         header: _buildHeader(),
         content: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
@@ -98,7 +99,10 @@ class _EasyOrderScreenState extends State<EasyOrderScreen> {
             ],
           ),
         ),
-        navbar: const AppBottomNavbar(activeTab: AppNavTab.home),
+        navbar: const AppBottomNavbar(
+          activeTab: AppNavTab.home,
+          homeColor: AppColors.success,
+        ),
       ),
     );
   }
@@ -108,13 +112,13 @@ class _EasyOrderScreenState extends State<EasyOrderScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: Row(
         children: [
-          const AppBackButton(),
+          const AppBackButton(color: AppColors.success),
           Expanded(
             child: IgnorePointer(
               child: Text(
                 'Kolay Sipariş',
                 textAlign: TextAlign.center,
-                style: AppTextStyles.pageHeader,
+                style: AppTextStyles.pageHeader.copyWith(color: AppColors.success),
               ),
             ),
           ),
@@ -140,9 +144,11 @@ class _EasyOrderScreenState extends State<EasyOrderScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Son Siparişini Tekrarla',
-                style: AppTextStyles.sectionHeader,
+                style: AppTextStyles.sectionHeader.copyWith(
+                  color: AppColors.success,
+                ),
               ),
               const SizedBox(height: 2),
               Text(
@@ -182,6 +188,7 @@ class _EasyOrderScreenState extends State<EasyOrderScreen> {
       ),
       onQuantityChanged: (qty) => setState(() => _items[index].quantity = qty),
       onRemove: () => _remove(index),
+      accent: AppColors.success,
     );
   }
 
@@ -194,23 +201,23 @@ class _EasyOrderScreenState extends State<EasyOrderScreen> {
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: AppColors.success.withValues(alpha: 0.28)),
         ),
         child: const Row(
           children: [
-            Icon(Icons.add_circle_outline_rounded, color: AppColors.primary, size: 20),
+            Icon(Icons.add_circle_outline_rounded, color: AppColors.success, size: 20),
             SizedBox(width: 8),
             Expanded(
               child: Text(
                 'Ürün Ekle',
                 style: TextStyle(
-                  color: AppColors.primary,
+                  color: AppColors.success,
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
                 ),
               ),
             ),
-            Icon(Icons.chevron_right_rounded, color: AppColors.primary, size: 22),
+            Icon(Icons.chevron_right_rounded, color: AppColors.success, size: 22),
           ],
         ),
       ),
@@ -223,7 +230,7 @@ class _EasyOrderScreenState extends State<EasyOrderScreen> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.success.withValues(alpha: 0.28)),
       ),
       child: Row(
         children: [
@@ -231,13 +238,13 @@ class _EasyOrderScreenState extends State<EasyOrderScreen> {
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: AppColors.selected,
+              color: AppColors.success.withValues(alpha: 0.10),
               shape: BoxShape.circle,
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: AppColors.success.withValues(alpha: 0.28)),
             ),
             child: const Icon(
               Icons.delivery_dining_rounded,
-              color: AppColors.primary,
+              color: AppColors.success,
               size: 18,
             ),
           ),
@@ -283,7 +290,7 @@ class _EasyOrderScreenState extends State<EasyOrderScreen> {
               Text(
                 _formatPrice(_payableTotal),
                 style: const TextStyle(
-                  color: AppColors.primary,
+                  color: AppColors.success,
                   fontSize: 16,
                   fontWeight: FontWeight.w900,
                 ),
@@ -325,6 +332,7 @@ class _EasyOrderScreenState extends State<EasyOrderScreen> {
                 ),
               );
             },
+      accent: AppColors.success,
       width: double.infinity,
       height: 52,
       padding: EdgeInsets.zero,

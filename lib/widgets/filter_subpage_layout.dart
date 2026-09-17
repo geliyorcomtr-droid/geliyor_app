@@ -12,9 +12,9 @@ class FilterSubpageItem {
     required this.subtitle,
     this.imagePath,
     this.icon,
-    this.iconColor = AppColors.primary,
+    this.iconColor,
     this.badgeIcon = Icons.pets_rounded,
-    this.badgeIconColor = AppColors.primary,
+    this.badgeIconColor,
     this.leadingColor,
     this.leadingLabel,
     this.onTap,
@@ -24,9 +24,9 @@ class FilterSubpageItem {
   final String subtitle;
   final String? imagePath;
   final IconData? icon;
-  final Color iconColor;
+  final Color? iconColor;
   final IconData badgeIcon;
-  final Color badgeIconColor;
+  final Color? badgeIconColor;
   final Color? leadingColor;
   final String? leadingLabel;
   final VoidCallback? onTap;
@@ -39,12 +39,14 @@ class FilterSubpageLayout extends StatelessWidget {
     this.items,
     this.content,
     this.defaultOnTap,
+    this.accent = AppColors.primary,
   }) : assert(items != null || content != null);
 
   final String title;
   final List<FilterSubpageItem>? items;
   final Widget? content;
   final VoidCallback? defaultOnTap;
+  final Color accent;
 
   @override
   Widget build(BuildContext context) {
@@ -52,6 +54,7 @@ class FilterSubpageLayout extends StatelessWidget {
       backgroundColor: AppColors.background,
       body: AppPageFrame.standard(
         backgroundColor: AppColors.background,
+        pawPrintColor: accent,
         header: _buildHeader(context),
         content: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -64,10 +67,10 @@ class FilterSubpageLayout extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: AppColors.surface,
                     borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: AppColors.border),
+                    border: Border.all(color: accent.withValues(alpha: 0.28)),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.05),
+                        color: accent.withValues(alpha: 0.05),
                         blurRadius: 10,
                         offset: const Offset(0, 3),
                       ),
@@ -78,12 +81,12 @@ class FilterSubpageLayout extends StatelessWidget {
                         physics: const BouncingScrollPhysics(),
                         padding: const EdgeInsets.symmetric(vertical: 4),
                         itemCount: items!.length,
-                        separatorBuilder: (context, index) => const Divider(
+                        separatorBuilder: (context, index) => Divider(
                           height: 1,
                           thickness: 1,
                           indent: 76,
                           endIndent: 16,
-                          color: AppColors.border,
+                          color: accent.withValues(alpha: 0.28),
                         ),
                         itemBuilder: (context, index) {
                           return _buildCategoryRow(context, items![index]);
@@ -94,7 +97,7 @@ class FilterSubpageLayout extends StatelessWidget {
             ],
           ),
         ),
-        navbar: const AppBottomNavbar(),
+        navbar: AppBottomNavbar(homeColor: accent),
       ),
     );
   }
@@ -104,7 +107,7 @@ class FilterSubpageLayout extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Row(
         children: [
-          const AppBackButton(),
+          AppBackButton(color: accent),
           Expanded(
             child: IgnorePointer(
               child: Text(
@@ -112,7 +115,7 @@ class FilterSubpageLayout extends StatelessWidget {
                 textAlign: TextAlign.center,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: AppTextStyles.pageHeader,
+                style: AppTextStyles.pageHeader.copyWith(color: accent),
               ),
             ),
           ),
@@ -132,11 +135,11 @@ class FilterSubpageLayout extends StatelessWidget {
             decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: accent.withValues(alpha: 0.28)),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.search_rounded, color: AppColors.primary, size: 22),
+                Icon(Icons.search_rounded, color: accent, size: 22),
                 SizedBox(width: 8),
                 Expanded(
                   child: TextField(
@@ -163,17 +166,17 @@ class FilterSubpageLayout extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: accent.withValues(alpha: 0.28)),
           ),
-          child: const Row(
+          child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.tune_rounded, color: AppColors.primary, size: 18),
-              SizedBox(width: 4),
+              Icon(Icons.tune_rounded, color: accent, size: 18),
+              const SizedBox(width: 4),
               Text(
                 'Filtrele',
                 style: TextStyle(
-                  color: AppColors.primary,
+                  color: accent,
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
                 ),
@@ -208,15 +211,19 @@ class FilterSubpageLayout extends StatelessWidget {
                             item.title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: AppColors.primary,
+                            style: TextStyle(
+                              color: accent,
                               fontSize: 15,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
                         ),
                         const SizedBox(width: 4),
-                        Icon(item.badgeIcon, size: 14, color: item.badgeIconColor),
+                        Icon(
+                          item.badgeIcon,
+                          size: 14,
+                          color: item.badgeIconColor ?? accent,
+                        ),
                       ],
                     ),
                     const SizedBox(height: 2),
@@ -233,9 +240,9 @@ class FilterSubpageLayout extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(
+              Icon(
                 Icons.chevron_right_rounded,
-                color: AppColors.primary,
+                color: accent,
                 size: 22,
               ),
             ],
@@ -252,14 +259,14 @@ class FilterSubpageLayout extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surface,
         shape: BoxShape.circle,
-        border: Border.all(color: AppColors.border, width: 1.2),
+        border: Border.all(color: accent.withValues(alpha: 0.28), width: 1.2),
       ),
       child: item.leadingLabel != null
           ? Center(
               child: Text(
                 item.leadingLabel!,
                 style: TextStyle(
-                  color: item.leadingColor ?? AppColors.primary,
+                  color: item.leadingColor ?? accent,
                   fontSize: 16,
                   fontWeight: FontWeight.w900,
                 ),
@@ -274,14 +281,14 @@ class FilterSubpageLayout extends StatelessWidget {
                       errorBuilder: (context, error, stackTrace) {
                         return Icon(
                           item.icon ?? Icons.pets_rounded,
-                          color: item.iconColor,
+                          color: item.iconColor ?? accent,
                           size: 24,
                         );
                       },
                     )
                   : Icon(
                       item.icon ?? Icons.pets_rounded,
-                      color: item.iconColor,
+                      color: item.iconColor ?? accent,
                       size: 24,
                     ),
             ),

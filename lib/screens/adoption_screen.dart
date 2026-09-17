@@ -7,6 +7,7 @@ import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/utils/product_image.dart';
 import 'package:geliyor_app/widgets/app_banner_slider.dart';
+import 'package:geliyor_app/widgets/app_back_button.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
@@ -73,9 +74,12 @@ class _AdoptionScreenState extends State<AdoptionScreen> {
       backgroundColor: AppColors.background,
       body: AppPageFrame.standard(
         backgroundColor: AppColors.background,
+        pawPrintColor: AppColors.warning,
         activeTab: AppNavTab.home,
         header: const AppPageHeader(
           title: 'Sahiplendirme',
+          titleColor: AppColors.warning,
+          leading: AppBackButton(color: AppColors.warning),
           trailing: AppNotificationButton(),
         ),
         content: StreamBuilder<List<AdoptionListing>>(
@@ -136,7 +140,10 @@ class _AdoptionScreenState extends State<AdoptionScreen> {
             );
           },
         ),
-        navbar: const AppBottomNavbar(activeTab: AppNavTab.home),
+        navbar: const AppBottomNavbar(
+          activeTab: AppNavTab.home,
+          homeColor: AppColors.warning,
+        ),
       ),
     );
   }
@@ -177,7 +184,7 @@ class _AdoptionScreenState extends State<AdoptionScreen> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.search_rounded, color: AppColors.primary, size: 22),
+          const Icon(Icons.search_rounded, color: AppColors.warning, size: 22),
           const SizedBox(width: 8),
           Expanded(
             child: TextField(
@@ -219,12 +226,12 @@ class _AdoptionScreenState extends State<AdoptionScreen> {
               label: Text(option),
               selected: selected == option,
               onSelected: (_) => onSelected(option),
-              selectedColor: AppColors.selected,
-              checkmarkColor: AppColors.primary,
+              selectedColor: AppColors.warning.withValues(alpha: 0.16),
+              checkmarkColor: AppColors.warning,
               visualDensity: VisualDensity.compact,
-              side: const BorderSide(color: AppColors.border),
+              side: BorderSide(color: AppColors.warning.withValues(alpha: 0.28)),
               labelStyle: TextStyle(
-                color: selected == option ? AppColors.primary : AppColors.text,
+                color: selected == option ? AppColors.warning : AppColors.text,
                 fontWeight: FontWeight.w800,
                 fontSize: 12,
               ),

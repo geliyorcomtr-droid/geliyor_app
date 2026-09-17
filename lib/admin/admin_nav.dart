@@ -205,7 +205,7 @@ const adminNavItems = <AdminNavItem>[
       ),
       AdminNavChild(
         page: AdminPage.banners,
-        label: 'Dostunu Tanıyalım',
+        label: 'Dostlarım',
         bannerGroup: 'meet_pet',
       ),
       AdminNavChild(

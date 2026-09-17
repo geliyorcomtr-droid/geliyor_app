@@ -81,16 +81,19 @@ class AppPressableButton extends StatefulWidget {
     double? width,
     double? height,
     bool enabled = true,
+    Color? accent,
   }) {
+    final fill = accent ?? AppColors.primaryLight;
+    final press = accent ?? AppColors.primary;
     return AppPressableButton(
       key: key,
       onTap: onTap,
-      backgroundColor: AppColors.primaryLight,
-      pressedBackgroundColor: AppColors.primary,
+      backgroundColor: fill,
+      pressedBackgroundColor: press,
       foregroundColor: AppColors.surface,
       pressedForegroundColor: AppColors.surface,
-      borderColor: AppColors.primaryLight,
-      pressedBorderColor: AppColors.primary,
+      borderColor: fill,
+      pressedBorderColor: press,
       borderRadius: borderRadius,
       padding: padding,
       width: width,
@@ -122,16 +125,21 @@ class AppPressableButton extends StatefulWidget {
     double? width,
     double? height,
     bool enabled = true,
+    Color? accent,
   }) {
+    final idle = accent?.withValues(alpha: 0.14) ?? AppColors.border;
+    final press = accent ?? AppColors.primary;
+    final idleBorder = accent?.withValues(alpha: 0.35) ?? AppColors.border;
+    final idleFg = accent ?? AppColors.text;
     return AppPressableButton(
       key: key,
       onTap: onTap,
-      backgroundColor: AppColors.border,
-      pressedBackgroundColor: AppColors.primary,
-      foregroundColor: AppColors.text,
+      backgroundColor: idle,
+      pressedBackgroundColor: press,
+      foregroundColor: idleFg,
       pressedForegroundColor: AppColors.surface,
-      borderColor: AppColors.border,
-      pressedBorderColor: AppColors.primary,
+      borderColor: idleBorder,
+      pressedBorderColor: press,
       borderRadius: borderRadius,
       padding: padding,
       width: width,
@@ -141,14 +149,14 @@ class AppPressableButton extends StatefulWidget {
         style: TextStyle(
           color: !enabled
               ? AppColors.subText
-              : (pressed ? AppColors.surface : AppColors.text),
+              : (pressed ? AppColors.surface : idleFg),
           fontWeight: FontWeight.w800,
         ),
         child: IconTheme.merge(
           data: IconThemeData(
             color: !enabled
                 ? AppColors.subText
-                : (pressed ? AppColors.surface : AppColors.text),
+                : (pressed ? AppColors.surface : idleFg),
           ),
           child: child,
         ),

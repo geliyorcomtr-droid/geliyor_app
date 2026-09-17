@@ -681,11 +681,13 @@ class MarketCompactProductCard extends StatelessWidget {
     required this.product,
     this.onTap,
     this.onAddToCart,
+    this.accent = AppColors.primary,
   });
 
   final MarketProductData product;
   final VoidCallback? onTap;
   final VoidCallback? onAddToCart;
+  final Color accent;
 
   static const double cardHeight = 148;
   static const double cardGap = 8;
@@ -726,7 +728,7 @@ class MarketCompactProductCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: accent.withValues(alpha: 0.28)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -790,8 +792,8 @@ class MarketCompactProductCard extends StatelessWidget {
                     formatProductPrice(price),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.primary,
+                    style: TextStyle(
+                      color: accent,
                       fontSize: 12,
                       fontWeight: FontWeight.w900,
                     ),
@@ -803,7 +805,7 @@ class MarketCompactProductCard extends StatelessWidget {
                     width: 22,
                     height: 22,
                     decoration: BoxDecoration(
-                      color: AppColors.primary,
+                      color: accent,
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: const Icon(

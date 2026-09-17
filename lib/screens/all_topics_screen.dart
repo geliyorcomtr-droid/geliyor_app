@@ -43,6 +43,7 @@ class _AllTopicsScreenState extends State<AllTopicsScreen> {
       backgroundColor: AppColors.background,
       body: AppPageFrame.standard(
         backgroundColor: AppColors.background,
+        pawPrintColor: AppColors.warning,
         header: _buildHeader(context),
         content: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
@@ -60,7 +61,7 @@ class _AllTopicsScreenState extends State<AllTopicsScreen> {
             ],
           ),
         ),
-        navbar: const AppBottomNavbar(),
+        navbar: const AppBottomNavbar(homeColor: AppColors.warning),
       ),
     );
   }
@@ -70,13 +71,13 @@ class _AllTopicsScreenState extends State<AllTopicsScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: Row(
         children: [
-          const AppBackButton(),
+          const AppBackButton(color: AppColors.warning),
           Expanded(
             child: IgnorePointer(
               child: Text(
                 'Tüm Konular',
                 textAlign: TextAlign.center,
-                style: AppTextStyles.pageHeader,
+                style: AppTextStyles.pageHeader.copyWith(color: AppColors.warning),
               ),
             ),
           ),
@@ -100,11 +101,11 @@ class _AllTopicsScreenState extends State<AllTopicsScreen> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.28)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.search_rounded, color: AppColors.primary, size: 20),
+          const Icon(Icons.search_rounded, color: AppColors.warning, size: 20),
           const SizedBox(width: 8),
           Expanded(
             child: TextField(
@@ -209,8 +210,7 @@ class _AllTopicsScreenState extends State<AllTopicsScreen> {
               color: AppColors.surface,
               shape: BoxShape.circle,
               border: Border.all(
-                color: Color.lerp(topic.color, Colors.white, 0.45) ??
-                    AppColors.border,
+                color: AppColors.warning.withValues(alpha: 0.45),
                 width: 1.4,
               ),
             ),
@@ -221,7 +221,7 @@ class _AllTopicsScreenState extends State<AllTopicsScreen> {
                 filterQuality: FilterQuality.high,
                 errorWidget: Icon(
                   Icons.health_and_safety_outlined,
-                  color: topic.color,
+                  color: AppColors.warning,
                   size: 24,
                 ),
               ),
@@ -234,7 +234,7 @@ class _AllTopicsScreenState extends State<AllTopicsScreen> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              color: AppColors.text,
+              color: AppColors.warning,
               fontSize: 9,
               fontWeight: FontWeight.w800,
               height: 1.1,

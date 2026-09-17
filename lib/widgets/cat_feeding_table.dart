@@ -8,11 +8,13 @@ class CatFeedingTableCard extends StatefulWidget {
     this.highlighted,
     this.bodyType,
     this.activityLevel,
+    this.accent = AppColors.primary,
   });
 
   final CatFeedingRow? highlighted;
   final String? bodyType;
   final String? activityLevel;
+  final Color accent;
 
   @override
   State<CatFeedingTableCard> createState() => _CatFeedingTableCardState();
@@ -29,7 +31,7 @@ class _CatFeedingTableCardState extends State<CatFeedingTableCard> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: widget.accent.withValues(alpha: 0.28)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -71,9 +73,9 @@ class _CatFeedingTableCardState extends State<CatFeedingTableCard> {
                     AnimatedRotation(
                       turns: _expanded ? 0.5 : 0,
                       duration: const Duration(milliseconds: 200),
-                      child: const Icon(
+                      child: Icon(
                         Icons.keyboard_arrow_down_rounded,
-                        color: AppColors.primary,
+                        color: widget.accent,
                         size: 22,
                       ),
                     ),
@@ -90,7 +92,7 @@ class _CatFeedingTableCardState extends State<CatFeedingTableCard> {
                 ? Column(
                     children: [
                       const SizedBox(height: 8),
-                      const _HeaderRow(),
+                      _HeaderRow(accent: widget.accent),
                       const SizedBox(height: 4),
                       for (final row in CatFeedingGuide.rows)
                         _DataRow(
@@ -101,6 +103,7 @@ class _CatFeedingTableCardState extends State<CatFeedingTableCard> {
                           ),
                           selected: widget.highlighted != null &&
                               widget.highlighted!.catKg == row.catKg,
+                          accent: widget.accent,
                         ),
                     ],
                   )
@@ -113,7 +116,9 @@ class _CatFeedingTableCardState extends State<CatFeedingTableCard> {
 }
 
 class _HeaderRow extends StatelessWidget {
-  const _HeaderRow();
+  const _HeaderRow({required this.accent});
+
+  final Color accent;
 
   @override
   Widget build(BuildContext context) {
@@ -121,15 +126,15 @@ class _HeaderRow extends StatelessWidget {
       height: 28,
       padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
-        color: AppColors.selected,
+        color: accent.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(999),
       ),
-      child: const Row(
+      child: Row(
         children: [
-          Expanded(flex: 22, child: _Cell('Kedi kilosu', header: true, align: TextAlign.left)),
-          Expanded(flex: 24, child: _Cell('Günlük', header: true)),
-          Expanded(flex: 28, child: _Cell('30 günlük', header: true)),
-          Expanded(flex: 26, child: _Cell('10 kg mama', header: true)),
+          Expanded(flex: 22, child: _Cell('Kedi kilosu', header: true, align: TextAlign.left, accent: accent)),
+          Expanded(flex: 24, child: _Cell('Günlük', header: true, accent: accent)),
+          Expanded(flex: 28, child: _Cell('30 günlük', header: true, accent: accent)),
+          Expanded(flex: 26, child: _Cell('10 kg mama', header: true, accent: accent)),
         ],
       ),
     );
@@ -141,11 +146,13 @@ class _DataRow extends StatelessWidget {
     required this.row,
     required this.daily,
     required this.selected,
+    required this.accent,
   });
 
   final CatFeedingRow row;
   final int daily;
   final bool selected;
+  final Color accent;
 
   @override
   Widget build(BuildContext context) {
@@ -154,20 +161,20 @@ class _DataRow extends StatelessWidget {
       margin: const EdgeInsets.only(top: 2),
       padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
-        color: selected ? AppColors.selected : Colors.transparent,
+        color: selected ? accent.withValues(alpha: 0.10) : Colors.transparent,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
         children: [
           Expanded(
             flex: 22,
-            child: _Cell(row.catKgLabel, align: TextAlign.left, emphasize: true),
+            child: _Cell(row.catKgLabel, align: TextAlign.left, emphasize: true, accent: accent),
           ),
-          Expanded(flex: 24, child: _Cell('$daily g')),
-          Expanded(flex: 28, child: _Cell(row.monthlyFor(daily))),
+          Expanded(flex: 24, child: _Cell('$daily g', accent: accent)),
+          Expanded(flex: 28, child: _Cell(row.monthlyFor(daily), accent: accent)),
           Expanded(
             flex: 26,
-            child: _Cell('${row.daysForBagKg(10, daily: daily)} gün'),
+            child: _Cell('${row.daysForBagKg(10, daily: daily)} gün', accent: accent),
           ),
         ],
       ),
@@ -181,12 +188,14 @@ class _Cell extends StatelessWidget {
     this.header = false,
     this.emphasize = false,
     this.align = TextAlign.right,
+    required this.accent,
   });
 
   final String text;
   final bool header;
   final bool emphasize;
   final TextAlign align;
+  final Color accent;
 
   @override
   Widget build(BuildContext context) {
@@ -196,7 +205,7 @@ class _Cell extends StatelessWidget {
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style: TextStyle(
-        color: header || emphasize ? AppColors.primary : AppColors.text,
+        color: header || emphasize ? accent : AppColors.text,
         fontSize: header ? 9.5 : 10.5,
         fontWeight: header || emphasize ? FontWeight.w800 : FontWeight.w600,
       ),

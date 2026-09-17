@@ -22,7 +22,7 @@ class TopicSearchScreen extends StatefulWidget {
         count: defaultKnowledgeQuestions
             .where((item) => item.topicId == topic.id)
             .length,
-        color: topic.color,
+        color: AppColors.warning,
         iconPath: topic.iconPath,
         icon: topic.icon,
       ),
@@ -57,6 +57,7 @@ class _TopicSearchScreenState extends State<TopicSearchScreen> {
       backgroundColor: AppColors.background,
       body: AppPageFrame.standard(
         backgroundColor: AppColors.background,
+        pawPrintColor: AppColors.warning,
         header: _buildHeader(context),
         content: Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
@@ -68,7 +69,7 @@ class _TopicSearchScreenState extends State<TopicSearchScreen> {
               const Text(
                 'Sağlık Konuları',
                 style: TextStyle(
-                  color: AppColors.text,
+                  color: AppColors.warning,
                   fontSize: 13,
                   fontWeight: FontWeight.w900,
                 ),
@@ -79,7 +80,7 @@ class _TopicSearchScreenState extends State<TopicSearchScreen> {
                   decoration: BoxDecoration(
                     color: AppColors.surface,
                     borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: AppColors.border),
+                    border: Border.all(color: AppColors.warning.withValues(alpha: 0.28)),
                   ),
                   child: items.isEmpty
                       ? const Center(
@@ -96,9 +97,9 @@ class _TopicSearchScreenState extends State<TopicSearchScreen> {
                           physics: const BouncingScrollPhysics(),
                           padding: const EdgeInsets.symmetric(vertical: 4),
                           itemCount: items.length,
-                          separatorBuilder: (_, _) => const Divider(
+                          separatorBuilder: (_, _) => Divider(
                             height: 1,
-                            color: AppColors.border,
+                            color: AppColors.warning.withValues(alpha: 0.28),
                           ),
                           itemBuilder: (context, index) {
                             return _buildTopicRow(items[index]);
@@ -111,7 +112,7 @@ class _TopicSearchScreenState extends State<TopicSearchScreen> {
             ],
           ),
         ),
-        navbar: const AppBottomNavbar(),
+        navbar: const AppBottomNavbar(homeColor: AppColors.warning),
       ),
     );
   }
@@ -121,13 +122,13 @@ class _TopicSearchScreenState extends State<TopicSearchScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: Row(
         children: [
-          const AppBackButton(),
+          const AppBackButton(color: AppColors.warning),
           Expanded(
             child: IgnorePointer(
               child: Text(
                 'Konu Seçin',
                 textAlign: TextAlign.center,
-                style: AppTextStyles.pageHeader,
+                style: AppTextStyles.pageHeader.copyWith(color: AppColors.warning),
               ),
             ),
           ),
@@ -144,11 +145,11 @@ class _TopicSearchScreenState extends State<TopicSearchScreen> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.primary, width: 1.3),
+        border: Border.all(color: AppColors.warning, width: 1.3),
       ),
       child: Row(
         children: [
-          const Icon(Icons.search_rounded, color: AppColors.primary, size: 22),
+          const Icon(Icons.search_rounded, color: AppColors.warning, size: 22),
           const SizedBox(width: 8),
           Expanded(
             child: TextField(
@@ -202,17 +203,17 @@ class _TopicSearchScreenState extends State<TopicSearchScreen> {
             Expanded(
               child: Text(
                 topic.title,
-                style: TextStyle(
-                  color: selected ? AppColors.primary : AppColors.text,
+                style: const TextStyle(
+                  color: AppColors.warning,
                   fontSize: 13,
-                  fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ),
             Text(
               '${topic.count} soru',
               style: const TextStyle(
-                color: AppColors.primary,
+                color: AppColors.warning,
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
               ),
@@ -221,7 +222,7 @@ class _TopicSearchScreenState extends State<TopicSearchScreen> {
               const SizedBox(width: 6),
               const Icon(
                 Icons.check_circle_rounded,
-                color: AppColors.primary,
+                color: AppColors.warning,
                 size: 18,
               ),
             ],
@@ -240,7 +241,7 @@ class _TopicSearchScreenState extends State<TopicSearchScreen> {
           topic.iconPath!,
           fit: BoxFit.contain,
           errorBuilder: (context, error, stackTrace) {
-            return Icon(topic.icon, color: topic.color, size: 24);
+            return Icon(topic.icon, color: AppColors.warning, size: 24);
           },
         ),
       );
@@ -249,10 +250,10 @@ class _TopicSearchScreenState extends State<TopicSearchScreen> {
       width: 32,
       height: 32,
       decoration: BoxDecoration(
-        color: Color.lerp(topic.color, Colors.white, 0.85),
+        color: AppColors.warning.withValues(alpha: 0.12),
         shape: BoxShape.circle,
       ),
-      child: Icon(topic.icon, color: topic.color, size: 18),
+      child: Icon(topic.icon, color: AppColors.warning, size: 18),
     );
   }
 }

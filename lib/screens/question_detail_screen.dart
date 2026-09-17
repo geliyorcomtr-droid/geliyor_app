@@ -40,6 +40,7 @@ class QuestionDetailScreen extends StatelessWidget {
       backgroundColor: AppColors.background,
       body: AppPageFrame.standard(
         backgroundColor: AppColors.background,
+        pawPrintColor: AppColors.warning,
         header: _buildHeader(context),
         content: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
@@ -56,7 +57,7 @@ class QuestionDetailScreen extends StatelessWidget {
               _buildAnswerCard(),
               if (_showFeedingTable) ...[
                 const SizedBox(height: 10),
-                const CatFeedingTableCard(),
+                const CatFeedingTableCard(accent: AppColors.warning),
               ],
               const SizedBox(height: 10),
               _buildTipsCard(),
@@ -65,7 +66,7 @@ class QuestionDetailScreen extends StatelessWidget {
             ],
           ),
         ),
-        navbar: const AppBottomNavbar(),
+        navbar: const AppBottomNavbar(homeColor: AppColors.warning),
       ),
     );
   }
@@ -75,13 +76,13 @@ class QuestionDetailScreen extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: Row(
         children: [
-          const AppBackButton(),
+          const AppBackButton(color: AppColors.warning),
           Expanded(
             child: IgnorePointer(
               child: Text(
                 'Soru Detayı',
                 textAlign: TextAlign.center,
-                style: AppTextStyles.pageHeader,
+                style: AppTextStyles.pageHeader.copyWith(color: AppColors.warning),
               ),
             ),
           ),
@@ -98,11 +99,15 @@ class QuestionDetailScreen extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.border, width: 1.2),
-        gradient: const LinearGradient(
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.28), width: 1.2),
+        gradient: LinearGradient(
           begin: Alignment.centerLeft,
           end: Alignment.centerRight,
-          colors: [Color(0xFFE8F3FF), Color(0xFFFBFDFF), Color(0xFFE8F3FF)],
+          colors: [
+            AppColors.warning.withValues(alpha: 0.16),
+            AppColors.background,
+            AppColors.warning.withValues(alpha: 0.16),
+          ],
         ),
       ),
       clipBehavior: Clip.antiAlias,
@@ -114,7 +119,7 @@ class QuestionDetailScreen extends StatelessWidget {
             child: Icon(
               Icons.pets_rounded,
               size: 80,
-              color: AppColors.primary.withValues(alpha: 0.07),
+              color: AppColors.warning.withValues(alpha: 0.07),
             ),
           ),
           Row(
@@ -129,7 +134,7 @@ class QuestionDetailScreen extends StatelessWidget {
                 ),
                 child: const Icon(
                   Icons.info_outline_rounded,
-                  color: AppColors.primary,
+                  color: AppColors.warning,
                   size: 16,
                 ),
               ),
@@ -156,19 +161,19 @@ class QuestionDetailScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: AppColors.selected,
+        color: AppColors.warning.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.28)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.folder_open_rounded, color: AppColors.primary, size: 14),
+          const Icon(Icons.folder_open_rounded, color: AppColors.warning, size: 14),
           const SizedBox(width: 5),
           Text(
             topicTitle,
             style: const TextStyle(
-              color: AppColors.primary,
+              color: AppColors.warning,
               fontSize: 11,
               fontWeight: FontWeight.w800,
             ),
@@ -185,7 +190,7 @@ class QuestionDetailScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.28)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -198,11 +203,11 @@ class QuestionDetailScreen extends StatelessWidget {
                 height: 30,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.primary, width: 1.4),
+                  border: Border.all(color: AppColors.warning, width: 1.4),
                 ),
                 child: const Icon(
                   Icons.help_outline_rounded,
-                  color: AppColors.primary,
+                  color: AppColors.warning,
                   size: 16,
                 ),
               ),
@@ -211,7 +216,7 @@ class QuestionDetailScreen extends StatelessWidget {
                 child: Text(
                   question,
                   style: const TextStyle(
-                    color: AppColors.text,
+                    color: AppColors.warning,
                     fontSize: 14,
                     fontWeight: FontWeight.w900,
                     height: 1.3,
@@ -266,19 +271,19 @@ class QuestionDetailScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.28)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Row(
             children: [
-              Icon(Icons.verified_rounded, color: AppColors.primary, size: 16),
+              Icon(Icons.verified_rounded, color: AppColors.warning, size: 16),
               SizedBox(width: 6),
               Text(
                 'Yanıt',
                 style: TextStyle(
-                  color: AppColors.primary,
+                  color: AppColors.warning,
                   fontSize: 13,
                   fontWeight: FontWeight.w900,
                 ),
@@ -354,7 +359,7 @@ class QuestionDetailScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.28)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -366,7 +371,7 @@ class QuestionDetailScreen extends StatelessWidget {
               Text(
                 'Pratik öneriler',
                 style: TextStyle(
-                  color: AppColors.text,
+                  color: AppColors.warning,
                   fontSize: 13,
                   fontWeight: FontWeight.w900,
                 ),
@@ -383,14 +388,14 @@ class QuestionDetailScreen extends StatelessWidget {
                   width: 18,
                   height: 18,
                   alignment: Alignment.center,
-                  decoration: const BoxDecoration(
-                    color: AppColors.selected,
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withValues(alpha: 0.10),
                     shape: BoxShape.circle,
                   ),
                   child: Text(
                     '${i + 1}',
                     style: const TextStyle(
-                      color: AppColors.primary,
+                      color: AppColors.warning,
                       fontSize: 10,
                       fontWeight: FontWeight.w800,
                     ),

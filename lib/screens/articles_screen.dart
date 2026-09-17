@@ -32,25 +32,25 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
     _ArticleCategory(
       id: 'beslenme',
       title: 'Beslenme',
-      color: Color(0xFF00A859),
+      color: AppColors.warning,
       imagePath: 'assets/images/bilgi_beslenme.png',
     ),
     _ArticleCategory(
       id: 'saglik',
       title: 'Sağlık',
-      color: Color(0xFF9B4DCA),
+      color: AppColors.warning,
       imagePath: 'assets/images/bilgi_saglik.png',
     ),
     _ArticleCategory(
       id: 'bakim',
       title: 'Bakım',
-      color: Color(0xFFFF6600),
+      color: AppColors.warning,
       imagePath: 'assets/images/bilgi_bakim.png',
     ),
     _ArticleCategory(
       id: 'asi',
       title: 'Aşı',
-      color: Color(0xFF1E90FF),
+      color: AppColors.warning,
       imagePath: 'assets/images/bilgi_asi_koruma.png',
     ),
   ];
@@ -96,6 +96,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
           backgroundColor: AppColors.background,
           body: AppPageFrame.standard(
             backgroundColor: AppColors.background,
+            pawPrintColor: AppColors.warning,
             header: _buildHeader(context),
             content: SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
@@ -117,7 +118,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
                 ],
               ),
             ),
-            navbar: const AppBottomNavbar(),
+            navbar: const AppBottomNavbar(homeColor: AppColors.warning),
           ),
         );
       },
@@ -129,13 +130,13 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: Row(
         children: [
-          const AppBackButton(),
+          const AppBackButton(color: AppColors.warning),
           Expanded(
             child: IgnorePointer(
               child: Text(
                 'Makaleler',
                 textAlign: TextAlign.center,
-                style: AppTextStyles.pageHeader,
+                style: AppTextStyles.pageHeader.copyWith(color: AppColors.warning),
               ),
             ),
           ),
@@ -159,11 +160,11 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.28)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.search_rounded, color: AppColors.primary, size: 20),
+          const Icon(Icons.search_rounded, color: AppColors.warning, size: 20),
           const SizedBox(width: 8),
           Expanded(
             child: TextField(
@@ -226,7 +227,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: selected ? cat.color : AppColors.border,
+            color: selected ? cat.color : AppColors.warning.withValues(alpha: 0.28),
             width: selected ? 2 : 1,
           ),
         ),
@@ -240,7 +241,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) {
                   return Container(
-                    color: AppColors.selected,
+                    color: AppColors.warning.withValues(alpha: 0.10),
                     alignment: Alignment.center,
                     child: const Icon(
                       Icons.image_outlined,
@@ -260,7 +261,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: selected ? AppColors.surface : AppColors.text,
+                  color: selected ? AppColors.surface : AppColors.warning,
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
                 ),
@@ -282,7 +283,9 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
             '${_selectedCategory.title} Makaleleri',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: AppTextStyles.sectionHeader,
+            style: AppTextStyles.sectionHeader.copyWith(
+              color: AppColors.warning,
+            ),
           ),
         ),
         Text(
@@ -337,7 +340,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: AppColors.warning.withValues(alpha: 0.28)),
         ),
         clipBehavior: Clip.antiAlias,
         child: Row(
@@ -349,7 +352,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
               article.displayImage,
               fit: BoxFit.cover,
               errorWidget: Container(
-                color: AppColors.selected,
+                color: AppColors.warning.withValues(alpha: 0.10),
                 alignment: Alignment.center,
                 child: const Icon(
                   Icons.image_outlined,
@@ -370,7 +373,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color: AppColors.text,
+                      color: AppColors.warning,
                       fontSize: 12.5,
                       fontWeight: FontWeight.w800,
                       height: 1.2,
@@ -408,7 +411,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
                       const Spacer(),
                       const Icon(
                         Icons.chevron_right_rounded,
-                        color: AppColors.primary,
+                        color: AppColors.warning,
                         size: 18,
                       ),
                     ],

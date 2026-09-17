@@ -24,6 +24,7 @@ class BrandsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return FilterSubpageLayout(
       title: 'Markaya Göre Alışveriş',
+      accent: AppColors.success,
       content: StreamBuilder<List<AppBrand>>(
         stream: BrandRepository.instance.watchAll(activeOnly: true),
         builder: (context, snapshot) {
@@ -104,7 +105,7 @@ class BrandsScreen extends StatelessWidget {
         maxLines: 2,
         overflow: TextOverflow.ellipsis,
         style: const TextStyle(
-          color: AppColors.primary,
+          color: AppColors.success,
           fontSize: 11,
           fontWeight: FontWeight.w800,
         ),
