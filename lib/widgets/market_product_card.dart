@@ -263,7 +263,7 @@ class _MarketProductCardState extends State<MarketProductCard> {
     return Container(
       width: 80,
       decoration: BoxDecoration(
-        color: AppColors.background,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Stack(
@@ -275,6 +275,7 @@ class _MarketProductCardState extends State<MarketProductCard> {
               child: buildProductImage(
                 p.imagePath,
                 fit: BoxFit.contain,
+                cacheWidth: productThumbCachePx,
                 errorWidget: const Icon(
                   Icons.inventory_2_outlined,
                   color: AppColors.subText,
@@ -742,6 +743,7 @@ class MarketCompactProductCard extends StatelessWidget {
                         product.imagePath,
                         fit: BoxFit.contain,
                         filterQuality: FilterQuality.high,
+                        cacheWidth: productPhotoCachePx,
                         errorWidget: const Icon(
                           Icons.image_outlined,
                           color: AppColors.subText,

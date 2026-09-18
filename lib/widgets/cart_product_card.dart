@@ -145,7 +145,7 @@ class _CartProductCardState extends State<CartProductCard> {
       width: 72,
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.background,
+          color: AppColors.surface,
           borderRadius: BorderRadius.circular(16),
         ),
         clipBehavior: Clip.antiAlias,
@@ -157,6 +157,7 @@ class _CartProductCardState extends State<CartProductCard> {
                 child: buildProductImage(
                   item.imagePath,
                   fit: BoxFit.contain,
+                  cacheWidth: productThumbCachePx,
                   errorWidget: const Icon(
                     Icons.inventory_2_outlined,
                     color: AppColors.subText,

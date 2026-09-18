@@ -18,6 +18,7 @@ enum AdminPage {
   support,
   bankTransfer,
   adoption,
+  foodTracking,
 }
 
 class AdminNavChild {
@@ -109,6 +110,12 @@ const adminNavItems = <AdminNavItem>[
       AdminNavChild(page: AdminPage.trustBadges, label: 'Güven Rozetleri'),
       AdminNavChild(page: AdminPage.advantages, label: 'Ürün Özellikleri'),
     ],
+  ),
+  AdminNavItem(
+    page: AdminPage.foodTracking,
+    label: 'Mama Tüketim Takibi',
+    icon: Icons.scale_rounded,
+    accent: AdminAccents.foodTracking,
   ),
   AdminNavItem(
     page: AdminPage.members,
@@ -315,6 +322,7 @@ String adminPageTitle(
     AdminPage.categories => 'Kategoriler',
     AdminPage.trustBadges => 'Güven Rozetleri',
     AdminPage.advantages => 'Ürün Özellikleri',
+    AdminPage.foodTracking => 'Mama Tüketim Takibi',
     AdminPage.members => 'Üyeler',
     AdminPage.campaigns => 'Kampanyalar',
     AdminPage.coupons => 'Kuponlar',

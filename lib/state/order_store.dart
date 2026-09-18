@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:geliyor_app/data/firestore_collections.dart';
+import 'package:geliyor_app/data/pet_life_stage.dart';
 import 'package:geliyor_app/data/user_doc_persist.dart';
 import 'package:geliyor_app/state/cart_store.dart';
 
@@ -150,20 +151,20 @@ class OrderStore extends ChangeNotifier {
     );
   }
 
-  String _titleFromCart(String fullTitle) {
-    final parts = fullTitle.split(' ');
-    if (parts.length <= 3) return fullTitle;
-    return parts.take(3).join(' ');
-  }
+  String _titleFromCart(String fullTitle) => fullTitle.trim();
 
   String _subtitleFromCart(String fullTitle) {
-    if (fullTitle.toLowerCase().contains('kedi')) {
-      return 'Kedi Maması';
+    final lower = fullTitle.toLowerCase();
+    final puppy = PetLifeStage.isPuppyTitle(fullTitle);
+    if (lower.contains('kedi') || lower.contains('cat')) {
+      return puppy ? 'Yavru kedi maması' : 'Kedi maması';
     }
-    if (fullTitle.toLowerCase().contains('köpek')) {
-      return 'Köpek Maması';
+    if (lower.contains('köpek') ||
+        lower.contains('kopek') ||
+        lower.contains('dog')) {
+      return puppy ? 'Yavru köpek maması' : 'Köpek maması';
     }
-    return 'Pet ürünü';
+    return puppy ? 'Yavru mama' : 'Pet ürünü';
   }
 
   String _weightFromCartItem(CartItem item) {

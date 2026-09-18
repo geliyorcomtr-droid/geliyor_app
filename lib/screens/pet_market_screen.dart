@@ -8,6 +8,7 @@ import 'package:geliyor_app/screens/product_detail_screen.dart';
 import 'package:geliyor_app/state/cart_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/utils/advantage_search.dart';
+import 'package:geliyor_app/utils/product_image.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
@@ -69,6 +70,10 @@ class _PetMarketScreenState extends State<PetMarketScreen> {
     _CategoryIcon('Mama', 'assets/images/petmarket_mama.png'),
     _CategoryIcon('Yavru', 'assets/images/petmarket_kopek_yavru.png'),
     _CategoryIcon('Mini Irk', 'assets/images/petmarket_mini_irk.png'),
+    _CategoryIcon(
+      'Mini Irk Yavru',
+      'assets/images/petmarket_kopek_yavru.png',
+    ),
     _CategoryIcon('Ödül', 'assets/images/petmarket_odul.png'),
   ];
 
@@ -108,6 +113,10 @@ class _PetMarketScreenState extends State<PetMarketScreen> {
       return 'Ödül';
     }
     if (q.contains('kum') || q.contains('litter')) return 'Kum';
+    if (q.contains('mini') &&
+        (q.contains('yavru') || q.contains('puppy'))) {
+      return 'Mini Irk Yavru';
+    }
     if (q.contains('yavru') || q.contains('puppy') || q.contains('kitten')) {
       return 'Yavru';
     }
@@ -168,6 +177,11 @@ class _PetMarketScreenState extends State<PetMarketScreen> {
       ),
       builder: (context, snapshot) {
         final products = _mergedProducts(snapshot.data ?? const []);
+        ImageWarmup.precache(
+          context,
+          products.map((product) => product.imagePath),
+          cacheWidth: productThumbCachePx,
+        );
 
         return Scaffold(
           backgroundColor: AppColors.background,
@@ -528,13 +542,14 @@ class _PetMarketScreenState extends State<PetMarketScreen> {
           const SizedBox(height: 4),
           Text(
             category.title,
-            maxLines: 1,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
             style: TextStyle(
               color: selected ? AppColors.success : AppColors.text,
               fontSize: 9,
               fontWeight: FontWeight.w700,
+              height: 1.1,
             ),
           ),
         ],

@@ -171,7 +171,10 @@ class BannerPlacement {
     pageId: 'easy_order',
     pageLabel: 'Kolay Sipariş',
     slotLabel: 'Sayfa bannerı',
-    height: 160,
+    height: 132,
+    boxWidth: 361,
+    boxRadius: 24,
+    description: '361×132 · Kolay Sipariş sayfa bannerı',
   );
   static const foodTracking = BannerPlacement(
     id: 'food_tracking',
@@ -580,38 +583,29 @@ class BannerRepository {
     try {
       final snap = await _col.get();
       final existingIds = {for (final doc in snap.docs) doc.id};
-      final batch = FirebaseFirestore.instance.batch();
-      var writes = 0;
-      for (final banner in defaultBanners) {
-        if (existingIds.contains(banner.id)) continue;
-        batch.set(_col.doc(banner.id), banner.toMap());
-        writes++;
-      }
-      // Dostlarım bannerı: yeni varsayılan görsele geç (eski Storage yüklemesini düşür).
-      const meetPetId = 'meet-pet';
-      const meetPetRev = 2;
-      if (existingIds.contains(meetPetId)) {
-        final meetDoc = snap.docs.firstWhere((doc) => doc.id == meetPetId);
-        final rev = (meetDoc.data()['bannerRev'] as num?)?.toInt() ?? 0;
-        if (rev < meetPetRev) {
-          batch.set(_col.doc(meetPetId), {
-            BannerFields.assetPath:
-                'assets/images/dostunu_taniyalim_banner.png',
-            BannerFields.imageUrl: '',
-            'bannerRev': meetPetRev,
-            BannerFields.updatedAt: FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
-          writes++;
+      final alreadySeeded =
+          existingIds.contains(seededDocId) || snap.docs.any(_isBannerDoc);
+      final deletedIds = <String>{};
+      if (existingIds.contains(seededDocId)) {
+        final seededData =
+            snap.docs.firstWhere((doc) => doc.id == seededDocId).data();
+        final raw = seededData['deletedIds'];
+        if (raw is Iterable) {
+          deletedIds.addAll(raw.map((item) => item.toString()));
         }
       }
-      if (!existingIds.contains(seededDocId)) {
+      if (!alreadySeeded) {
+        final batch = FirebaseFirestore.instance.batch();
+        for (final banner in defaultBanners) {
+          if (deletedIds.contains(banner.id)) continue;
+          batch.set(_col.doc(banner.id), banner.toMap());
+        }
         batch.set(_col.doc(seededDocId), {
           'seeded': true,
           BannerFields.updatedAt: FieldValue.serverTimestamp(),
         });
-        writes++;
+        await batch.commit();
       }
-      if (writes > 0) await batch.commit();
       await pruneStaleStripBanners();
       await restoreHomeDostEkleIfMeetPetLeaked();
     } catch (_) {
@@ -766,6 +760,16 @@ class BannerRepository {
     } catch (_) {}
   }
 
+  Future<void> deleteBanner(AppBanner banner) async {
+    await deleteStorageUrl(banner.imageUrl);
+    await _col.doc(banner.id).delete();
+    await _col.doc(seededDocId).set({
+      'seeded': true,
+      'deletedIds': FieldValue.arrayUnion([banner.id]),
+      BannerFields.updatedAt: FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
   Stream<List<AppBanner>> watchAll() {
     return watchAllMeta().map((item) => item.banners);
   }
@@ -791,7 +795,7 @@ class BannerRepository {
           .where(
             (item) =>
                 item.active &&
-                item.displayImage.isNotEmpty &&
+                item.imageUrl.trim().isNotEmpty &&
                 (placement == null || item.placement == placement),
           )
           .toList();
@@ -806,7 +810,7 @@ class BannerRepository {
           .where(
             (banner) =>
                 banner.active &&
-                banner.displayImage.isNotEmpty &&
+                banner.imageUrl.trim().isNotEmpty &&
                 (placement == null || banner.placement == placement),
           )
           .toList();
@@ -822,7 +826,7 @@ class BannerRepository {
         .where(
           (item) =>
               item.active &&
-              item.displayImage.isNotEmpty &&
+              item.imageUrl.trim().isNotEmpty &&
               (placement == null || item.placement == placement),
         )
         .toList();

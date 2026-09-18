@@ -130,6 +130,9 @@ class FoodTrackingFields {
   static const purchaseDate = 'purchaseDate';
   static const petName = 'petName';
   static const petSpecies = 'petSpecies';
+  static const lifeStage = 'lifeStage';
+  static const isMiniBreed = 'isMiniBreed';
+  static const ageMonths = 'ageMonths';
 }
 
 class PetFields {
@@ -297,6 +300,9 @@ class BrandFields {
   static const active = 'active';
   static const feedingCat = 'feedingCat';
   static const feedingDog = 'feedingDog';
+  static const feedingCatKitten = 'feedingCatKitten';
+  static const feedingDogPuppy = 'feedingDogPuppy';
+  static const feedingDogMiniPuppy = 'feedingDogMiniPuppy';
   static const updatedAt = 'updatedAt';
 }
 

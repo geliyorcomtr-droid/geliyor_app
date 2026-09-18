@@ -6,6 +6,7 @@ import 'package:geliyor_app/data/brand_feeding_guide.dart';
 import 'package:geliyor_app/data/brand_repository.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/utils/compress_upload_image.dart';
+import 'package:geliyor_app/utils/product_image.dart';
 
 class AdminBrandsScreen extends StatefulWidget {
   const AdminBrandsScreen({super.key});
@@ -191,14 +192,7 @@ class _AdminBrandsScreenState extends State<AdminBrandsScreen> {
     final url = await _pickAndUploadImage();
     if (url == null) return;
     await BrandRepository.instance.save(
-      AppBrand(
-        id: brand.id,
-        name: brand.name,
-        imageUrl: url,
-        order: brand.order,
-        active: brand.active,
-        feeding: brand.feeding,
-      ),
+      brand.copyWith(imageUrl: url, assetPath: ''),
     );
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -448,7 +442,7 @@ class _AdminBrandsScreenState extends State<AdminBrandsScreen> {
                             child: Text(
                               brand.feeding.isEmpty
                                   ? 'Gir'
-                                  : '${brand.feeding.filledCatCount()} kedi / ${brand.feeding.filledDogCount()} köpek',
+                                  : '${brand.feeding.filledCatCount() + brand.feeding.filledCatKittenCount()} kedi / ${brand.feeding.filledDogCount() + brand.feeding.filledDogPuppyCount()} köpek',
                               style: TextStyle(
                                 color: brand.feeding.isEmpty
                                     ? AppColors.subText
@@ -531,21 +525,20 @@ class _AdminBrandsScreenState extends State<AdminBrandsScreen> {
         ),
       ),
     );
-    final image = imageUrl.isNotEmpty
-        ? Image.network(
-            imageUrl,
-            key: ValueKey(imageUrl),
+    final path = imageUrl.trim().isNotEmpty
+        ? imageUrl.trim()
+        : assetPath.trim();
+    final image = path.isEmpty
+        ? fallback
+        : buildProductImage(
+            path,
             fit: BoxFit.contain,
-            gaplessPlayback: false,
-            errorBuilder: (_, _, _) => fallback,
-          )
-        : assetPath.isNotEmpty
-        ? Image.asset(
-            assetPath,
-            fit: BoxFit.contain,
-            errorBuilder: (_, _, _) => fallback,
-          )
-        : fallback;
+            width: size,
+            height: size,
+            filterQuality: FilterQuality.high,
+            cacheWidth: uiIconAssetPx,
+            errorWidget: fallback,
+          );
 
     return Container(
       width: size,

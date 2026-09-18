@@ -79,11 +79,7 @@ class _AdminBannersScreenState extends State<AdminBannersScreen> {
       ),
     );
     if (ok != true) return;
-    await BannerRepository.deleteStorageUrl(banner.imageUrl);
-    await FirebaseFirestore.instance
-        .collection(FirestoreCollections.banners)
-        .doc(banner.id)
-        .delete();
+    await BannerRepository.instance.deleteBanner(banner);
   }
 
   Future<String?> _upload() async {
@@ -369,7 +365,7 @@ class _AdminBannersScreenState extends State<AdminBannersScreen> {
               FirebaseFirestore.instance.collection('banners').doc().id,
           title: resolvedTitle,
           imageUrl: nextUrl,
-          assetPath: nextUrl.isNotEmpty ? '' : (existing?.assetPath ?? ''),
+          assetPath: '',
           placement: selectedPlacement,
           order: existing?.order ?? nextOrder,
           active: active,

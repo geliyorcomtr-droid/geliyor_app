@@ -25,7 +25,7 @@ class DogCategoryScreen extends StatelessWidget {
       items: [
         FilterSubpageItem(
           title: 'Mama',
-          subtitle: 'Kuru mama, yaş mama ve özel diyet',
+          subtitle: 'Yetişkin köpek mamaları ve ürünleri',
           imagePath: 'assets/images/petmarket_mama.png',
           onTap: () => _openProducts(context, 'Mama'),
         ),
@@ -37,9 +37,15 @@ class DogCategoryScreen extends StatelessWidget {
         ),
         FilterSubpageItem(
           title: 'Mini Irk',
-          subtitle: 'Küçük ırk köpek ürünleri',
+          subtitle: 'Mini ırk yetişkin köpek ürünleri',
           imagePath: 'assets/images/petmarket_mini_irk.png',
           onTap: () => _openProducts(context, 'Mini Irk'),
+        ),
+        FilterSubpageItem(
+          title: 'Mini Irk Yavru',
+          subtitle: 'Mini ırk yavru köpek mamaları ve ürünleri',
+          imagePath: 'assets/images/petmarket_kopek_yavru.png',
+          onTap: () => _openProducts(context, 'Mini Irk Yavru'),
         ),
         FilterSubpageItem(
           title: 'Ödül',

@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geliyor_app/admin/admin_models.dart';
 import 'package:geliyor_app/data/firestore_collections.dart';
+import 'package:geliyor_app/data/pet_life_stage.dart';
 import 'package:geliyor_app/data/pet_market_catalog.dart';
 import 'package:geliyor_app/data/product_advantage_repository.dart';
 import 'package:geliyor_app/utils/product_skt.dart';
@@ -89,17 +90,32 @@ class ProductRepository {
       return true;
     }
 
-    bool matches(String raw) {
-      final category = raw.trim().toLowerCase();
-      if (category.isEmpty) return false;
-      return category == subLower ||
-          category.contains(subLower) ||
-          subLower.contains(category);
+    final wanted = PetLifeStage.normalizeTitle(subLower);
+    final titles = [
+      product.category,
+      ...product.extraCategories,
+    ]
+        .map(PetLifeStage.normalizeTitle)
+        .where((title) => title.isNotEmpty)
+        .toList();
+
+    if (titles.isEmpty) {
+      return PetLifeStage.isAdultFoodTitle(wanted);
     }
 
-    if (product.category.trim().isEmpty && product.extraCategories.isEmpty) {
-      return true;
+    if (PetLifeStage.isLifeStageTitle(wanted)) {
+      return titles.any((title) => title == wanted);
     }
+
+    bool matches(String raw) {
+      final category = PetLifeStage.normalizeTitle(raw);
+      if (category.isEmpty) return false;
+      if (PetLifeStage.isLifeStageTitle(category)) return false;
+      return category == wanted ||
+          category.contains(wanted) ||
+          wanted.contains(category);
+    }
+
     if (matches(product.category)) return true;
     return product.extraCategories.any(matches);
   }

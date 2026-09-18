@@ -113,7 +113,7 @@ const defaultAdminCategories = <AdminMainCategory>[
       AdminSubCategory(
         id: 'cat-mama',
         title: 'Mama',
-        subtitle: 'Kuru mama, yaş mama ve özel diyet',
+        subtitle: 'Yetişkin kedi mamaları ve ürünleri',
         order: 0,
       ),
       AdminSubCategory(
@@ -168,7 +168,7 @@ const defaultAdminCategories = <AdminMainCategory>[
       AdminSubCategory(
         id: 'dog-mama',
         title: 'Mama',
-        subtitle: 'Kuru mama, yaş mama ve özel diyet',
+        subtitle: 'Yetişkin köpek mamaları ve ürünleri',
         order: 0,
       ),
       AdminSubCategory(
@@ -180,38 +180,44 @@ const defaultAdminCategories = <AdminMainCategory>[
       AdminSubCategory(
         id: 'dog-mini',
         title: 'Mini Irk',
-        subtitle: 'Küçük ırk köpek ürünleri',
+        subtitle: 'Mini ırk yetişkin köpek ürünleri',
         order: 2,
+      ),
+      AdminSubCategory(
+        id: 'dog-mini-yavru',
+        title: 'Mini Irk Yavru',
+        subtitle: 'Mini ırk yavru köpek mamaları ve ürünleri',
+        order: 3,
       ),
       AdminSubCategory(
         id: 'dog-odul',
         title: 'Ödül',
         subtitle: 'Eğitim ve ödül atıştırmalıkları',
-        order: 3,
+        order: 4,
       ),
       AdminSubCategory(
         id: 'dog-tasma',
         title: 'Tasma',
         subtitle: 'Tasma, kayış ve gezi ürünleri',
-        order: 4,
+        order: 5,
       ),
       AdminSubCategory(
         id: 'dog-oyuncak',
         title: 'Oyuncak',
         subtitle: 'Çiğneme ve oyun ürünleri',
-        order: 5,
+        order: 6,
       ),
       AdminSubCategory(
         id: 'dog-bakim',
         title: 'Bakım',
         subtitle: 'Şampuan ve bakım ürünleri',
-        order: 6,
+        order: 7,
       ),
       AdminSubCategory(
         id: 'dog-yatak',
         title: 'Yatak',
         subtitle: 'Yatak ve dinlenme ürünleri',
-        order: 7,
+        order: 8,
       ),
     ],
   ),
@@ -281,13 +287,39 @@ class CategoryRepository {
   }
 
   Future<void> ensureDefaults() async {
-    final snap = await _col.limit(1).get();
-    if (snap.docs.isNotEmpty) return;
-    final batch = FirebaseFirestore.instance.batch();
-    for (final cat in defaultAdminCategories) {
-      batch.set(_col.doc(cat.id), cat.toMap());
+    final snap = await _col.get();
+    if (snap.docs.isEmpty) {
+      final batch = FirebaseFirestore.instance.batch();
+      for (final cat in defaultAdminCategories) {
+        batch.set(_col.doc(cat.id), cat.toMap());
+      }
+      await batch.commit();
+      return;
     }
-    await batch.commit();
+
+    final existing = {
+      for (final doc in snap.docs) doc.id: AdminMainCategory.fromDoc(doc),
+    };
+    for (final cat in defaultAdminCategories) {
+      final current = existing[cat.id];
+      if (current == null) {
+        await saveMain(cat);
+        continue;
+      }
+      final knownIds = current.subcategories.map((sub) => sub.id).toSet();
+      final knownTitles = {
+        for (final sub in current.subcategories)
+          sub.title.trim().toLowerCase(),
+      };
+      final missing = [
+        for (final sub in cat.subcategories)
+          if (!knownIds.contains(sub.id) &&
+              !knownTitles.contains(sub.title.trim().toLowerCase()))
+            sub,
+      ];
+      if (missing.isEmpty) continue;
+      await saveSubs(cat.id, [...current.subcategories, ...missing]);
+    }
   }
 
   Future<void> saveMain(AdminMainCategory category) async {

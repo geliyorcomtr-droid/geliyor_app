@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:geliyor_app/utils/product_image.dart';
 import 'package:geliyor_app/utils/product_price.dart';
 import 'package:geliyor_app/widgets/product_favorite_corner.dart';
 
@@ -107,10 +108,11 @@ class AppProductCard extends StatelessWidget {
                   border: Border.all(color: AppColors.border),
                 ),
                 padding: const EdgeInsets.all(6),
-                child: Image.asset(
+                child: buildProductImage(
                   imagePath,
                   fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) => const Icon(
+                  cacheWidth: productThumbCachePx,
+                  errorWidget: const Icon(
                     Icons.inventory_2_outlined,
                     color: AppColors.subText,
                     size: 28,

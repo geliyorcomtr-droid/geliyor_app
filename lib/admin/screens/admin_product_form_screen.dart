@@ -9,6 +9,7 @@ import 'package:geliyor_app/admin/admin_ui.dart';
 import 'package:geliyor_app/admin/category_repository.dart';
 import 'package:geliyor_app/data/brand_repository.dart';
 import 'package:geliyor_app/data/firestore_collections.dart';
+import 'package:geliyor_app/data/pet_life_stage.dart';
 import 'package:geliyor_app/data/product_advantage_repository.dart';
 import 'package:geliyor_app/data/trust_badge_repository.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
@@ -225,7 +226,10 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
           );
           _mainCategory = selectedMain.id;
           if (selectedMain.subcategories.isNotEmpty) {
-            _category.text = selectedMain.subcategories.first.title;
+            _category.text = PetLifeStage.savedCategory(
+              mainCategory: _mainCategory,
+              selected: selectedMain.subcategories.first.title,
+            );
           }
         }
       }
@@ -264,7 +268,10 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
         oldPrice: double.tryParse(_oldPrice.text.replaceAll(',', '.')) ?? 0,
         discountPercent: int.tryParse(_discount.text) ?? 0,
         imageUrl: _imageUrl.text,
-        category: _category.text,
+        category: PetLifeStage.savedCategory(
+          mainCategory: _mainCategory,
+          selected: _category.text,
+        ),
         extraCategories: [
           for (final title in _extraCategories)
             if (title.trim().isNotEmpty &&
@@ -843,8 +850,23 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
         }
 
         final subs = selectedMain.subcategories;
-        final currentSub = _category.text.trim();
-        final subExists = subs.any((s) => s.title == currentSub);
+        final formSubs = [
+          for (final sub in subs)
+            if (!PetLifeStage.hideAsFormChip(sub.title)) sub,
+        ];
+        final currentSub = PetLifeStage.savedCategory(
+          mainCategory: _mainCategory,
+          selected: _category.text.trim(),
+        );
+        final subExists = formSubs.any(
+          (s) => PetLifeStage.isSameLifeStageCategory(s.title, currentSub) ||
+              (PetLifeStage.isMiniTitle(s.title) &&
+                  PetLifeStage.isMiniTitle(currentSub)),
+        );
+        final isFoodLifeStage = PetLifeStage.isLifeStageTitle(currentSub);
+        final isMiniSelected = _mainCategory == 'dog' &&
+            PetLifeStage.isMiniTitle(currentSub);
+        final isPuppySelected = PetLifeStage.isPuppyTitle(currentSub);
 
         return _panel(
           title: 'Kategori Seçimi',
@@ -892,7 +914,7 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
                 style: TextStyle(fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 10),
-              if (subs.isEmpty)
+              if (formSubs.isEmpty)
                 const Text(
                   'Bu ana kategoride alt kategori yok. Kategoriler ekranından ekleyin.',
                   style: TextStyle(color: AppColors.subText),
@@ -902,16 +924,32 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
                   spacing: 10,
                   runSpacing: 10,
                   children: [
-                    for (final sub in subs)
+                    for (final sub in formSubs)
                       FilterChip(
                         label: Text(sub.title),
-                        selected: currentSub == sub.title,
+                        selected: PetLifeStage.isMiniTitle(sub.title)
+                            ? isMiniSelected
+                            : PetLifeStage.isSameLifeStageCategory(
+                                sub.title,
+                                currentSub,
+                              ),
                         selectedColor: AppColors.selected,
                         checkmarkColor: AppColors.primary,
                         onSelected: (_) {
                           setState(() {
-                            _category.text = sub.title;
-                            _extraCategories.remove(sub.title);
+                            if (PetLifeStage.isLifeStageTitle(sub.title)) {
+                              _category.text = PetLifeStage.categoryTitle(
+                                mainCategory: _mainCategory,
+                                isMini: PetLifeStage.isMiniTitle(sub.title),
+                                isPuppy: PetLifeStage.isMiniTitle(sub.title)
+                                    ? isPuppySelected
+                                    : PetLifeStage.isPuppyTitle(sub.title),
+                              );
+                            } else {
+                              _category.text = sub.title;
+                            }
+                            _extraCategories.remove(_category.text);
+                            _extraCategories.remove(PetLifeStage.dogMiniPuppy);
                           });
                         },
                       ),
@@ -937,7 +975,65 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              if (subs.where((s) => s.title != currentSub).isNotEmpty) ...[
+              if ((_mainCategory == 'cat' || _mainCategory == 'dog') &&
+                  isFoodLifeStage) ...[
+                const SizedBox(height: 22),
+                Text(
+                  isMiniSelected
+                      ? 'Mini ırk yaş grubu'
+                      : 'Yaş grubu',
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  isMiniSelected
+                      ? 'Mini ırk seçildiğinde yetişkin veya yavru ayrımı yapılır. Yavru seçilmezse yetişkin mini ırk olarak kaydedilir.'
+                      : 'Yavru seçilmezse ürün yetişkin kedi veya köpek (Mama) olarak kaydedilir.',
+                  style: const TextStyle(
+                    color: AppColors.subText,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    FilterChip(
+                      label: const Text('Yetişkin'),
+                      selected: !isPuppySelected,
+                      selectedColor: AppColors.selected,
+                      checkmarkColor: AppColors.primary,
+                      onSelected: (_) {
+                        setState(() {
+                          _category.text = PetLifeStage.categoryTitle(
+                            mainCategory: _mainCategory,
+                            isMini: isMiniSelected,
+                            isPuppy: false,
+                          );
+                        });
+                      },
+                    ),
+                    FilterChip(
+                      label: const Text('Yavru'),
+                      selected: isPuppySelected,
+                      selectedColor: AppColors.selected,
+                      checkmarkColor: AppColors.primary,
+                      onSelected: (_) {
+                        setState(() {
+                          _category.text = PetLifeStage.categoryTitle(
+                            mainCategory: _mainCategory,
+                            isMini: isMiniSelected,
+                            isPuppy: true,
+                          );
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ],
+              if (formSubs.where((s) => s.title != currentSub).isNotEmpty) ...[
                 const SizedBox(height: 22),
                 const Text(
                   'Ayrıca şu alt kategorilerde de göster',
@@ -957,11 +1053,17 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
                   spacing: 10,
                   runSpacing: 10,
                   children: [
-                    for (final sub in subs)
-                      if (sub.title != currentSub)
+                    for (final sub in formSubs)
+                      if (sub.title != currentSub &&
+                          !(isMiniSelected &&
+                              PetLifeStage.isMiniTitle(sub.title)))
                         FilterChip(
                           label: Text(sub.title),
-                          selected: _extraCategories.contains(sub.title),
+                          selected: _extraCategories.contains(sub.title) ||
+                              (PetLifeStage.isMiniTitle(sub.title) &&
+                                  _extraCategories.contains(
+                                    PetLifeStage.dogMiniPuppy,
+                                  )),
                           selectedColor: AppColors.selected,
                           checkmarkColor: AppColors.primary,
                           onSelected: (selected) {
@@ -970,6 +1072,9 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
                                 _extraCategories.add(sub.title);
                               } else {
                                 _extraCategories.remove(sub.title);
+                                _extraCategories.remove(
+                                  PetLifeStage.dogMiniPuppy,
+                                );
                               }
                             });
                           },

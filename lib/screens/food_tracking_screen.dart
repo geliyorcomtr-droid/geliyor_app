@@ -4,6 +4,9 @@ import 'package:geliyor_app/data/brand_repository.dart';
 import 'package:geliyor_app/data/cat_feeding_guide.dart';
 import 'package:geliyor_app/data/dog_feeding_guide.dart';
 import 'package:geliyor_app/data/food_tracking_choices.dart';
+import 'package:geliyor_app/data/kitten_feeding_guide.dart';
+import 'package:geliyor_app/data/pet_life_stage.dart';
+import 'package:geliyor_app/data/puppy_feeding_guide.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/services/food_remaining_estimator.dart';
 import 'package:geliyor_app/state/food_tracking_store.dart';
@@ -11,6 +14,7 @@ import 'package:geliyor_app/state/pet_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/theme/app_icons.dart';
 import 'package:geliyor_app/utils/login_gate.dart';
+import 'package:geliyor_app/utils/product_image.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
 import 'package:geliyor_app/widgets/app_banner_slider.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
@@ -19,6 +23,7 @@ import 'package:geliyor_app/widgets/app_pressable_button.dart';
 import 'package:geliyor_app/widgets/brand_feeding_table.dart';
 import 'package:geliyor_app/widgets/cat_feeding_table.dart';
 import 'package:geliyor_app/widgets/dog_feeding_table.dart';
+import 'package:geliyor_app/widgets/month_feeding_table.dart';
 
 class FoodTrackingScreen extends StatefulWidget {
   const FoodTrackingScreen({super.key});
@@ -33,6 +38,9 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
   String _foodId = FoodTrackingChoice.standardId;
   String _foodLabel = FoodTrackingChoice.standardLabel;
   String? _selectedPetName;
+  bool _isPuppy = false;
+  bool _isMiniBreed = false;
+  int _ageMonths = 4;
 
   static const int _minKg = 1;
   static const int _maxKg = 19;
@@ -63,6 +71,13 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
         tracking.petName ??
         PetStore.instance.activePet?.name ??
         (pets.isNotEmpty ? pets.first.name : null);
+    if (tracking.isActive) {
+      _isPuppy = tracking.isPuppy;
+      _isMiniBreed = tracking.isMiniBreed;
+      _ageMonths = tracking.ageMonths;
+    } else {
+      _applyPetProfile(_guidePet);
+    }
     if (!tracking.isActive) return;
     _foodLabel = tracking.foodName.isEmpty
         ? FoodTrackingChoice.standardLabel
@@ -98,6 +113,9 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
       purchaseDate: _purchaseDate,
       petName: _guidePet?.name,
       petSpecies: _guidePet?.species,
+      isPuppy: _isPuppy,
+      isMiniBreed: _isMiniBreed,
+      ageMonths: _ageMonths,
     );
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -119,6 +137,20 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
     return pets.isEmpty ? null : pets.first;
   }
 
+  PetLifeStageProfile get _lifeProfile => PetLifeStageProfile(
+        isPuppy: _isPuppy,
+        isMiniBreed: _isMiniBreed,
+        ageMonths: _ageMonths,
+      );
+
+  void _applyPetProfile(PetData? pet, {bool keepFoodPuppy = false}) {
+    if (!keepFoodPuppy || FoodTrackingChoice.isStandard(_foodId)) {
+      _isPuppy = PetLifeStage.inferIsPuppy(ageRange: pet?.ageRange);
+    }
+    _isMiniBreed = _isDog && PetLifeStage.inferIsMini(ageRange: pet?.ageRange);
+    _ageMonths = PetLifeStage.monthsFromLabel(pet?.ageRange) ?? 4;
+  }
+
   bool get _isDog =>
       _guidePet?.species.toLowerCase().contains('köpek') == true ||
       _guidePet?.species.toLowerCase().contains('kopek') == true;
@@ -132,8 +164,10 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
   }
 
   DogFeedingRow? get _dogFeedingRow {
-    if (!_isDog) return null;
-    return DogFeedingGuide.fromSizeLabel(_guidePet?.ageRange);
+    if (!_isDog || _isPuppy) return null;
+    return DogFeedingGuide.fromSizeLabel(
+      _isMiniBreed ? 'Mini' : _guidePet?.ageRange,
+    );
   }
 
   AppBrand? get _selectedBrand {
@@ -145,37 +179,67 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
     final brand = _selectedBrand;
     final feeding = brand?.feeding;
     if (brand != null && feeding != null) {
-      if (_isDog && feeding.hasDog) {
+      final hasBrandTable = _isPuppy
+          ? (_isDog
+              ? (_isMiniBreed ? feeding.hasDogMiniPuppy : feeding.hasDogPuppy)
+              : feeding.hasCatKitten)
+          : (_isDog ? feeding.hasDog : feeding.hasCat);
+      if (hasBrandTable) {
         return [
           BrandFeedingTableCard(
             brandName: brand.name,
             feeding: feeding,
-            isDog: true,
-            highlightSize: _guidePet?.ageRange,
-          ),
-        ];
-      }
-      if (!_isDog && feeding.hasCat) {
-        return [
-          BrandFeedingTableCard(
-            brandName: brand.name,
-            feeding: feeding,
-            isDog: false,
+            isDog: _isDog,
+            isPuppy: _isPuppy,
+            isMiniBreed: _isMiniBreed,
             highlightWeight: _guidePet?.weight,
+            highlightSize: _guidePet?.ageRange,
+            highlightMonths: _ageMonths,
           ),
         ];
       }
     }
+    if (_isPuppy) {
+      if (_isDog) {
+        return [
+          MonthFeedingTableCard(
+            title: _isMiniBreed
+                ? 'Mini ırk yavru köpek tüketimi (ay)'
+                : 'Yavru köpek tüketimi (ay)',
+            accent: _accent,
+            highlightedMonths: _ageMonths,
+            rows: [
+              for (final row in PuppyFeedingGuide.rows)
+                (months: row.months, grams: row.gramsFor(isMini: _isMiniBreed)),
+            ],
+          ),
+        ];
+      }
+      return [
+        MonthFeedingTableCard(
+          title: 'Yavru kedi tüketimi (ay)',
+          accent: _accent,
+          highlightedMonths: _ageMonths,
+          rows: [
+            for (final row in KittenFeedingGuide.rows)
+              (months: row.months, grams: row.dailyGrams),
+          ],
+        ),
+      ];
+    }
+    if (_isDog) {
+      return [
+        DogFeedingTableCard(
+          highlighted: _dogFeedingRow,
+          activityLevel: _guidePet?.activityLevel,
+        ),
+      ];
+    }
     return [
       CatFeedingTableCard(
-        highlighted: _isDog ? null : _feedingRow,
-        bodyType: _isDog ? null : _guidePet?.bodyType,
-        activityLevel: _isDog ? null : _guidePet?.activityLevel,
-      ),
-      const SizedBox(height: 10),
-      DogFeedingTableCard(
-        highlighted: _isDog ? _dogFeedingRow : null,
-        activityLevel: _isDog ? _guidePet?.activityLevel : null,
+        highlighted: _feedingRow,
+        bodyType: _guidePet?.bodyType,
+        activityLevel: _guidePet?.activityLevel,
       ),
     ];
   }
@@ -188,6 +252,10 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
     return FoodRemainingEstimator.sharedDailyGrams(
       FoodRemainingEstimator.sharingPetsFor(pet),
       foodId: _foodId,
+      foodIsPuppy: _isPuppy,
+      foodIsMini: _isMiniBreed,
+      profileFor: pet,
+      profile: _lifeProfile,
     );
   }
 
@@ -452,7 +520,10 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
           children: [
             for (final pet in pets)
               GestureDetector(
-                onTap: () => setState(() => _selectedPetName = pet.name),
+                onTap: () => setState(() {
+                  _selectedPetName = pet.name;
+                  _applyPetProfile(pet, keepFoodPuppy: true);
+                }),
                 child: Container(
                   height: 34,
                   padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -497,67 +568,90 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
   }
 
   Future<void> _pickFood() async {
-    List<AppBrand> brands = defaultBrands;
-    try {
-      await BrandRepository.instance.ensureDefaults();
-      brands = await BrandRepository.instance.fetchAll(activeOnly: true);
-      if (brands.isEmpty) brands = defaultBrands;
-    } catch (_) {
-      brands = defaultBrands;
-    }
     if (!mounted) return;
-    final selected = await showModalBottomSheet<({String id, String label})>(
+    final selected = await showModalBottomSheet<FoodTrackingMatch>(
       context: context,
       backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (ctx) {
-        return SafeArea(
-          child: ListView(
-            shrinkWrap: true,
-            padding: const EdgeInsets.fromLTRB(8, 12, 8, 16),
-            children: [
-              const Padding(
-                padding: EdgeInsets.fromLTRB(12, 4, 12, 8),
-                child: Text(
-                  'Mama seçin',
-                  style: TextStyle(
-                    color: AppColors.text,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
+        return StreamBuilder<List<AppBrand>>(
+          stream: BrandRepository.instance.watchAll(activeOnly: true),
+          builder: (context, snapshot) {
+            final brands = (snapshot.data ?? BrandRepository.instance.cached)
+                .where((brand) => !brand.feeding.isEmpty)
+                .toList(growable: false);
+            final picks = [
+              for (final brand in brands) ...FoodTrackingChoice.picksFor(brand),
+            ];
+            return SafeArea(
+              child: ListView(
+                shrinkWrap: true,
+                padding: const EdgeInsets.fromLTRB(8, 12, 8, 16),
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(12, 4, 12, 8),
+                    child: Text(
+                      'Mama seçin',
+                      style: TextStyle(
+                        color: AppColors.text,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              _foodOptionTile(
-                ctx,
-                id: FoodTrackingChoice.standardId,
-                label: FoodTrackingChoice.standardLabel,
-                subtitle: 'Sistemdeki kedi / köpek tüketim tablosu',
-              ),
-              const Divider(height: 16),
-              const Padding(
-                padding: EdgeInsets.fromLTRB(12, 0, 12, 8),
-                child: Text(
-                  'Markalar',
-                  style: TextStyle(
-                    color: AppColors.subText,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
+                  _foodOptionTile(
+                    ctx,
+                    id: FoodTrackingChoice.standardId,
+                    label: FoodTrackingChoice.standardLabel,
+                    subtitle: 'Sistemdeki kedi / köpek tüketim tablosu',
                   ),
-                ),
+                  const Divider(height: 16),
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(12, 0, 12, 8),
+                    child: Text(
+                      'Markalar',
+                      style: TextStyle(
+                        color: AppColors.subText,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  if (picks.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(12, 8, 12, 12),
+                      child: Text(
+                        'Admin panelinden marka ekleyip tüketim gramajı girildiğinde burada görünür.',
+                        style: TextStyle(
+                          color: AppColors.subText,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          height: 1.35,
+                        ),
+                      ),
+                    )
+                  else
+                    for (final pick in picks)
+                      _foodOptionTile(
+                        ctx,
+                        id: pick.id,
+                        label: pick.label,
+                        subtitle: pick.isPuppy
+                            ? 'Yavru tüketimi (ay)'
+                            : 'Yetişkin tüketimi (kilo / beden)',
+                        imagePath: BrandRepository.instance
+                                .byId(pick.id)
+                                ?.displayImage ??
+                            '',
+                        isPuppy: pick.isPuppy,
+                        isMiniBreed: pick.isMiniBreed,
+                      ),
+                ],
               ),
-              for (final brand in brands)
-                _foodOptionTile(
-                  ctx,
-                  id: brand.id,
-                  label: brand.name,
-                  subtitle: brand.feeding.isEmpty
-                      ? 'Gramaj yoksa standart tablo kullanılır'
-                      : 'Bu markanın tüketim tablosu',
-                ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -565,6 +659,12 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
     setState(() {
       _foodId = selected.id;
       _foodLabel = selected.label;
+      if (!FoodTrackingChoice.isStandard(selected.id)) {
+        _isPuppy = selected.isPuppy;
+        _applyPetProfile(_guidePet, keepFoodPuppy: true);
+      } else {
+        _applyPetProfile(_guidePet);
+      }
     });
   }
 
@@ -573,16 +673,24 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
     required String id,
     required String label,
     required String subtitle,
+    String imagePath = '',
+    bool isPuppy = false,
+    bool isMiniBreed = false,
   }) {
-    final selected = _foodId == id;
+    final selected = FoodTrackingChoice.isStandard(id)
+        ? FoodTrackingChoice.isStandard(_foodId)
+        : _foodId == id && _isPuppy == isPuppy;
     return ListTile(
-      onTap: () => Navigator.pop(ctx, (id: id, label: label)),
-      leading: id == FoodTrackingChoice.standardId
-          ? const _BowlSpoonIcon(size: 28)
-          : Icon(
-              Icons.storefront_rounded,
-              color: selected ? _accent : AppColors.subText,
-            ),
+      onTap: () => Navigator.pop(
+        ctx,
+        FoodTrackingMatch(
+          id: id,
+          label: label,
+          isPuppy: isPuppy,
+          isMiniBreed: isMiniBreed,
+        ),
+      ),
+      leading: _foodBrandMark(imagePath: imagePath, size: 36),
       title: Text(
         label,
         style: TextStyle(
@@ -597,6 +705,27 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
       trailing: selected
           ? const Icon(Icons.check_rounded, color: _accent)
           : null,
+    );
+  }
+
+  Widget _foodBrandMark({String imagePath = '', double size = 26}) {
+    if (imagePath.trim().isEmpty) {
+      return _BowlSpoonIcon(size: size);
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: buildProductImage(
+          imagePath,
+          fit: BoxFit.contain,
+          width: size,
+          height: size,
+          cacheWidth: uiIconAssetPx,
+          errorWidget: _BowlSpoonIcon(size: size),
+        ),
+      ),
     );
   }
 
@@ -619,13 +748,10 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
             ),
             child: Row(
               children: [
-                FoodTrackingChoice.isStandard(_foodId)
-                    ? const _BowlSpoonIcon(size: 26)
-                    : const Icon(
-                        Icons.storefront_rounded,
-                        color: _accent,
-                        size: 20,
-                      ),
+                _foodBrandMark(
+                  imagePath: _selectedBrand?.displayImage ?? '',
+                  size: 26,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -651,10 +777,12 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
         const SizedBox(height: 6),
         Text(
           FoodTrackingChoice.isStandard(_foodId)
-              ? 'Tüketim, sistemdeki standart mama tablosuna göre hesaplanır.'
+              ? 'Tüketim, dostun kayıtlı özelliklerine göre standart tablodan hesaplanır.'
               : (_selectedBrand?.feeding.isEmpty ?? true)
                   ? 'Bu marka için henüz gramaj girilmedi; standart tablo kullanılır.'
-                  : 'Tüketim, ${_selectedBrand!.name} için girilen gramaja göre hesaplanır.',
+                  : _isPuppy
+                      ? 'Yavru mama seçildi; tüketim dostun ayına göre hesaplanır.'
+                      : 'Yetişkin mama seçildi; tüketim dostun kilosuna / bedenine göre hesaplanır.',
           style: const TextStyle(
             color: AppColors.subText,
             fontSize: 11,

@@ -112,6 +112,7 @@ const petMarketMainCategories = [
 const petMarketSubCategories = <String, List<PetMarketSubCategory>>{
   'cat': [
     PetMarketSubCategory('Mama', Icons.rice_bowl_rounded),
+    PetMarketSubCategory('Yavru', Icons.child_care_outlined),
     PetMarketSubCategory('Ödül', Icons.cookie_outlined),
     PetMarketSubCategory('Bakım', Icons.spa_outlined),
     PetMarketSubCategory('Oyuncak', Icons.sports_baseball_outlined),
@@ -120,6 +121,9 @@ const petMarketSubCategories = <String, List<PetMarketSubCategory>>{
   ],
   'dog': [
     PetMarketSubCategory('Mama', Icons.rice_bowl_rounded),
+    PetMarketSubCategory('Yavru', Icons.child_care_outlined),
+    PetMarketSubCategory('Mini Irk', Icons.pets_outlined),
+    PetMarketSubCategory('Mini Irk Yavru', Icons.pets_rounded),
     PetMarketSubCategory('Ödül', Icons.cookie_outlined),
     PetMarketSubCategory('Tasma', Icons.link_rounded),
     PetMarketSubCategory('Oyuncak', Icons.sports_baseball_outlined),

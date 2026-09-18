@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:geliyor_app/data/firestore_collections.dart';
+import 'package:geliyor_app/data/pet_life_stage.dart';
 import 'package:geliyor_app/state/auth_store.dart';
 
 /// Kullanıcının “Mama Takibini Başlat” ile girdiği manuel stok.
@@ -18,6 +19,9 @@ class FoodTrackingStore extends ChangeNotifier {
   DateTime _purchaseDate = DateTime.now();
   String? _petName;
   String? _petSpecies;
+  String _lifeStage = PetLifeStage.adult;
+  bool _isMiniBreed = false;
+  int _ageMonths = 4;
   bool _suppressPersist = false;
   bool _bound = false;
 
@@ -28,6 +32,16 @@ class FoodTrackingStore extends ChangeNotifier {
   DateTime get purchaseDate => _purchaseDate;
   String? get petName => _petName;
   String? get petSpecies => _petSpecies;
+  String get lifeStage => _lifeStage;
+  bool get isMiniBreed => _isMiniBreed;
+  int get ageMonths => _ageMonths;
+  bool get isPuppy => _lifeStage == PetLifeStage.puppy;
+
+  PetLifeStageProfile get lifeProfile => PetLifeStageProfile(
+        isPuppy: isPuppy,
+        isMiniBreed: _isMiniBreed,
+        ageMonths: _ageMonths,
+      );
 
   void clearLocal() {
     _suppressPersist = true;
@@ -39,6 +53,9 @@ class FoodTrackingStore extends ChangeNotifier {
     _purchaseDate = DateTime.now();
     _petName = null;
     _petSpecies = null;
+    _lifeStage = PetLifeStage.adult;
+    _isMiniBreed = false;
+    _ageMonths = 4;
     _suppressPersist = false;
     notifyListeners();
   }
@@ -55,6 +72,9 @@ class FoodTrackingStore extends ChangeNotifier {
       _bagKg = 0;
       _petName = null;
       _petSpecies = null;
+      _lifeStage = PetLifeStage.adult;
+      _isMiniBreed = false;
+      _ageMonths = 4;
     } else {
       _isActive = true;
       _foodName = (data[FoodTrackingFields.foodName] as String?)?.trim() ?? '';
@@ -64,6 +84,15 @@ class FoodTrackingStore extends ChangeNotifier {
           DateTime.now();
       _petName = data[FoodTrackingFields.petName] as String?;
       _petSpecies = data[FoodTrackingFields.petSpecies] as String?;
+      _lifeStage =
+          (data[FoodTrackingFields.lifeStage] as String?)?.trim() ==
+              PetLifeStage.puppy
+          ? PetLifeStage.puppy
+          : PetLifeStage.adult;
+      _isMiniBreed = data[FoodTrackingFields.isMiniBreed] == true;
+      _ageMonths =
+          ((data[FoodTrackingFields.ageMonths] as num?)?.toInt() ?? 4)
+              .clamp(1, 12);
     }
     _suppressPersist = false;
     notifyListeners();
@@ -76,6 +105,9 @@ class FoodTrackingStore extends ChangeNotifier {
     required DateTime purchaseDate,
     String? petName,
     String? petSpecies,
+    bool isPuppy = false,
+    bool isMiniBreed = false,
+    int ageMonths = 4,
   }) {
     if (bagKg <= 0) return;
     _isActive = true;
@@ -89,6 +121,9 @@ class FoodTrackingStore extends ChangeNotifier {
     );
     _petName = petName;
     _petSpecies = petSpecies;
+    _lifeStage = isPuppy ? PetLifeStage.puppy : PetLifeStage.adult;
+    _isMiniBreed = isMiniBreed;
+    _ageMonths = ageMonths.clamp(1, 12);
     notifyListeners();
     unawaited(_persist());
   }
@@ -100,6 +135,9 @@ class FoodTrackingStore extends ChangeNotifier {
     _bagKg = 0;
     _petName = null;
     _petSpecies = null;
+    _lifeStage = PetLifeStage.adult;
+    _isMiniBreed = false;
+    _ageMonths = 4;
     notifyListeners();
     unawaited(_persist());
   }
@@ -121,6 +159,9 @@ class FoodTrackingStore extends ChangeNotifier {
       FoodTrackingFields.purchaseDate: _ymd(_purchaseDate),
       FoodTrackingFields.petName: _petName,
       FoodTrackingFields.petSpecies: _petSpecies,
+      FoodTrackingFields.lifeStage: _lifeStage,
+      FoodTrackingFields.isMiniBreed: _isMiniBreed,
+      FoodTrackingFields.ageMonths: _ageMonths,
     };
   }
 

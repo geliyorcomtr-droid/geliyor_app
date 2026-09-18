@@ -4,6 +4,8 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:geliyor_app/data/cat_feeding_guide.dart';
 import 'package:geliyor_app/data/dog_feeding_guide.dart';
+import 'package:geliyor_app/data/kitten_feeding_guide.dart';
+import 'package:geliyor_app/data/pet_life_stage.dart';
 import 'package:geliyor_app/state/auth_store.dart';
 import 'package:geliyor_app/state/pet_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
@@ -37,6 +39,7 @@ class _AddPetScreenState extends State<AddPetScreen> {
   final TextEditingController _nameController = TextEditingController();
   String? _species = 'Kedi';
   String? _ageRange = 'Yavru';
+  int _ageMonths = 4;
   String? _weight = '1-2 kg';
   String? _neutered;
   String? _bodyType = 'İdeal';
@@ -106,7 +109,12 @@ class _AddPetScreenState extends State<AddPetScreen> {
     if (pet != null) {
       _nameController.text = pet.name;
       _species = pet.species;
-      _ageRange = pet.ageRange;
+      _ageRange = _isDog
+          ? pet.ageRange
+          : PetLifeStage.ageGroupOf(pet.ageRange).isEmpty
+              ? pet.ageRange
+              : PetLifeStage.ageGroupOf(pet.ageRange);
+      _ageMonths = PetLifeStage.monthsFromLabel(pet.ageRange) ?? 4;
       _weight = pet.weight;
       _neutered = pet.neutered;
       _bodyType = pet.bodyType ?? 'İdeal';
@@ -115,6 +123,35 @@ class _AddPetScreenState extends State<AddPetScreen> {
       _gender = pet.gender;
       _photoUrl = pet.photoUrl;
     }
+  }
+
+  String _savedAgeRange(String species) {
+    if (species == 'Köpek') return _ageRange ?? _dogSizeOptions.first;
+    final group = _ageRange ?? 'Yavru';
+    if (PetLifeStage.ageGroupOf(group) == 'Yavru') {
+      return PetLifeStage.persistAgeRange(
+        ageGroup: 'Yavru',
+        months: _ageMonths,
+      );
+    }
+    return group;
+  }
+
+  int? _dailyGramsFor(String species, String savedAge) {
+    if (species == 'Köpek') {
+      return DogFeedingGuide.dailyGramsFor(
+        sizeLabel: savedAge,
+        activityLevel: _activityLevel,
+      );
+    }
+    if (PetLifeStage.inferIsPuppy(ageRange: savedAge)) {
+      return KittenFeedingGuide.dailyGramsFor(_ageMonths);
+    }
+    return CatFeedingGuide.dailyGramsFor(
+      weightLabel: _weight,
+      bodyType: _bodyType ?? 'İdeal',
+      activityLevel: _activityLevel,
+    );
   }
 
   void _selectSpecies(String species) {
@@ -309,16 +346,8 @@ class _AddPetScreenState extends State<AddPetScreen> {
 
       final species = _species ?? 'Kedi';
       final typedName = _nameController.text.trim();
-      final dailyFoodGrams = species == 'Köpek'
-          ? DogFeedingGuide.dailyGramsFor(
-              sizeLabel: _ageRange,
-              activityLevel: _activityLevel,
-            )
-          : CatFeedingGuide.dailyGramsFor(
-              weightLabel: _weight,
-              bodyType: _bodyType ?? 'İdeal',
-              activityLevel: _activityLevel,
-            );
+      final savedAge = _savedAgeRange(species);
+      final dailyFoodGrams = _dailyGramsFor(species, savedAge);
 
       if (widget.isEditing) {
         final existing = widget.pet!;
@@ -327,7 +356,7 @@ class _AddPetScreenState extends State<AddPetScreen> {
           PetData(
             name: typedName.isEmpty ? existing.name : typedName,
             species: species,
-            ageRange: _ageRange,
+            ageRange: savedAge,
             weight: _weight,
             bodyType: _bodyType ?? 'İdeal',
             neutered: _neutered,
@@ -346,7 +375,7 @@ class _AddPetScreenState extends State<AddPetScreen> {
           PetData(
             name: typedName.isEmpty ? '$species $count' : typedName,
             species: species,
-            ageRange: _ageRange,
+            ageRange: savedAge,
             weight: _weight,
             bodyType: _bodyType ?? 'İdeal',
             neutered: _neutered,
@@ -444,6 +473,31 @@ class _AddPetScreenState extends State<AddPetScreen> {
                     ),
                   ),
                 ),
+                if (PetLifeStage.ageGroupOf(_ageRange) == 'Yavru') ...[
+                  const SizedBox(height: 10),
+                  _buildQuestion(
+                    title: 'Yavru kaç aylık?',
+                    child: _buildSelectDropdown(
+                      value: PetLifeStage.monthLabel(_ageMonths),
+                      placeholder: 'Ay seç',
+                      compact: true,
+                      onTap: () => _openSelectSheet(
+                        title: 'Yavru kaç aylık?',
+                        options: [
+                          for (final months in PetLifeStage.monthOptions)
+                            PetLifeStage.monthLabel(months),
+                        ],
+                        selected: PetLifeStage.monthLabel(_ageMonths),
+                        onSelect: (v) {
+                          final parsed = int.tryParse(v.split(' ').first);
+                          if (parsed != null) {
+                            setState(() => _ageMonths = parsed.clamp(1, 12));
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 10),
                 _buildQuestion(
                   number: '4',

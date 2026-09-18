@@ -1,8 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:geliyor_app/app_navigator.dart';
+import 'package:geliyor_app/data/banner_repository.dart';
+import 'package:geliyor_app/data/product_repository.dart';
 import 'package:geliyor_app/screens/home_screen.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:geliyor_app/utils/product_image.dart';
 import 'package:geliyor_app/widgets/app_brand_logo.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
 import 'package:geliyor_app/widgets/paw_print_background.dart';
@@ -32,6 +36,36 @@ class _SplashScreenState extends State<SplashScreen> {
       setState(() => _canTapNavigate = true);
     });
     _autoNavigateTimer = Timer(_autoNavigateDelay, _goHome);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _warmupImages());
+  }
+
+  Future<void> _warmupImages() async {
+    BuildContext? ctx() =>
+        appNavigatorKey.currentContext ?? (mounted ? context : null);
+    try {
+      final banners = await BannerRepository.instance.fetchActiveFromServer();
+      ImageWarmup.precache(
+        ctx(),
+        [
+          for (final banner in banners) ...[
+            banner.displayImage,
+            AppBanner.liveNetworkPath([banner]),
+          ],
+        ],
+        cacheWidth: bannerCachePx,
+      );
+    } catch (_) {}
+    try {
+      final products = await ProductRepository.instance
+          .watchMarketProducts()
+          .first
+          .timeout(const Duration(seconds: 3), onTimeout: () => const []);
+      ImageWarmup.precache(
+        ctx(),
+        products.take(16).map((product) => product.imagePath),
+        cacheWidth: productThumbCachePx,
+      );
+    } catch (_) {}
   }
 
   @override

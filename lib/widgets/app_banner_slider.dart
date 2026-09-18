@@ -18,6 +18,7 @@ class AppBannerSlot extends StatelessWidget {
   });
 
   final BannerPlacement placement;
+  // ignore: unused_field
   final List<String> fallbackAssets;
   final bool autoPlay;
   final Duration autoPlayInterval;
@@ -29,22 +30,22 @@ class AppBannerSlot extends StatelessWidget {
       stream: BannerRepository.instance.watchActive(placement: placement.id),
       builder: (context, snapshot) {
         final remote = snapshot.data;
-        final banners = remote ?? const <AppBanner>[];
-        final items = banners.isNotEmpty
-            ? banners
-            : [
-                for (var i = 0; i < fallbackAssets.length; i++)
-                  AppBanner(
-                    id: 'fallback-$i',
-                    title: '',
-                    assetPath: fallbackAssets[i],
-                    placement: placement.id,
-                    order: i,
-                  ),
-              ];
-        if (items.isEmpty) return const SizedBox.shrink();
+        if (remote == null) {
+          return SizedBox(height: placement.height);
+        }
+        if (remote.isEmpty) return const SizedBox.shrink();
+        ImageWarmup.precache(
+          context,
+          [
+            for (final banner in remote) ...[
+              banner.displayImage,
+              banner.imageUrl,
+            ],
+          ],
+          cacheWidth: bannerCachePx,
+        );
         return AppBannerSlider(
-          banners: items,
+          banners: remote,
           height: placement.height,
           radius: placement.boxRadius,
           autoPlay: autoPlay,
@@ -153,21 +154,18 @@ class _AppBannerStripState extends State<AppBannerStrip> {
     }
     final path = next.isNotEmpty
         ? next
-        : (fromServer ? widget.fallbackAsset.trim() : '');
+        : widget.fallbackAsset.trim();
     if (path.isEmpty && !fromServer) return;
-    if (_path != null &&
-        _path!.startsWith('http') &&
-        path.isNotEmpty &&
-        !path.startsWith('http')) {
-      return;
-    }
     if (_path == path && _ready) return;
     final previous = _path;
     if (previous != null && previous != path) {
-      final provider = productImageProvider(previous, cacheWidth: 1080);
+      final provider = productImageProvider(previous, cacheWidth: bannerCachePx);
       if (provider != null) {
         imageCache.evict(provider);
       }
+    }
+    if (path.isNotEmpty) {
+      ImageWarmup.precache(context, [path], cacheWidth: bannerCachePx);
     }
     setState(() {
       _ready = true;
@@ -196,7 +194,7 @@ class _AppBannerStripState extends State<AppBannerStrip> {
               height: double.infinity,
               alignment: Alignment.center,
               filterQuality: FilterQuality.high,
-              cacheWidth: 1080,
+              cacheWidth: bannerCachePx,
             ),
           ),
         ),
@@ -243,6 +241,7 @@ class _AppBannerSliderState extends State<AppBannerSlider> {
     super.initState();
     _controller = PageController();
     _startAutoPlay();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _warmup());
   }
 
   @override
@@ -259,6 +258,15 @@ class _AppBannerSliderState extends State<AppBannerSlider> {
         oldWidget.banners.length != widget.banners.length) {
       _startAutoPlay();
     }
+    _warmup();
+  }
+
+  void _warmup() {
+    ImageWarmup.precache(
+      context,
+      widget.banners.map((banner) => banner.displayImage),
+      cacheWidth: bannerCachePx,
+    );
   }
 
   @override
@@ -320,33 +328,15 @@ class _AppBannerSliderState extends State<AppBannerSlider> {
                     final banner = banners[pageIndex];
                     final path = banner.displayImage;
                     final useContain = path.contains('banner_geliyor');
-                    final isNetwork = path.startsWith('http');
-                    final dpr = MediaQuery.devicePixelRatioOf(context);
-                    final decodeW =
-                        (BannerPlacement.width * dpr).round().clamp(720, 1080);
-                    final image = ColoredBox(
-                      color: AppColors.selected,
-                      child: isNetwork
-                          ? Image.network(
-                              path,
-                              fit: useContain ? BoxFit.contain : BoxFit.cover,
-                              width: double.infinity,
-                              height: double.infinity,
-                              cacheWidth: decodeW,
-                              filterQuality: FilterQuality.medium,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  _fallback(),
-                            )
-                          : Image.asset(
-                              path,
-                              fit: useContain ? BoxFit.contain : BoxFit.cover,
-                              width: double.infinity,
-                              height: double.infinity,
-                              cacheWidth: decodeW,
-                              filterQuality: FilterQuality.medium,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  _fallback(),
-                            ),
+                    final image = buildProductImage(
+                      path,
+                      fit: useContain ? BoxFit.contain : BoxFit.cover,
+                      width: double.infinity,
+                      height: double.infinity,
+                      alignment: Alignment.center,
+                      filterQuality: FilterQuality.medium,
+                      cacheWidth: bannerCachePx,
+                      errorWidget: _fallback(),
                     );
                     if (!widget.openOnTap) return image;
                     return GestureDetector(

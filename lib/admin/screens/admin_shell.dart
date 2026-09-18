@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:geliyor_app/admin/admin_auth.dart';
 import 'package:geliyor_app/admin/admin_models.dart';
 import 'package:geliyor_app/admin/admin_nav.dart';
 import 'package:geliyor_app/admin/admin_theme.dart';
+import 'package:geliyor_app/admin/category_repository.dart';
 import 'package:geliyor_app/admin/screens/admin_adoption_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_bank_transfer_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_banners_screen.dart';
@@ -12,6 +15,7 @@ import 'package:geliyor_app/admin/screens/admin_campaigns_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_categories_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_coupons_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_dashboard_screen.dart';
+import 'package:geliyor_app/admin/screens/admin_food_tracking_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_knowledge_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_members_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_orders_screen.dart';
@@ -45,6 +49,12 @@ class _AdminShellState extends State<AdminShell> {
     AdminPage.knowledge,
     AdminPage.adoption,
   };
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(CategoryRepository.instance.ensureDefaults());
+  }
 
   void _go(
     AdminPage page, {
@@ -122,6 +132,7 @@ class _AdminShellState extends State<AdminShell> {
       AdminPage.categories => const AdminCategoriesScreen(),
       AdminPage.trustBadges => const AdminTrustBadgesScreen(),
       AdminPage.advantages => const AdminProductAdvantagesScreen(),
+      AdminPage.foodTracking => const AdminFoodTrackingScreen(),
       AdminPage.members => const AdminMembersScreen(),
       AdminPage.campaigns => const AdminCampaignsScreen(),
       AdminPage.coupons => const AdminCouponsScreen(),

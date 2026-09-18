@@ -9,6 +9,7 @@ import 'package:geliyor_app/screens/product_detail_screen.dart';
 import 'package:geliyor_app/state/cart_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
+import 'package:geliyor_app/utils/product_image.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
 import 'package:geliyor_app/widgets/app_pressable_button.dart';
@@ -436,6 +437,11 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
       ),
       builder: (context, snapshot) {
         final products = _filteredProducts(snapshot.data ?? const []);
+        ImageWarmup.precache(
+          context,
+          products.map((product) => product.imagePath),
+          cacheWidth: productThumbCachePx,
+        );
         return Scaffold(
           backgroundColor: AppColors.background,
           body: AppPageFrame.standard(

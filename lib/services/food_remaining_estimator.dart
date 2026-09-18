@@ -1,6 +1,9 @@
 import 'package:geliyor_app/data/cat_feeding_guide.dart';
 import 'package:geliyor_app/data/dog_feeding_guide.dart';
 import 'package:geliyor_app/data/food_tracking_choices.dart';
+import 'package:geliyor_app/data/kitten_feeding_guide.dart';
+import 'package:geliyor_app/data/pet_life_stage.dart';
+import 'package:geliyor_app/data/puppy_feeding_guide.dart';
 import 'package:geliyor_app/state/food_tracking_store.dart';
 import 'package:geliyor_app/state/order_store.dart';
 import 'package:geliyor_app/state/pet_store.dart';
@@ -66,6 +69,10 @@ abstract final class FoodRemainingEstimator {
       final dailyGrams = sharedDailyGrams(
         pets,
         foodId: tracking.foodId,
+        foodIsPuppy: tracking.isPuppy,
+        foodIsMini: tracking.isMiniBreed,
+        profileFor: seed,
+        profile: tracking.lifeProfile,
       );
       if (dailyGrams <= 0) return null;
       return _build(
@@ -84,7 +91,13 @@ abstract final class FoodRemainingEstimator {
     if (orderMatch == null) return null;
     final food = orderMatch.$1;
     final pets = sharingPetsFor(orderMatch.$2);
-    final dailyGrams = sharedDailyGrams(pets, foodId: foodIdFromOrder(food));
+    final match = foodIdFromOrder(food);
+    final dailyGrams = sharedDailyGrams(
+      pets,
+      foodId: match.id,
+      foodIsPuppy: match.isPuppy,
+      foodIsMini: match.isMiniBreed,
+    );
     if (dailyGrams <= 0) return null;
 
     final bagKg = kgFromLabel(food.weight) * food.quantity;
@@ -146,7 +159,7 @@ abstract final class FoodRemainingEstimator {
     return matched.isEmpty ? [seed] : matched;
   }
 
-  static String foodIdFromOrder(LastOrderItem food) {
+  static FoodTrackingMatch foodIdFromOrder(LastOrderItem food) {
     return FoodTrackingChoice.resolveFromProduct(
       brandName: food.brand,
       title: food.title,
@@ -154,10 +167,26 @@ abstract final class FoodRemainingEstimator {
     );
   }
 
-  static int sharedDailyGrams(List<PetData> pets, {String foodId = ''}) {
+  static int sharedDailyGrams(
+    List<PetData> pets, {
+    String foodId = '',
+    bool? foodIsPuppy,
+    bool? foodIsMini,
+    PetData? profileFor,
+    PetLifeStageProfile? profile,
+  }) {
     var total = 0;
     for (final pet in pets) {
-      total += _dailyGramsFor(pet, foodId: foodId);
+      final useProfile = profileFor != null && pet.name == profileFor.name
+          ? profile
+          : null;
+      total += _dailyGramsFor(
+        pet,
+        foodId: foodId,
+        foodIsPuppy: foodIsPuppy,
+        foodIsMini: foodIsMini,
+        profile: useProfile,
+      );
     }
     return total;
   }
@@ -275,20 +304,53 @@ abstract final class FoodRemainingEstimator {
         (blob.contains('mama') || blob.contains('food') || hasKg);
   }
 
-  static int _dailyGramsFor(PetData pet, {String foodId = ''}) {
+  static int _dailyGramsFor(
+    PetData pet, {
+    String foodId = '',
+    PetLifeStageProfile? profile,
+    bool? foodIsPuppy,
+    bool? foodIsMini,
+  }) {
+    final inferred = PetLifeStageProfile(
+      isPuppy: PetLifeStage.inferIsPuppy(ageRange: pet.ageRange),
+      isMiniBreed: PetLifeStage.inferIsMini(ageRange: pet.ageRange),
+      ageMonths: PetLifeStage.monthsFromLabel(pet.ageRange) ??
+          profile?.ageMonths ??
+          4,
+    );
+    final life = PetLifeStageProfile(
+      isPuppy: foodIsPuppy ?? profile?.isPuppy ?? inferred.isPuppy,
+      isMiniBreed: foodIsMini ?? profile?.isMiniBreed ?? inferred.isMiniBreed,
+      ageMonths: profile?.ageMonths ?? inferred.ageMonths,
+    );
     final branded = FoodTrackingChoice.brandDailyGrams(
       foodId: foodId,
       pet: pet,
+      profile: life,
+      foodIsPuppy: life.isPuppy,
+      foodIsMini: life.isMiniBreed,
     );
     if (branded != null && branded > 0) return branded;
-    if (pet.dailyFoodGrams != null && pet.dailyFoodGrams! > 0) {
+    if (!life.isPuppy &&
+        pet.dailyFoodGrams != null &&
+        pet.dailyFoodGrams! > 0) {
       return pet.dailyFoodGrams!;
     }
     final isDog = pet.species.toLowerCase().contains('köpek') ||
         pet.species.toLowerCase().contains('kopek');
+    if (life.isPuppy) {
+      if (isDog) {
+        return PuppyFeedingGuide.dailyGramsFor(
+              life.ageMonths,
+              isMini: life.isMiniBreed,
+            ) ??
+            0;
+      }
+      return KittenFeedingGuide.dailyGramsFor(life.ageMonths) ?? 0;
+    }
     if (isDog) {
       return DogFeedingGuide.dailyGramsFor(
-            sizeLabel: pet.ageRange,
+            sizeLabel: life.isMiniBreed ? 'Mini' : pet.ageRange,
             activityLevel: pet.activityLevel,
           ) ??
           0;

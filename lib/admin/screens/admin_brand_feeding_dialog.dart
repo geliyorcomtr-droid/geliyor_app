@@ -28,6 +28,9 @@ class _AdminBrandFeedingDialog extends StatefulWidget {
 class _AdminBrandFeedingDialogState extends State<_AdminBrandFeedingDialog> {
   late final Map<String, TextEditingController> _cat;
   late final Map<String, TextEditingController> _dog;
+  late final Map<String, TextEditingController> _catKitten;
+  late final Map<String, TextEditingController> _dogPuppy;
+  late final Map<String, TextEditingController> _dogMiniPuppy;
   var _saving = false;
 
   @override
@@ -46,14 +49,41 @@ class _AdminBrandFeedingDialogState extends State<_AdminBrandFeedingDialog> {
           text: _textOf(feeding.dogGrams[size]),
         ),
     };
+    _catKitten = {
+      for (final months in BrandFeedingGuide.monthRows)
+        BrandFeedingGuide.monthKey(months): TextEditingController(
+          text: _textOf(
+            feeding.catKittenGrams[BrandFeedingGuide.monthKey(months)],
+          ),
+        ),
+    };
+    _dogPuppy = {
+      for (final months in BrandFeedingGuide.monthRows)
+        BrandFeedingGuide.monthKey(months): TextEditingController(
+          text: _textOf(
+            feeding.dogPuppyGrams[BrandFeedingGuide.monthKey(months)],
+          ),
+        ),
+    };
+    _dogMiniPuppy = {
+      for (final months in BrandFeedingGuide.monthRows)
+        BrandFeedingGuide.monthKey(months): TextEditingController(
+          text: _textOf(
+            feeding.dogMiniPuppyGrams[BrandFeedingGuide.monthKey(months)],
+          ),
+        ),
+    };
   }
 
   @override
   void dispose() {
-    for (final c in _cat.values) {
-      c.dispose();
-    }
-    for (final c in _dog.values) {
+    for (final c in [
+      ..._cat.values,
+      ..._dog.values,
+      ..._catKitten.values,
+      ..._dogPuppy.values,
+      ..._dogMiniPuppy.values,
+    ]) {
       c.dispose();
     }
     super.dispose();
@@ -68,21 +98,26 @@ class _AdminBrandFeedingDialogState extends State<_AdminBrandFeedingDialog> {
     return int.tryParse(raw) ?? double.tryParse(raw)?.round();
   }
 
+  Map<String, int> _collect(Map<String, TextEditingController> source) {
+    final out = <String, int>{};
+    source.forEach((key, controller) {
+      final grams = _parse(controller);
+      if (grams != null && grams > 0) out[key] = grams;
+    });
+    return out;
+  }
+
   Future<void> _save() async {
     setState(() => _saving = true);
-    final cat = <String, int>{};
-    _cat.forEach((key, controller) {
-      final grams = _parse(controller);
-      if (grams != null && grams > 0) cat[key] = grams;
-    });
-    final dog = <String, int>{};
-    _dog.forEach((key, controller) {
-      final grams = _parse(controller);
-      if (grams != null && grams > 0) dog[key] = grams;
-    });
     await BrandRepository.instance.saveFeeding(
       widget.brand.copyWith(
-        feeding: BrandFeedingGuide(catGrams: cat, dogGrams: dog),
+        feeding: BrandFeedingGuide(
+          catGrams: _collect(_cat),
+          dogGrams: _collect(_dog),
+          catKittenGrams: _collect(_catKitten),
+          dogPuppyGrams: _collect(_dogPuppy),
+          dogMiniPuppyGrams: _collect(_dogMiniPuppy),
+        ),
       ),
     );
     if (!mounted) return;
@@ -97,35 +132,66 @@ class _AdminBrandFeedingDialogState extends State<_AdminBrandFeedingDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text('${widget.brand.name} — günlük tüketim (g)'),
-      content: SizedBox(
-        width: 640,
+    final maxHeight = MediaQuery.sizeOf(context).height * 0.88;
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+      backgroundColor: AppColors.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: 720, maxHeight: maxHeight),
         child: DefaultTabController(
-          length: 2,
+          length: 4,
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
-                'Boş satırlar hesaplamada yok sayılır. Hiç değer yoksa '
-                'müşteri standart mama tablosuna düşer.',
-                style: TextStyle(
-                  color: AppColors.subText,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  height: 1.35,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 12, 0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${widget.brand.name} — günlük tüketim (g)',
+                        style: const TextStyle(
+                          color: AppColors.text,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: _saving ? null : () => Navigator.pop(context),
+                      tooltip: 'Kapat',
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 12),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(20, 8, 20, 0),
+                child: Text(
+                  'Yetişkin kedi kilo, yavru kedi ay esas alır. Köpekte yetişkin '
+                  'beden; yavru ay + standart/mini ırk ayrımı kullanılır. Boş '
+                  'satırlar yok sayılır.',
+                  style: TextStyle(
+                    color: AppColors.subText,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    height: 1.35,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
               const TabBar(
+                isScrollable: true,
                 labelColor: AppColors.primary,
                 tabs: [
-                  Tab(text: 'Kedi'),
-                  Tab(text: 'Köpek'),
+                  Tab(text: 'Kedi yetişkin'),
+                  Tab(text: 'Kedi yavru'),
+                  Tab(text: 'Köpek yetişkin'),
+                  Tab(text: 'Köpek yavru'),
                 ],
               ),
-              SizedBox(
-                height: 420,
+              Expanded(
                 child: TabBarView(
                   children: [
                     _gramsTable(
@@ -140,6 +206,16 @@ class _AdminBrandFeedingDialogState extends State<_AdminBrandFeedingDialog> {
                     ),
                     _gramsTable(
                       rows: [
+                        for (final months in BrandFeedingGuide.monthRows)
+                          (
+                            label: '$months ay',
+                            controller:
+                                _catKitten[BrandFeedingGuide.monthKey(months)]!,
+                          ),
+                      ],
+                    ),
+                    _gramsTable(
+                      rows: [
                         for (final size in BrandFeedingGuide.dogSizeRows)
                           (
                             label:
@@ -148,6 +224,24 @@ class _AdminBrandFeedingDialogState extends State<_AdminBrandFeedingDialog> {
                           ),
                       ],
                     ),
+                    _puppyDogTables(),
+                  ],
+                ),
+              ),
+              const Divider(height: 1, color: AppColors.border),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                child: Row(
+                  children: [
+                    TextButton(
+                      onPressed: _saving ? null : () => Navigator.pop(context),
+                      child: const Text('Vazgeç'),
+                    ),
+                    const Spacer(),
+                    FilledButton(
+                      onPressed: _saving ? null : _save,
+                      child: Text(_saving ? 'Kaydediliyor...' : 'Kaydet'),
+                    ),
                   ],
                 ),
               ),
@@ -155,15 +249,44 @@ class _AdminBrandFeedingDialogState extends State<_AdminBrandFeedingDialog> {
           ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: _saving ? null : () => Navigator.pop(context),
-          child: const Text('Vazgeç'),
+    );
+  }
+
+  Widget _puppyDogTables() {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+      children: [
+        const Text(
+          'Standart ırk yavru',
+          style: TextStyle(fontWeight: FontWeight.w800),
         ),
-        FilledButton(
-          onPressed: _saving ? null : _save,
-          child: Text(_saving ? 'Kaydediliyor...' : 'Kaydet'),
+        const SizedBox(height: 8),
+        ...[
+          for (final months in BrandFeedingGuide.monthRows)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _gramRow(
+                label: '$months ay',
+                controller: _dogPuppy[BrandFeedingGuide.monthKey(months)]!,
+              ),
+            ),
+        ],
+        const SizedBox(height: 8),
+        const Text(
+          'Mini ırk yavru',
+          style: TextStyle(fontWeight: FontWeight.w800),
         ),
+        const SizedBox(height: 8),
+        ...[
+          for (final months in BrandFeedingGuide.monthRows)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _gramRow(
+                label: '$months ay',
+                controller: _dogMiniPuppy[BrandFeedingGuide.monthKey(months)]!,
+              ),
+            ),
+        ],
       ],
     );
   }
@@ -173,38 +296,45 @@ class _AdminBrandFeedingDialogState extends State<_AdminBrandFeedingDialog> {
   }) {
     return Scrollbar(
       child: ListView.separated(
-        padding: const EdgeInsets.only(top: 12, right: 8),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
         itemCount: rows.length,
         separatorBuilder: (_, _) => const SizedBox(height: 8),
         itemBuilder: (context, index) {
           final row = rows[index];
-          return Row(
-            children: [
-              Expanded(
-                child: Text(
-                  row.label,
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ),
-              SizedBox(
-                width: 120,
-                child: TextField(
-                  controller: row.controller,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'[0-9]')),
-                  ],
-                  decoration: const InputDecoration(
-                    suffixText: 'g',
-                    isDense: true,
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-              ),
-            ],
-          );
+          return _gramRow(label: row.label, controller: row.controller);
         },
       ),
+    );
+  }
+
+  Widget _gramRow({
+    required String label,
+    required TextEditingController controller,
+  }) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+        SizedBox(
+          width: 120,
+          child: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[0-9]')),
+            ],
+            decoration: const InputDecoration(
+              suffixText: 'g',
+              isDense: true,
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

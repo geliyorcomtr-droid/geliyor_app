@@ -25,7 +25,7 @@ class CatCategoryScreen extends StatelessWidget {
       items: [
         FilterSubpageItem(
           title: 'Mama',
-          subtitle: 'Kuru mama, yaş mama ve özel diyet',
+          subtitle: 'Yetişkin kedi mamaları ve ürünleri',
           imagePath: 'assets/images/petmarket_mama.png',
           onTap: () => _openProducts(context, 'Mama'),
         ),

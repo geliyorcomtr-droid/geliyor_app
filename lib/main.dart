@@ -17,8 +17,6 @@ import 'package:geliyor_app/widgets/mobile_web_shell.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  imageCache.clear();
-  imageCache.clearLiveImages();
   imageCache.maximumSize = 200;
   imageCache.maximumSizeBytes = 120 << 20;
   await Firebase.initializeApp(

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -20,6 +21,12 @@ const int uiIconAssetPx = 256;
 
 /// Ürün fotoğrafı detayda ~240 logical px; 3x için 900 px decode yeter.
 const int productPhotoCachePx = 900;
+
+/// Liste / kart thumbnail.
+const int productThumbCachePx = 480;
+
+/// Ana sayfa ve sayfa bannerleri (361 logical px, 3x).
+const int bannerCachePx = 1080;
 
 ImageProvider? productImageProvider(
   String path, {
@@ -50,15 +57,40 @@ ImageProvider? productImageProvider(
   );
 }
 
-/// Detay ekranının kullandığı canvas + 900px decode önbelleğini ısıtır.
-Future<void> precacheProductImage(BuildContext context, String path) {
+/// Görseli ImageCache'e alır; gösterimle aynı cacheWidth kullanılmalı.
+Future<void> precacheProductImage(
+  BuildContext context,
+  String path, {
+  int? cacheWidth,
+}) {
   final provider = productImageProvider(
     path,
     useHtmlElement: false,
-    cacheWidth: productPhotoCachePx,
+    cacheWidth: cacheWidth ?? productPhotoCachePx,
   );
   if (provider == null) return Future.value();
   return precacheImage(provider, context).onError((_, _) {});
+}
+
+/// Aynı URL'yi tekrar indirmemek için tek seferlik ısıtma.
+abstract final class ImageWarmup {
+  static final Set<String> _queued = <String>{};
+
+  static void precache(
+    BuildContext? context,
+    Iterable<String> paths, {
+    int? cacheWidth,
+  }) {
+    final ctx = context;
+    if (ctx == null || !ctx.mounted) return;
+    for (final raw in paths) {
+      final path = raw.trim();
+      if (path.isEmpty) continue;
+      final key = '$path#${cacheWidth ?? 0}';
+      if (!_queued.add(key)) continue;
+      unawaited(precacheProductImage(ctx, path, cacheWidth: cacheWidth));
+    }
+  }
 }
 
 Widget buildProductImage(
@@ -100,7 +132,7 @@ Widget buildProductImage(
   );
 }
 
-class _FittedDecodeImage extends StatelessWidget {
+class _FittedDecodeImage extends StatefulWidget {
   const _FittedDecodeImage({
     required this.path,
     required this.fit,
@@ -130,36 +162,74 @@ class _FittedDecodeImage extends StatelessWidget {
   final int? cacheHeight;
 
   @override
+  State<_FittedDecodeImage> createState() => _FittedDecodeImageState();
+}
+
+class _FittedDecodeImageState extends State<_FittedDecodeImage> {
+  int? _decodePx;
+
+  @override
+  void didUpdateWidget(covariant _FittedDecodeImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.path != widget.path ||
+        oldWidget.cacheWidth != widget.cacheWidth ||
+        oldWidget.cacheHeight != widget.cacheHeight) {
+      _decodePx = null;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final decodePx = _layoutDecodePx(
+        final next = _layoutDecodePx(
           context: context,
           constraints: constraints,
-          width: width,
-          height: height,
-          cacheWidth: cacheWidth,
-          cacheHeight: cacheHeight,
-          maxPx: maxDecodePx,
-          minPx: minDecodePx,
+          width: widget.width,
+          height: widget.height,
+          cacheWidth: widget.cacheWidth,
+          cacheHeight: widget.cacheHeight,
+          maxPx: widget.maxDecodePx,
+          minPx: widget.minDecodePx,
         );
+        final tight =
+            (widget.cacheWidth != null) ||
+            (widget.width != null &&
+                widget.width!.isFinite &&
+                widget.width! > 0) ||
+            (constraints.hasBoundedWidth &&
+                constraints.maxWidth.isFinite &&
+                constraints.maxWidth > 0 &&
+                constraints.maxWidth < 4000);
+
+        if (tight) {
+          _decodePx ??= next;
+          if (next > _decodePx! * 1.5) {
+            _decodePx = next;
+          }
+        }
+
+        if (_decodePx == null) {
+          return SizedBox(width: widget.width, height: widget.height);
+        }
+
         final provider = productImageProvider(
-          path,
-          useHtmlElement: useHtmlElement,
-          cacheWidth: decodePx,
-          cacheHeight: cacheHeight == null ? null : decodePx,
+          widget.path,
+          useHtmlElement: widget.useHtmlElement,
+          cacheWidth: _decodePx,
+          cacheHeight: widget.cacheHeight == null ? null : _decodePx,
         );
-        if (provider == null) return fallback;
+        if (provider == null) return widget.fallback;
 
         return Image(
           image: provider,
-          fit: fit,
-          width: width,
-          height: height,
-          alignment: alignment,
-          filterQuality: filterQuality,
-          gaplessPlayback: false,
-          errorBuilder: (_, _, _) => fallback,
+          fit: widget.fit,
+          width: widget.width,
+          height: widget.height,
+          alignment: widget.alignment,
+          filterQuality: widget.filterQuality,
+          gaplessPlayback: true,
+          errorBuilder: (_, _, _) => widget.fallback,
         );
       },
     );

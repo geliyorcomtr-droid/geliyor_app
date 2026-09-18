@@ -5,12 +5,12 @@ import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/screens/auto_order_settings_screen.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
 import 'package:geliyor_app/screens/food_tracking_screen.dart';
-import 'package:geliyor_app/services/food_remaining_estimator.dart';
 import 'package:geliyor_app/state/food_tracking_store.dart';
 import 'package:geliyor_app/state/notification_settings_store.dart';
 import 'package:geliyor_app/state/order_store.dart';
 import 'package:geliyor_app/state/pet_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:geliyor_app/utils/product_image.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
@@ -70,9 +70,10 @@ class _SmartPlanScreenState extends State<SmartPlanScreen> {
     required Widget child,
     double height = 36,
     double? width,
+    bool solid = false,
     EdgeInsetsGeometry padding = const EdgeInsets.symmetric(horizontal: 12),
   }) {
-    final fill = _buttonFill(color);
+    final fill = solid ? color : _buttonFill(color);
     return AppPressableButton(
       onTap: onTap,
       height: height,
@@ -598,109 +599,120 @@ class _SmartPlanScreenState extends State<SmartPlanScreen> {
 
   Widget _buildFoodTrackingCard() {
     const color = _hangiMamaColor;
-    final estimate = FoodRemainingEstimator.compute();
-    final tracking = FoodTrackingStore.instance.isActive;
-    final stockAccent = estimate == null
-        ? color
-        : _stockColor(estimate.stockLevel);
+    final order = OrderStore.instance;
+    final hasOrder =
+        order.hasLastOrder || order.lastOrderId.trim().isNotEmpty;
+    final bagPath = _trackingBagImage;
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: color, width: 1),
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: color.withValues(alpha: 0.45)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
         children: [
-          Row(
-            children: [
-              const Icon(Icons.inventory_2_outlined, color: color, size: 17),
-              const SizedBox(width: 6),
-              Expanded(child: Text('Mama Takibi', style: _sectionTitle(color))),
-              _sourceChip(
-                estimate == null
-                    ? 'Beklemede'
-                    : (estimate.fromManual ? 'Manuel' : 'Son sipariş'),
-                color,
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          if (estimate == null)
-            _emptyFoodBody(color)
-          else
-            _activeFoodBody(estimate, color, stockAccent),
-          const SizedBox(height: 10),
-          _coloredButton(
-            color: color,
-            onTap: _openFoodTracking,
-            width: double.infinity,
-            height: 38,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  tracking ? Icons.tune_rounded : Icons.add_rounded,
-                  size: 15,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  tracking ? 'Takibi Düzenle' : 'Mama Takibi Başlat',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ],
+          Positioned(
+            right: 18,
+            top: 58,
+            child: Icon(
+              Icons.pets_rounded,
+              size: 42,
+              color: color.withValues(alpha: 0.10),
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _activeFoodBody(
-    FoodRemainingEstimate estimate,
-    Color theme,
-    Color stockAccent,
-  ) {
-    final percent = (estimate.remainingRatio * 100).round();
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: _softFill(theme),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: theme.withValues(alpha: 0.22)),
+          Positioned(
+            left: 8,
+            bottom: 52,
+            child: Icon(
+              Icons.pets_rounded,
+              size: 36,
+              color: color.withValues(alpha: 0.08),
+            ),
           ),
-          child: Row(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: const BoxDecoration(
+                      color: _hangiMamaColor,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.inventory_2_rounded,
+                      color: AppColors.surface,
+                      size: 18,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Mama Tüketim Takibi',
+                          style: TextStyle(
+                            color: _hangiMamaColor,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
+                            height: 1.15,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Mamanın ne zaman biteceğini takip et, zamanında haber al.',
+                          style: TextStyle(
+                            color: AppColors.subText,
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w600,
+                            height: 1.25,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  _howItWorksChip(color),
+                ],
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 210,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(
-                      estimate.foodTitle,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: theme,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w900,
-                        height: 1.2,
+                    Expanded(
+                      child: _trackingOptionCard(
+                        color: color,
+                        title: 'Siparişten\nOtomatik Takip',
+                        subtitle: hasOrder
+                            ? 'Siparişinizdeki mama sisteme eklendi.'
+                            : 'Siparişindeki mama otomatik takip edilir.',
+                        icon: Icons.shopping_cart_rounded,
+                        buttonLabel: 'Siparişten Takip',
+                        buttonIcon: Icons.shopping_cart_outlined,
+                        onTap: _openOrderTrackingSheet,
+                        illustration: _trackingBagFill(bagPath),
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      '${_formatBagKg(estimate.bagKg)} paket  ·  ${estimate.shareLabel}',
-                      style: const TextStyle(
-                        color: AppColors.text,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _trackingOptionCard(
+                        color: color,
+                        title: 'Manuel Takip',
+                        subtitle: 'Dışarıdan aldığın mamayı ekle.',
+                        icon: Icons.edit_rounded,
+                        buttonLabel: 'Mama Ekle',
+                        buttonIcon: Icons.add_rounded,
+                        onTap: _openFoodTracking,
+                        illustration: _trackingBagFill(bagPath),
                       ),
                     ),
                   ],
@@ -708,135 +720,189 @@ class _SmartPlanScreenState extends State<SmartPlanScreen> {
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+
+  String get _trackingBagImage {
+    final items = OrderStore.instance.lastOrderItems;
+    if (items.isNotEmpty && items.first.imagePath.trim().isNotEmpty) {
+      return items.first.imagePath;
+    }
+    return 'assets/images/kitir_kitir_bag.jpg';
+  }
+
+  Widget _howItWorksChip(Color color) {
+    return GestureDetector(
+      onTap: () => _showWhatIs(
+        title: 'Mama Takibi',
+        color: color,
+        icon: Icons.inventory_2_rounded,
+        body:
+            'Manuel mama takibi, aldığın paketin kilosunu ve tarihini senin girmenle çalışır. Uygulama günlük tüketime bakarak kaç gün kaldığını hesaplar. Sipariş geçmişin olmasa da stoku kendin takip edebilirsin.',
+      ),
+      child: Container(
+        height: 28,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: color.withValues(alpha: 0.22)),
         ),
-        const SizedBox(height: 10),
-        Row(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              child: _statTile('Günlük', '${estimate.dailyGrams} g', theme),
+            Text(
+              'Nasıl Çalışır?',
+              style: TextStyle(
+                color: color,
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+              ),
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _statTile('Kalan', '${estimate.remainingDays} gün', theme),
-            ),
-            const SizedBox(width: 8),
-            Expanded(child: _statTile('Stok', '%$percent', theme)),
+            const SizedBox(width: 2),
+            Icon(Icons.chevron_right_rounded, color: color, size: 16),
           ],
         ),
-        const SizedBox(height: 10),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(999),
-          child: LinearProgressIndicator(
-            value: estimate.remainingRatio,
-            minHeight: 8,
-            backgroundColor: _softFill(theme),
-            color: stockAccent,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            _stockHint(estimate),
-            style: TextStyle(
-              color: stockAccent,
-              fontSize: 12,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 
-  Widget _emptyFoodBody(Color color) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
-      decoration: BoxDecoration(
-        color: _softFill(color),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: color.withValues(alpha: 0.22)),
-      ),
-      child: Column(
+  Widget _trackingOptionCard({
+    required Color color,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required String buttonLabel,
+    required IconData buttonIcon,
+    required VoidCallback onTap,
+    required Widget illustration,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: color.withValues(alpha: 0.18)),
+        ),
+        padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        child: Column(
         children: [
-          Text(
-            'Henüz takip edilen mama yok',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: color,
-              fontSize: 15,
-              fontWeight: FontWeight.w900,
+          SizedBox(
+            height: 56,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 26,
+                  height: 26,
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: AppColors.surface, size: 14),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: color,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                          height: 1.15,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.subText,
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w600,
+                          height: 1.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 8),
-          const Text(
-            'Dışarıdan aldığınız paketi ekleyin veya son siparişinizden otomatik takip başlasın.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: AppColors.text,
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-              height: 1.35,
+          Expanded(child: illustration),
+          IgnorePointer(
+            child: _coloredButton(
+              color: color,
+              onTap: onTap,
+              solid: true,
+              width: double.infinity,
+              height: 34,
+              padding: EdgeInsets.zero,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(buttonIcon, size: 14),
+                  const SizedBox(width: 4),
+                  Text(
+                    buttonLabel,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right_rounded, size: 16),
+                ],
+              ),
             ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _statTile(String label, String value, Color color) {
-    return Container(
-      height: 52,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      decoration: BoxDecoration(
-        color: _softFill(color),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: color.withValues(alpha: 0.22)),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: color,
-              fontSize: 14,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ],
       ),
     );
   }
 
-  Widget _sourceChip(String label, Color color) {
-    return Container(
-      height: 26,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: _softFill(color),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withValues(alpha: 0.28)),
+  Widget _trackingBagFill(String path) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: SizedBox.expand(
+        child: buildProductImage(
+          path,
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.high,
+          errorWidget: Image.asset(
+            'assets/images/kitir_kitir_bag.jpg',
+            fit: BoxFit.contain,
+          ),
+        ),
       ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontSize: 11,
-          fontWeight: FontWeight.w900,
+    );
+  }
+
+  Widget _bagImage(String path, {double height = 78}) {
+    return SizedBox(
+      height: height,
+      width: 52,
+      child: buildProductImage(
+        path,
+        fit: BoxFit.contain,
+        height: height,
+        width: 52,
+        filterQuality: FilterQuality.high,
+        errorWidget: Image.asset(
+          'assets/images/kitir_kitir_bag.jpg',
+          fit: BoxFit.contain,
+          height: height,
+          width: 52,
         ),
       ),
     );
@@ -848,32 +914,225 @@ class _SmartPlanScreenState extends State<SmartPlanScreen> {
     ).push(MaterialPageRoute(builder: (_) => const FoodTrackingScreen()));
   }
 
-  Color _stockColor(FoodStockLevel level) {
-    return switch (level) {
-      FoodStockLevel.safe => AppColors.primary,
-      FoodStockLevel.watch => AppColors.warning,
-      FoodStockLevel.low => Color.lerp(
-        AppColors.warning,
-        AppColors.error,
-        0.45,
-      )!,
-      FoodStockLevel.critical => AppColors.error,
-    };
+  void _openOrderTrackingSheet() {
+    const color = _hangiMamaColor;
+    final order = OrderStore.instance;
+    final items = order.lastOrderItems;
+    final mama = items.isNotEmpty ? items.first : null;
+    final hasOrder =
+        order.hasLastOrder || order.lastOrderId.trim().isNotEmpty;
+    final bagPath = mama != null && mama.imagePath.trim().isNotEmpty
+        ? mama.imagePath
+        : 'assets/images/kitir_kitir_bag.jpg';
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        final media = MediaQuery.of(sheetContext);
+        return Align(
+          alignment: Alignment.bottomCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: AppPageFrame.width),
+            child: Material(
+              color: AppColors.surface,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(28),
+              ),
+              child: SizedBox(
+                height: media.size.height * 0.5,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    8,
+                    16,
+                    12 + media.padding.bottom,
+                  ),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.28),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.shopping_cart_rounded,
+                          color: color,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      const Text(
+                        'Siparişten Otomatik Takip',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: color,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Expanded(
+                        child: hasOrder
+                            ? _orderTrackingActiveBody(
+                                color: color,
+                                bagPath: bagPath,
+                                mama: mama,
+                              )
+                            : _orderTrackingEmptyBody(color),
+                      ),
+                      const SizedBox(height: 10),
+                      _coloredButton(
+                        color: color,
+                        solid: true,
+                        onTap: () => Navigator.of(sheetContext).pop(),
+                        width: double.infinity,
+                        height: 42,
+                        child: const Text(
+                          'Anladım',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
-  String _stockHint(FoodRemainingEstimate estimate) {
-    return switch (estimate.stockLevel) {
-      FoodStockLevel.safe => '${estimate.remainingDays} gün yetecek stok var.',
-      FoodStockLevel.watch => 'Stok azalıyor, siparişi planlayın.',
-      FoodStockLevel.low => 'Mama yakında bitecek.',
-      FoodStockLevel.critical => 'Kritik seviye — hemen yenileyin.',
-    };
+  Widget _orderTrackingActiveBody({
+    required Color color,
+    required String bagPath,
+    required LastOrderItem? mama,
+  }) {
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          _bagImage(bagPath, height: 88),
+          if (mama != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              mama.title,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppColors.text,
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            if (mama.weight.trim().isNotEmpty)
+              Text(
+                mama.weight,
+                style: const TextStyle(
+                  color: AppColors.subText,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+          ],
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: color.withValues(alpha: 0.22)),
+            ),
+            child: Column(
+              children: [
+                Icon(Icons.check_circle_rounded, color: color, size: 22),
+                const SizedBox(height: 8),
+                const Text(
+                  'Sipariş verdiğiniz için sistem takibi otomatik başlatmıştır.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: AppColors.text,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Siparişinizdeki mamadan otomatik tüketim takibi başladı.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: AppColors.subText,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
-  String _formatBagKg(double kg) {
-    if (kg <= 0) return '-';
-    return kg == kg.roundToDouble()
-        ? '${kg.toStringAsFixed(0)} kg'
-        : '${kg.toStringAsFixed(1).replaceAll('.', ',')} kg';
+  Widget _orderTrackingEmptyBody(Color color) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 16, 14, 16),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
+      ),
+      child: const Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.shopping_bag_outlined,
+            color: _hangiMamaColor,
+            size: 28,
+          ),
+          SizedBox(height: 10),
+          Text(
+            'Henüz bir siparişiniz yok',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: _hangiMamaColor,
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          SizedBox(height: 8),
+          Text(
+            'Uygulamadan mama siparişi verdiğinizde tüketim takibi otomatik başlar.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppColors.text,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              height: 1.35,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

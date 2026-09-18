@@ -24,6 +24,12 @@ class AppBrand {
   final bool active;
   final BrandFeedingGuide feeding;
 
+  String get displayImage {
+    final url = imageUrl.trim();
+    if (url.isNotEmpty) return url;
+    return assetPath.trim();
+  }
+
   factory AppBrand.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? {};
     return AppBrand(
@@ -36,6 +42,9 @@ class AppBrand {
       feeding: BrandFeedingGuide.fromFirestore(
         data[BrandFields.feedingCat],
         data[BrandFields.feedingDog],
+        data[BrandFields.feedingCatKitten],
+        data[BrandFields.feedingDogPuppy],
+        data[BrandFields.feedingDogMiniPuppy],
       ),
     );
   }
@@ -52,6 +61,9 @@ class AppBrand {
   Map<String, dynamic> toFeedingMap() => {
         BrandFields.feedingCat: feeding.toCatMap(),
         BrandFields.feedingDog: feeding.toDogMap(),
+        BrandFields.feedingCatKitten: feeding.toCatKittenMap(),
+        BrandFields.feedingDogPuppy: feeding.toDogPuppyMap(),
+        BrandFields.feedingDogMiniPuppy: feeding.toDogMiniPuppyMap(),
         BrandFields.updatedAt: FieldValue.serverTimestamp(),
       };
 
@@ -168,6 +180,8 @@ const defaultBrands = <AppBrand>[
   ),
 ];
 
+const _brandsMetaDocId = '_meta';
+
 class BrandRepository extends ChangeNotifier {
   BrandRepository._();
 
@@ -176,18 +190,24 @@ class BrandRepository extends ChangeNotifier {
   final CollectionReference<Map<String, dynamic>> _collection =
       FirebaseFirestore.instance.collection(FirestoreCollections.brands);
 
-  List<AppBrand> _cached = List<AppBrand>.unmodifiable(defaultBrands);
+  List<AppBrand> _cached = const [];
   bool _listening = false;
 
   List<AppBrand> get cached => _cached;
+
+  /// Mama takibi: yalnızca aktif ve gramajı girilmiş markalar.
+  List<AppBrand> get feedingChoices => _cached
+      .where((brand) => brand.active && !brand.feeding.isEmpty)
+      .toList(growable: false);
 
   void startListening() {
     if (_listening) return;
     _listening = true;
     unawaited(ensureDefaults());
     _collection.orderBy(BrandFields.order).snapshots().listen((snapshot) {
-      if (snapshot.docs.isEmpty) return;
-      _setCache(snapshot.docs.map(AppBrand.fromDoc).toList());
+      _setCache(
+        snapshot.docs.where(_isBrandDoc).map(AppBrand.fromDoc).toList(),
+      );
     });
   }
 
@@ -215,14 +235,26 @@ class BrandRepository extends ChangeNotifier {
     String? title,
     String? subtitle,
   }) {
-    final named = byName(brandName ?? '');
-    if (named != null) return named.id;
+    return matchId(
+      _cached,
+      brandName: brandName,
+      title: title,
+      subtitle: subtitle,
+    );
+  }
 
+  /// En uzun marka adı kazanır: "Pro Plan Yavru" > "Pro Plan".
+  static String? matchId(
+    List<AppBrand> brands, {
+    String? brandName,
+    String? title,
+    String? subtitle,
+  }) {
     final blob = _normalize('$brandName $title $subtitle');
     if (blob.isEmpty) return null;
     final compactBlob = _compact(blob);
     AppBrand? best;
-    for (final brand in _cached) {
+    for (final brand in brands) {
       if (!brand.active) continue;
       final name = _normalize(brand.name);
       if (name.length < 3) continue;
@@ -234,13 +266,23 @@ class BrandRepository extends ChangeNotifier {
         best = brand;
       }
     }
-    return best?.id;
+    if (best != null) return best.id;
+
+    final named = _normalize(brandName ?? '');
+    if (named.isEmpty) return null;
+    for (final brand in brands) {
+      if (_normalize(brand.name) == named) return brand.id;
+    }
+    return null;
   }
 
   Stream<List<AppBrand>> watchAll({bool activeOnly = false}) {
     return _collection.orderBy(BrandFields.order).snapshots().map((snapshot) {
-      final brands = snapshot.docs.map(AppBrand.fromDoc).toList();
-      if (brands.isNotEmpty) _setCache(brands);
+      final brands = snapshot.docs
+          .where(_isBrandDoc)
+          .map(AppBrand.fromDoc)
+          .toList();
+      _setCache(brands);
       return activeOnly
           ? brands.where((brand) => brand.active).toList()
           : brands;
@@ -249,20 +291,32 @@ class BrandRepository extends ChangeNotifier {
 
   Future<List<AppBrand>> fetchAll({bool activeOnly = false}) async {
     final snapshot = await _collection.orderBy(BrandFields.order).get();
-    final brands = snapshot.docs.map(AppBrand.fromDoc).toList();
-    if (brands.isNotEmpty) _setCache(brands);
+    final brands = snapshot.docs
+        .where(_isBrandDoc)
+        .map(AppBrand.fromDoc)
+        .toList();
+    _setCache(brands);
     return activeOnly ? brands.where((brand) => brand.active).toList() : brands;
   }
 
+  /// Eksik katalog markalarını geri yazar; mevcut kayıtları silmez / ezmez.
   Future<void> ensureDefaults() async {
-    final snapshot = await _collection.limit(1).get();
-    if (snapshot.docs.isNotEmpty) return;
+    try {
+      final snapshot = await _collection.get();
+      final existingIds = snapshot.docs.map((doc) => doc.id).toSet();
+      final batch = FirebaseFirestore.instance.batch();
+      var writes = 0;
+      for (final brand in defaultBrands) {
+        if (existingIds.contains(brand.id)) continue;
+        batch.set(_collection.doc(brand.id), brand.toMap());
+        writes++;
+      }
+      if (writes > 0) await batch.commit();
+    } catch (_) {}
+  }
 
-    final batch = FirebaseFirestore.instance.batch();
-    for (final brand in defaultBrands) {
-      batch.set(_collection.doc(brand.id), brand.toMap());
-    }
-    await batch.commit();
+  bool _isBrandDoc(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+    return doc.id != _brandsMetaDocId;
   }
 
   Future<void> save(AppBrand brand) {
