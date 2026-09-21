@@ -218,6 +218,7 @@ class _AdminBannersScreenState extends State<AdminBannersScreen> {
                       icon: const Icon(Icons.upload_rounded),
                       label: Text(_uploading ? 'Yükleniyor…' : 'Görsel yükle'),
                     ),
+                    if (slot.pageId != 'smart_plan') ...[
                     const SizedBox(height: 12),
                     const Text(
                       'Tıklanınca',
@@ -318,6 +319,20 @@ class _AdminBannersScreenState extends State<AdminBannersScreen> {
                         },
                       ),
                     ],
+                    ],
+                    if (slot.pageId == 'smart_plan') ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        slot.id.contains('_inner_')
+                            ? 'Mama Tüketim Takibi kutusundaki sabit ürün görseli. Sipariş veya katalog değişince bu görsel değişmez.'
+                            : 'Kutuya tıklanınca bu görsel açılır; tekrar dokununca kapanır. Yazı paneli yok.',
+                        style: const TextStyle(
+                          color: AppColors.subText,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
                       title: const Text('Yayında göster'),
@@ -369,8 +384,15 @@ class _AdminBannersScreenState extends State<AdminBannersScreen> {
           placement: selectedPlacement,
           order: existing?.order ?? nextOrder,
           active: active,
-          linkType: linkType,
-          linkId: linkType == BannerLinkType.none ? '' : linkId,
+          linkType: BannerPlacement.byId(selectedPlacement).pageId ==
+                  'smart_plan'
+              ? BannerLinkType.none
+              : linkType,
+          linkId: BannerPlacement.byId(selectedPlacement).pageId ==
+                      'smart_plan' ||
+                  linkType == BannerLinkType.none
+              ? ''
+              : linkId,
         ),
       );
       if (previousUrl.isNotEmpty && previousUrl != nextUrl) {
@@ -426,6 +448,9 @@ class _AdminBannersScreenState extends State<AdminBannersScreen> {
               _PageCategoryBox(
                 pageLabel: box.$2,
                 slotCount: box.$3.length,
+                note: box.$1 == 'smart_plan'
+                    ? 'Üstte 3 kutu, tıklanınca açılan ayrıntılar ve Mama Tüketim iç görselleri. İç görseller sabit kalır; yazı paneli yok.'
+                    : 'Bu kutudaki banner ve reklamlar yalnızca ${box.$2} sayfasına aittir.',
                 children: [
                   for (final slot in box.$3) ...[
                     _SectionBlock(
@@ -480,11 +505,13 @@ class _PageCategoryBox extends StatelessWidget {
   const _PageCategoryBox({
     required this.pageLabel,
     required this.slotCount,
+    required this.note,
     required this.children,
   });
 
   final String pageLabel;
   final int slotCount;
+  final String note;
   final List<Widget> children;
 
   @override
@@ -516,7 +543,7 @@ class _PageCategoryBox extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Bu kutudaki banner ve reklamlar yalnızca $pageLabel sayfasına aittir.',
+            note,
             style: const TextStyle(
               color: AppColors.subText,
               fontWeight: FontWeight.w600,

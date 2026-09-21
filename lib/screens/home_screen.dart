@@ -1,4 +1,5 @@
 ﻿import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:geliyor_app/data/banner_repository.dart';
@@ -119,7 +120,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   FoodTrackingStore.instance,
                   BrandRepository.instance,
                 ]),
-                builder: (context, _) => _buildSmartPlanCard(),
+                builder: (context, _) => _ovalFramedStrip(
+                  color: AppColors.primary,
+                  child: _buildSmartPlanCard(),
+                ),
               ),
               const SizedBox(height: 12),
               _buildSpecialServices(),
@@ -175,18 +179,26 @@ class _HomeScreenState extends State<HomeScreen> {
             child: IgnorePointer(
               child: Transform.translate(
                 offset: const Offset(0, 6),
-                child: Image.asset(
-                  'assets/images/ana_logo.png',
-                  height: 46,
-                  fit: BoxFit.contain,
-                  alignment: Alignment.center,
-                  errorBuilder: (context, error, stackTrace) {
-                    return const Text(
-                      'geliyor.tr',
-                      textAlign: TextAlign.center,
-                      style: AppTextStyles.pageHeader,
-                    );
-                  },
+                child: Center(
+                  child: ClipRect(
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      widthFactor: 0.72,
+                      child: Image.asset(
+                        'assets/images/ana_logo.png',
+                        height: 46,
+                        fit: BoxFit.contain,
+                        alignment: Alignment.center,
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Text(
+                            'geliyor.tr',
+                            textAlign: TextAlign.center,
+                            style: AppTextStyles.pageHeader,
+                          );
+                        },
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -329,49 +341,60 @@ class _HomeScreenState extends State<HomeScreen> {
     final remaining = estimate?.remainingDays;
     final ratio = estimate?.remainingRatio ?? 0.0;
     final level = estimate?.stockLevel ?? FoodStockLevel.safe;
-    final ringColor =
+    final textColor =
         remaining == null ? AppColors.primary : _stockRingColor(level);
 
-    return GestureDetector(
-      onTap: _openSmartPlan,
-      behavior: HitTestBehavior.opaque,
-      child: SizedBox(
-        width: double.infinity,
-        height: 149,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: Stack(
+    return SizedBox(
+      width: double.infinity,
+      height: BannerPlacement.homeSmartPlan.height,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          const imgW = 1024.0;
+          const imgH = 409.0;
+          const circleCx = 151.0;
+          const circleCy = 199.0;
+          const circleD = 213.0;
+          final boxW = constraints.maxWidth;
+          final boxH = constraints.maxHeight;
+          final scale = math.max(boxW / imgW, boxH / imgH);
+          final cx = circleCx * scale - (imgW * scale - boxW) / 2;
+          final cy = circleCy * scale - (imgH * scale - boxH) / 2;
+          final overlayD = math.max(0.0, circleD * scale - 1);
+          final ringD = overlayD * 0.88;
+          return Stack(
             fit: StackFit.expand,
             children: [
-              Image.asset(
-                'assets/images/home_akilli_plan.jpg',
-                key: const ValueKey('home-akilli-plan-original'),
-                fit: BoxFit.cover,
-                alignment: Alignment.center,
-                filterQuality: FilterQuality.high,
-                gaplessPlayback: false,
+              AppBannerStrip(
+                placement: BannerPlacement.homeSmartPlan,
+                fallbackAsset: 'assets/images/home_akilli_plan.jpg',
+                onTap: _openSmartPlan,
               ),
               Positioned(
-                left: 8,
-                top: 18,
-                width: 84,
-                height: 84,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppColors.background,
-                  ),
+                left: cx - overlayD / 2,
+                top: cy - overlayD / 2,
+                width: overlayD,
+                height: overlayD,
+                child: IgnorePointer(
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
+                      const DecoratedBox(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.surface,
+                        ),
+                        child: SizedBox.expand(),
+                      ),
                       SizedBox(
-                        width: 76,
-                        height: 76,
+                        width: ringD,
+                        height: ringD,
                         child: CircularProgressIndicator(
                           value: remaining == null ? 0.72 : ratio,
-                          strokeWidth: 6,
-                          backgroundColor: ringColor.withValues(alpha: 0.16),
-                          color: ringColor,
+                          strokeWidth: (overlayD * 0.068).clamp(3.5, 5.5),
+                          backgroundColor: AppColors.primary.withValues(
+                            alpha: 0.18,
+                          ),
+                          color: AppColors.primary,
                           strokeCap: StrokeCap.round,
                         ),
                       ),
@@ -380,20 +403,19 @@ class _HomeScreenState extends State<HomeScreen> {
                         children: [
                           Icon(
                             Icons.calendar_month_rounded,
-                            color: ringColor,
-                            size: 13,
+                            color: textColor,
+                            size: overlayD * 0.16,
                           ),
-                          const SizedBox(height: 1),
                           SizedBox(
-                            width: 48,
+                            width: overlayD * 0.55,
                             child: FittedBox(
                               fit: BoxFit.scaleDown,
                               child: Text(
                                 remaining == null ? '—' : '$remaining',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  color: ringColor,
-                                  fontSize: 20,
+                                  color: textColor,
+                                  fontSize: overlayD * 0.24,
                                   fontWeight: FontWeight.w900,
                                   height: 1,
                                 ),
@@ -403,9 +425,10 @@ class _HomeScreenState extends State<HomeScreen> {
                           Text(
                             'Gün Kaldı',
                             style: TextStyle(
-                              color: ringColor,
-                              fontSize: 8.5,
+                              color: textColor,
+                              fontSize: overlayD * 0.105,
                               fontWeight: FontWeight.w700,
+                              height: 1,
                             ),
                           ),
                         ],
@@ -415,8 +438,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ],
-          ),
-        ),
+          );
+        },
       ),
     );
   }
@@ -563,16 +586,18 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _ovalFramedStrip({
     required Color color,
     required Widget child,
+    double radius = 999,
+    double innerRadius = 999,
   }) {
     return Container(
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(radius),
         border: Border.all(color: color.withValues(alpha: 0.25)),
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(innerRadius),
         child: child,
       ),
     );

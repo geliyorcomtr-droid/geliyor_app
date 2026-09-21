@@ -132,6 +132,17 @@ class BannerPlacement {
     boxRadius: 999,
     description: '361×82 · tıklanınca Sahiplendirme',
   );
+  static const homeSmartPlan = BannerPlacement(
+    id: 'home_smart_plan',
+    title: 'Akıllı Plan — Ana sayfa kutusu',
+    pageId: 'home',
+    pageLabel: 'Ana Sayfa',
+    slotLabel: 'Akıllı Plan kutusu',
+    height: 82,
+    boxWidth: 361,
+    boxRadius: 999,
+    description: '361×82 · Pet Market / Dost Ekle / Sahiplendirme ile aynı',
+  );
   static const adoption = BannerPlacement(
     id: 'adoption',
     title: 'Sahiplendirme — Sayfa bannerı',
@@ -157,13 +168,93 @@ class BannerPlacement {
     slotLabel: 'Alt banner',
     height: 100,
   );
-  static const smartPlan = BannerPlacement(
-    id: 'smart_plan',
-    title: 'Akıllı Plan',
+  static const smartPlanAutoOrder = BannerPlacement(
+    id: 'smart_plan_auto_order',
+    title: 'Otomatik Sipariş',
     pageId: 'smart_plan',
     pageLabel: 'Akıllı Plan',
-    slotLabel: 'Sayfa bannerı',
+    slotLabel: 'Otomatik Sipariş',
     height: 160,
+    boxWidth: 115,
+    boxRadius: 18,
+    description: '115×160 · Sayfadaki 3 kutudan ilki',
+  );
+  static const smartPlanReminder = BannerPlacement(
+    id: 'smart_plan_reminder',
+    title: 'Akıllı Hatırlatma',
+    pageId: 'smart_plan',
+    pageLabel: 'Akıllı Plan',
+    slotLabel: 'Akıllı Hatırlatma',
+    height: 160,
+    boxWidth: 115,
+    boxRadius: 18,
+    description: '115×160 · Sayfadaki 3 kutudan ikincisi',
+  );
+  static const smartPlanFoodTrack = BannerPlacement(
+    id: 'smart_plan_food_track',
+    title: 'Mama Takibi',
+    pageId: 'smart_plan',
+    pageLabel: 'Akıllı Plan',
+    slotLabel: 'Mama Takibi',
+    height: 160,
+    boxWidth: 115,
+    boxRadius: 18,
+    description: '115×160 · Sayfadaki 3 kutudan üçüncüsü',
+  );
+  static const smartPlanAutoOrderDetail = BannerPlacement(
+    id: 'smart_plan_auto_order_detail',
+    title: 'Otomatik Sipariş ayrıntı',
+    pageId: 'smart_plan',
+    pageLabel: 'Akıllı Plan',
+    slotLabel: 'Otomatik Sipariş ayrıntı',
+    height: 280,
+    boxWidth: 361,
+    boxRadius: 28,
+    description: '361×280 · Kutuya tıklanınca açılır',
+  );
+  static const smartPlanReminderDetail = BannerPlacement(
+    id: 'smart_plan_reminder_detail',
+    title: 'Akıllı Hatırlatma ayrıntı',
+    pageId: 'smart_plan',
+    pageLabel: 'Akıllı Plan',
+    slotLabel: 'Akıllı Hatırlatma ayrıntı',
+    height: 280,
+    boxWidth: 361,
+    boxRadius: 28,
+    description: '361×280 · Kutuya tıklanınca açılır',
+  );
+  static const smartPlanFoodTrackDetail = BannerPlacement(
+    id: 'smart_plan_food_track_detail',
+    title: 'Mama Takibi ayrıntı',
+    pageId: 'smart_plan',
+    pageLabel: 'Akıllı Plan',
+    slotLabel: 'Mama Takibi ayrıntı',
+    height: 280,
+    boxWidth: 361,
+    boxRadius: 28,
+    description: '361×280 · Kutuya tıklanınca açılır',
+  );
+  static const smartPlanFoodTrackInnerAuto = BannerPlacement(
+    id: 'smart_plan_food_track_inner_auto',
+    title: 'Mama tüketim iç görsel · Otomatik',
+    pageId: 'smart_plan',
+    pageLabel: 'Akıllı Plan',
+    slotLabel: 'Mama tüketim iç görsel · Otomatik',
+    height: 110,
+    boxWidth: 160,
+    boxRadius: 16,
+    description: 'Mama Tüketim Takibi · Siparişten Otomatik Takip kutusu',
+  );
+  static const smartPlanFoodTrackInnerManual = BannerPlacement(
+    id: 'smart_plan_food_track_inner_manual',
+    title: 'Mama tüketim iç görsel · Manuel',
+    pageId: 'smart_plan',
+    pageLabel: 'Akıllı Plan',
+    slotLabel: 'Mama tüketim iç görsel · Manuel',
+    height: 110,
+    boxWidth: 160,
+    boxRadius: 16,
+    description: 'Mama Tüketim Takibi · Manuel Takip kutusu',
   );
   static const easyOrder = BannerPlacement(
     id: 'easy_order',
@@ -271,13 +362,21 @@ class BannerPlacement {
   static const values = <BannerPlacement>[
     home,
     homeBottom,
+    homeSmartPlan,
     homeDostEkle,
     homePetMarket,
     homeSahiplendirme,
     adoption,
     healthTop,
     healthBottom,
-    smartPlan,
+    smartPlanAutoOrder,
+    smartPlanReminder,
+    smartPlanFoodTrack,
+    smartPlanAutoOrderDetail,
+    smartPlanReminderDetail,
+    smartPlanFoodTrackDetail,
+    smartPlanFoodTrackInnerAuto,
+    smartPlanFoodTrackInnerManual,
     easyOrder,
     foodTracking,
     campaignsPoints,
@@ -470,6 +569,12 @@ const defaultBanners = <AppBanner>[
     placement: 'home_sahiplendirme',
   ),
   AppBanner(
+    id: 'home-smart-plan',
+    title: 'Akıllı Plan',
+    assetPath: 'assets/images/home_akilli_plan.jpg',
+    placement: 'home_smart_plan',
+  ),
+  AppBanner(
     id: 'adoption-page',
     title: 'Sahiplendirme',
     assetPath: 'assets/images/sahiplendirme_banner.jpg',
@@ -488,10 +593,22 @@ const defaultBanners = <AppBanner>[
     placement: 'health_bottom',
   ),
   AppBanner(
-    id: 'smart-plan',
-    title: 'Akıllı Plan',
-    assetPath: 'assets/images/akilli_plan_banner.png',
-    placement: 'smart_plan',
+    id: 'smart-plan-auto-order',
+    title: 'Otomatik Sipariş',
+    assetPath: 'assets/images/smart_plan_auto_order.jpg',
+    placement: 'smart_plan_auto_order',
+  ),
+  AppBanner(
+    id: 'smart-plan-reminder',
+    title: 'Akıllı Hatırlatma',
+    assetPath: 'assets/images/smart_plan_reminder.jpg',
+    placement: 'smart_plan_reminder',
+  ),
+  AppBanner(
+    id: 'smart-plan-food-track',
+    title: 'Mama Takibi',
+    assetPath: 'assets/images/smart_plan_food_track.jpg',
+    placement: 'smart_plan_food_track',
   ),
   AppBanner(
     id: 'easy-order',
@@ -605,6 +722,26 @@ class BannerRepository {
           BannerFields.updatedAt: FieldValue.serverTimestamp(),
         });
         await batch.commit();
+      } else {
+        final batch = FirebaseFirestore.instance.batch();
+        var hasWrites = false;
+        for (final banner in defaultBanners) {
+          if (deletedIds.contains(banner.id)) continue;
+          if (existingIds.contains(banner.id)) continue;
+          batch.set(_col.doc(banner.id), banner.toMap());
+          hasWrites = true;
+        }
+        for (final doc in snap.docs.where(_isBannerDoc)) {
+          final placement =
+              (doc.data()[BannerFields.placement] as String?) ?? '';
+          if (placement != 'smart_plan') continue;
+          batch.set(doc.reference, {
+            BannerFields.active: false,
+            BannerFields.updatedAt: FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+          hasWrites = true;
+        }
+        if (hasWrites) await batch.commit();
       }
       await pruneStaleStripBanners();
       await restoreHomeDostEkleIfMeetPetLeaked();

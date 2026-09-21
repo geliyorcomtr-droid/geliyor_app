@@ -181,7 +181,16 @@ class _SmartPlanScreenState extends State<SmartPlanScreen> {
                   FoodTrackingStore.instance,
                   BrandRepository.instance,
                 ]),
-                builder: (context, _) => _buildFoodTrackingCard(),
+                builder: (context, _) {
+                  return StreamBuilder<List<AppBanner>>(
+                    stream: BannerRepository.instance.watchAll(),
+                    builder: (context, snapshot) {
+                      return _buildFoodTrackingCard(
+                        banners: snapshot.data ?? const [],
+                      );
+                    },
+                  );
+                },
               ),
             ],
           ),
@@ -218,141 +227,155 @@ class _SmartPlanScreenState extends State<SmartPlanScreen> {
   }
 
   Widget _buildTopBanner() {
-    return SizedBox(
-      height: BannerPlacement.smartPlan.height,
-      child: Row(
-        children: [
-          _featureCard(
-            color: _easyOrderColor,
-            icon: Icons.autorenew_rounded,
-            title: 'Otomatik Sipariş',
-            imagePath: 'assets/images/smart_plan_auto_order.jpg',
-            body:
-                'Otomatik sipariş, dostunun maması bitmeden siparişin senin yerine hazırlanmasıdır. Kalan gün azaldığında sistem siparişi oluşturur; ayarına göre senden onay ister veya doğrudan yola çıkar. Böylece mama stoku sıfırlanmaz.',
+    return StreamBuilder<List<AppBanner>>(
+      stream: BannerRepository.instance.watchAll(),
+      builder: (context, snapshot) {
+        final banners = snapshot.data ?? const <AppBanner>[];
+        return SizedBox(
+          height: BannerPlacement.smartPlanAutoOrder.height,
+          child: Row(
+            children: [
+              _featureCard(
+                color: _easyOrderColor,
+                cardPlacement: BannerPlacement.smartPlanAutoOrder,
+                detailPlacement: BannerPlacement.smartPlanAutoOrderDetail,
+                fallbackCard: 'assets/images/smart_plan_auto_order.jpg',
+                banners: banners,
+              ),
+              const SizedBox(width: 8),
+              _featureCard(
+                color: _knowledgeColor,
+                cardPlacement: BannerPlacement.smartPlanReminder,
+                detailPlacement: BannerPlacement.smartPlanReminderDetail,
+                fallbackCard: 'assets/images/smart_plan_reminder.jpg',
+                banners: banners,
+              ),
+              const SizedBox(width: 8),
+              _featureCard(
+                color: _hangiMamaColor,
+                cardPlacement: BannerPlacement.smartPlanFoodTrack,
+                detailPlacement: BannerPlacement.smartPlanFoodTrackDetail,
+                fallbackCard: 'assets/images/smart_plan_food_track.jpg',
+                banners: banners,
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          _featureCard(
-            color: _knowledgeColor,
-            icon: Icons.notifications_rounded,
-            title: 'Akıllı Hatırlatma',
-            imagePath: 'assets/images/smart_plan_reminder.jpg',
-            body:
-                'Akıllı hatırlatma, mama bitmeden kaç gün önce uyarılacağını senin seçmendir. 1, 3, 5 gün kala veya özel bir günde bildirim alırsın; stok azalınca unutmazsın.',
-          ),
-          const SizedBox(width: 8),
-          _featureCard(
-            color: _hangiMamaColor,
-            icon: Icons.inventory_2_rounded,
-            title: 'Mama Takibi',
-            imagePath: 'assets/images/smart_plan_food_track.jpg',
-            body:
-                'Manuel mama takibi, aldığın paketin kilosunu ve tarihini senin girmenle çalışır. Uygulama günlük tüketime bakarak kaç gün kaldığını hesaplar. Sipariş geçmişin olmasa da stoku kendin takip edebilirsin.',
-          ),
-        ],
-      ),
+        );
+      },
     );
+  }
+
+  String _bannerPath(
+    List<AppBanner> banners,
+    BannerPlacement placement, {
+    String fallback = '',
+  }) {
+    final list = banners
+        .where(
+          (item) =>
+              item.active &&
+              item.placement == placement.id &&
+              item.displayImage.trim().isNotEmpty,
+        )
+        .toList();
+    final live = AppBanner.latestLive(list);
+    if (live == null) return fallback;
+    if (live.imageUrl.trim().isNotEmpty) {
+      return AppBanner.liveNetworkPath(list);
+    }
+    final asset = live.assetPath.trim();
+    return asset.isNotEmpty ? asset : fallback;
   }
 
   Widget _featureCard({
     required Color color,
-    required IconData icon,
-    required String title,
-    required String imagePath,
-    required String body,
+    required BannerPlacement cardPlacement,
+    required BannerPlacement detailPlacement,
+    required String fallbackCard,
+    required List<AppBanner> banners,
   }) {
+    final cardPath = _bannerPath(banners, cardPlacement, fallback: fallbackCard);
+    final detailPath = _bannerPath(
+      banners,
+      detailPlacement,
+      fallback: cardPath,
+    );
     return Expanded(
       child: GestureDetector(
-        onTap: () => _showWhatIs(
-          title: title,
-          color: color,
-          icon: icon,
-          body: body,
-        ),
+        onTap: () => _showDetailImage(detailPath),
         behavior: HitTestBehavior.opaque,
         child: Container(
+          padding: const EdgeInsets.all(3),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(cardPlacement.boxRadius),
             border: Border.all(color: color, width: 1),
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(17),
-            child: Image.asset(
-              imagePath,
-              fit: BoxFit.cover,
-              width: double.infinity,
-              height: double.infinity,
-              alignment: Alignment.center,
-              filterQuality: FilterQuality.medium,
-              cacheWidth: 360,
-              errorBuilder: (context, error, stackTrace) => ColoredBox(
-                color: color.withValues(alpha: 0.12),
-              ),
-            ),
+            borderRadius: BorderRadius.circular(16),
+            child: cardPath.isEmpty
+                ? ColoredBox(color: color.withValues(alpha: 0.12))
+                : buildProductImage(
+                    cardPath,
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    height: double.infinity,
+                    alignment: Alignment.center,
+                    filterQuality: FilterQuality.medium,
+                    cacheWidth: 360,
+                    errorWidget: ColoredBox(
+                      color: color.withValues(alpha: 0.12),
+                    ),
+                  ),
           ),
         ),
       ),
     );
   }
 
-  void _showWhatIs({
-    required String title,
-    required Color color,
-    required IconData icon,
-    required String body,
-  }) {
+  Future<void> _openPlacementDetail({
+    required BannerPlacement cardPlacement,
+    required BannerPlacement detailPlacement,
+    required String fallbackCard,
+  }) async {
+    List<AppBanner> banners = const [];
+    try {
+      banners = await BannerRepository.instance.watchAll().first;
+    } catch (_) {}
+    if (!mounted) return;
+    final cardPath = _bannerPath(
+      banners,
+      cardPlacement,
+      fallback: fallbackCard,
+    );
+    _showDetailImage(
+      _bannerPath(banners, detailPlacement, fallback: cardPath),
+    );
+  }
+
+  void _showDetailImage(String imagePath) {
+    final path = imagePath.trim();
+    if (path.isEmpty) return;
+    final slot = BannerPlacement.smartPlanAutoOrderDetail;
     InfoGuideSheet.showCentered(
       context,
       dismissOnContentTap: true,
-      height: 280,
+      height: slot.height,
+      maxWidth: slot.boxWidth,
       builder: (sheetContext) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
-          child: Column(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: color.withValues(alpha: 0.45)),
-                ),
-                child: Icon(icon, color: color, size: 26),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                title.replaceAll('\n', ' '),
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
-                  height: 1.2,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Expanded(
-                child: Text(
-                  body,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: AppColors.text,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    height: 1.4,
-                  ),
-                ),
-              ),
-              const Text(
-                'Kapatmak için tekrar dokunun',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: AppColors.subText,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(slot.boxRadius),
+          child: ColoredBox(
+            color: AppColors.surface,
+            child: buildProductImage(
+              path,
+              fit: BoxFit.contain,
+              width: double.infinity,
+              height: double.infinity,
+              alignment: Alignment.center,
+              filterQuality: FilterQuality.high,
+              cacheWidth: 1083,
+            ),
           ),
         );
       },
@@ -597,12 +620,20 @@ class _SmartPlanScreenState extends State<SmartPlanScreen> {
     );
   }
 
-  Widget _buildFoodTrackingCard() {
+  Widget _buildFoodTrackingCard({required List<AppBanner> banners}) {
     const color = _hangiMamaColor;
     final order = OrderStore.instance;
     final hasOrder =
         order.hasLastOrder || order.lastOrderId.trim().isNotEmpty;
-    final bagPath = _trackingBagImage;
+    final autoBag = _innerFoodImage(
+      banners,
+      BannerPlacement.smartPlanFoodTrackInnerAuto,
+    );
+    final manualBag = _innerFoodImage(
+      banners,
+      BannerPlacement.smartPlanFoodTrackInnerManual,
+      fallback: autoBag,
+    );
 
     return Container(
       width: double.infinity,
@@ -698,8 +729,8 @@ class _SmartPlanScreenState extends State<SmartPlanScreen> {
                         icon: Icons.shopping_cart_rounded,
                         buttonLabel: 'Siparişten Takip',
                         buttonIcon: Icons.shopping_cart_outlined,
-                        onTap: _openOrderTrackingSheet,
-                        illustration: _trackingBagFill(bagPath),
+                        onTap: () => _openOrderTrackingSheet(autoBag),
+                        illustration: _trackingBagFill(autoBag),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -712,7 +743,7 @@ class _SmartPlanScreenState extends State<SmartPlanScreen> {
                         buttonLabel: 'Mama Ekle',
                         buttonIcon: Icons.add_rounded,
                         onTap: _openFoodTracking,
-                        illustration: _trackingBagFill(bagPath),
+                        illustration: _trackingBagFill(manualBag),
                       ),
                     ),
                   ],
@@ -725,22 +756,20 @@ class _SmartPlanScreenState extends State<SmartPlanScreen> {
     );
   }
 
-  String get _trackingBagImage {
-    final items = OrderStore.instance.lastOrderItems;
-    if (items.isNotEmpty && items.first.imagePath.trim().isNotEmpty) {
-      return items.first.imagePath;
-    }
-    return 'assets/images/kitir_kitir_bag.jpg';
+  String _innerFoodImage(
+    List<AppBanner> banners,
+    BannerPlacement placement, {
+    String fallback = 'assets/images/kitir_kitir_bag.jpg',
+  }) {
+    return _bannerPath(banners, placement, fallback: fallback);
   }
 
   Widget _howItWorksChip(Color color) {
     return GestureDetector(
-      onTap: () => _showWhatIs(
-        title: 'Mama Takibi',
-        color: color,
-        icon: Icons.inventory_2_rounded,
-        body:
-            'Manuel mama takibi, aldığın paketin kilosunu ve tarihini senin girmenle çalışır. Uygulama günlük tüketime bakarak kaç gün kaldığını hesaplar. Sipariş geçmişin olmasa da stoku kendin takip edebilirsin.',
+      onTap: () => _openPlacementDetail(
+        cardPlacement: BannerPlacement.smartPlanFoodTrack,
+        detailPlacement: BannerPlacement.smartPlanFoodTrackDetail,
+        fallbackCard: 'assets/images/smart_plan_food_track.jpg',
       ),
       child: Container(
         height: 28,
@@ -790,83 +819,83 @@ class _SmartPlanScreenState extends State<SmartPlanScreen> {
         ),
         padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
         child: Column(
-        children: [
-          SizedBox(
-            height: 56,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 26,
-                  height: 26,
-                  decoration: BoxDecoration(
-                    color: color,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(icon, color: AppColors.surface, size: 14),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: color,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w900,
-                          height: 1.15,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.subText,
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w600,
-                          height: 1.2,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(child: illustration),
-          IgnorePointer(
-            child: _coloredButton(
-              color: color,
-              onTap: onTap,
-              solid: true,
-              width: double.infinity,
-              height: 34,
-              padding: EdgeInsets.zero,
+          children: [
+            SizedBox(
+              height: 56,
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(buttonIcon, size: 14),
-                  const SizedBox(width: 4),
-                  Text(
-                    buttonLabel,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w900,
+                  Container(
+                    width: 26,
+                    height: 26,
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(icon, color: AppColors.surface, size: 14),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: color,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                            height: 1.15,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: AppColors.subText,
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w600,
+                            height: 1.2,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const Icon(Icons.chevron_right_rounded, size: 16),
                 ],
               ),
             ),
-          ),
-        ],
-      ),
+            Expanded(child: illustration),
+            IgnorePointer(
+              child: _coloredButton(
+                color: color,
+                onTap: onTap,
+                solid: true,
+                width: double.infinity,
+                height: 34,
+                padding: EdgeInsets.zero,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(buttonIcon, size: 14),
+                    const SizedBox(width: 4),
+                    Text(
+                      buttonLabel,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right_rounded, size: 16),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -914,16 +943,14 @@ class _SmartPlanScreenState extends State<SmartPlanScreen> {
     ).push(MaterialPageRoute(builder: (_) => const FoodTrackingScreen()));
   }
 
-  void _openOrderTrackingSheet() {
+  void _openOrderTrackingSheet(String fallbackBag) {
     const color = _hangiMamaColor;
     final order = OrderStore.instance;
     final items = order.lastOrderItems;
     final mama = items.isNotEmpty ? items.first : null;
     final hasOrder =
         order.hasLastOrder || order.lastOrderId.trim().isNotEmpty;
-    final bagPath = mama != null && mama.imagePath.trim().isNotEmpty
-        ? mama.imagePath
-        : 'assets/images/kitir_kitir_bag.jpg';
+    final bagPath = fallbackBag;
 
     showModalBottomSheet<void>(
       context: context,
