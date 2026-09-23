@@ -65,6 +65,7 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
   Uint8List? _mainImagePreviewBytes;
   bool _saving = false;
   bool _uploading = false;
+  bool _deleting = false;
   late int _section;
   final _brandSearch = TextEditingController();
   late final Future<List<AdminMainCategory>> _categoriesFuture;
@@ -127,14 +128,6 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
     _seoTitle = TextEditingController(text: p?.seoTitle ?? '');
     _metaDescription = TextEditingController(text: p?.metaDescription ?? '');
     _selectedAdvantageIds = [...?p?.productAdvantageIds];
-    if (!_selectedAdvantageIds.contains(
-      ProductAdvantageRepository.proteinAdvantageId,
-    )) {
-      _selectedAdvantageIds.insert(
-        0,
-        ProductAdvantageRepository.proteinAdvantageId,
-      );
-    }
     _selectedTrustBadgeIds = [
       for (final id in [...?p?.trustBadgeIds])
         if (id != TrustBadgeRepository.proteinBadgeId) id,
@@ -295,9 +288,9 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
             AdminProductFeature(
               title: item.name,
               description: item.description,
-              iconUrl: item.imageUrl.isNotEmpty
-                  ? item.imageUrl
-                  : item.assetPath,
+              iconUrl: ProductAdvantageRepository.displayImageUrl(item).isNotEmpty
+                  ? ProductAdvantageRepository.displayImageUrl(item)
+                  : ProductAdvantageRepository.displayAssetPath(item),
             ),
         ],
         technicalFeatures: [
@@ -305,9 +298,9 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
             AdminProductFeature(
               title: badge.name,
               description: '',
-              iconUrl: badge.imageUrl.isNotEmpty
-                  ? badge.imageUrl
-                  : badge.assetPath,
+              iconUrl: TrustBadgeRepository.displayImageUrl(badge).isNotEmpty
+                  ? TrustBadgeRepository.displayImageUrl(badge)
+                  : TrustBadgeRepository.displayAssetPath(badge),
             ),
         ],
         trustBadgeIds: [for (final badge in selectedBadges) badge.id],
@@ -715,41 +708,217 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
         return _panel(
           title: 'Ürün Özellikleri',
           subtitle:
-              'İlk 5 seçim ürün görselinin sağında kalır. Sonraki seçimler '
-              'yalnızca altta Ürün Özellikleri listesinde görünür. En fazla '
-              '${ProductAdvantageRepository.maxPerProduct} özellik seçilebilir. '
-              'Protein her üründe zorunludur; değeri Ürün Bilgileri adımından girilir.',
-          child: Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              for (final item in items)
-                _AdvantageChoiceTile(
-                  item: item,
-                  selected: _selectedAdvantageIds.contains(item.id),
-                  order: _selectedAdvantageIds.contains(item.id)
-                      ? _selectedAdvantageIds.indexOf(item.id) + 1
-                      : null,
-                  onTap: () {
-                    if (item.id ==
-                        ProductAdvantageRepository.proteinAdvantageId) {
-                      return;
-                    }
-                    setState(() {
-                      if (_selectedAdvantageIds.contains(item.id)) {
-                        _selectedAdvantageIds.remove(item.id);
-                      } else if (_selectedAdvantageIds.length <
-                          ProductAdvantageRepository.maxPerProduct) {
-                        _selectedAdvantageIds.add(item.id);
-                      }
-                    });
-                  },
-                ),
-            ],
+              'Seçilenler üstte durur. İlk 5 sağ sütundadır. Sırayı sürükleyerek '
+              'değiştirin; tekrar tıklayınca seçim kalkar ve alta iner. En fazla '
+              '${ProductAdvantageRepository.maxPerProduct} özellik seçilebilir.',
+          child: Builder(
+            builder: (context) {
+              final byId = {for (final item in items) item.id: item};
+              final selected = [
+                for (final id in _selectedAdvantageIds)
+                  if (byId[id] != null) byId[id]!,
+              ];
+              final available = [
+                for (final item in items)
+                  if (!_selectedAdvantageIds.contains(item.id)) item,
+              ];
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Seçilen özellikler (${selected.length})',
+                    style: const TextStyle(
+                      color: AppColors.text,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Sürükleyerek sıralayın. Tıklayınca alta iner.',
+                    style: TextStyle(
+                      color: AppColors.subText,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  if (selected.isEmpty)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 28,
+                        horizontal: 16,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.background,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: const Text(
+                        'Henüz özellik seçilmedi. Aşağıdaki ikonlara tıklayın.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: AppColors.subText,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    )
+                  else
+                    _advantageIconGrid(
+                      items: selected,
+                      selected: true,
+                    ),
+                  const SizedBox(height: 22),
+                  const Text(
+                    'Tüm özellikler',
+                    style: TextStyle(
+                      color: AppColors.text,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Seçmek için ikona tıklayın. Seçilenler üste taşınır.',
+                    style: TextStyle(
+                      color: AppColors.subText,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  if (available.isEmpty)
+                    const Text(
+                      'Tüm özellikler seçildi.',
+                      style: TextStyle(
+                        color: AppColors.subText,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    )
+                  else
+                    _advantageIconGrid(
+                      items: available,
+                      selected: false,
+                    ),
+                ],
+              );
+            },
           ),
         );
       },
     );
+  }
+
+  Widget _advantageIconGrid({
+    required List<AppProductAdvantage> items,
+    required bool selected,
+  }) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: items.length,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 5,
+        mainAxisSpacing: 10,
+        crossAxisSpacing: 10,
+        childAspectRatio: 0.82,
+      ),
+      itemBuilder: (context, index) {
+        final item = items[index];
+        if (!selected) {
+          return _AdvantageChoiceTile(
+            item: item,
+            selected: false,
+            onTap: () => _selectAdvantage(item.id),
+          );
+        }
+        return _selectedAdvantageCell(item: item, index: index);
+      },
+    );
+  }
+
+  Widget _selectedAdvantageCell({
+    required AppProductAdvantage item,
+    required int index,
+  }) {
+    final tile = _AdvantageChoiceTile(
+      item: item,
+      selected: true,
+      showDragHandle: true,
+      order: index + 1,
+      onTap: () => setState(() => _selectedAdvantageIds.remove(item.id)),
+    );
+    return DragTarget<int>(
+      onWillAcceptWithDetails: (details) => details.data != index,
+      onAcceptWithDetails: (details) {
+        _reorderSelectedAdvantage(details.data, index);
+      },
+      builder: (context, candidate, _) {
+        final hovering = candidate.isNotEmpty;
+        return Draggable<int>(
+          data: index,
+          maxSimultaneousDrags: 1,
+          feedback: Material(
+            elevation: 8,
+            color: AppColors.surface,
+            child: SizedBox(
+              width: 128,
+              height: 156,
+              child: _AdvantageChoiceTile(
+                item: item,
+                selected: true,
+                showDragHandle: true,
+                order: index + 1,
+                onTap: () {},
+              ),
+            ),
+          ),
+          childWhenDragging: Opacity(opacity: 0.35, child: tile),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
+            decoration: hovering
+                ? BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: AppColors.primary, width: 2),
+                  )
+                : null,
+            child: tile,
+          ),
+        );
+      },
+    );
+  }
+
+  void _selectAdvantage(String id) {
+    if (_selectedAdvantageIds.contains(id)) return;
+    if (_selectedAdvantageIds.length >=
+        ProductAdvantageRepository.maxPerProduct) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'En fazla ${ProductAdvantageRepository.maxPerProduct} özellik seçilebilir.',
+          ),
+        ),
+      );
+      return;
+    }
+    setState(() => _selectedAdvantageIds.add(id));
+  }
+
+  void _reorderSelectedAdvantage(int from, int to) {
+    if (from == to) return;
+    if (from < 0 ||
+        to < 0 ||
+        from >= _selectedAdvantageIds.length ||
+        to >= _selectedAdvantageIds.length) {
+      return;
+    }
+    setState(() {
+      final id = _selectedAdvantageIds.removeAt(from);
+      _selectedAdvantageIds.insert(
+        to.clamp(0, _selectedAdvantageIds.length),
+        id,
+      );
+    });
   }
 
   Widget _buildTrustBadgesSection() {
@@ -1224,7 +1393,7 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
                   children: [
                     _field(_proteinValue, 'Protein değeri (ör. %42 veya 42)'),
                     const Text(
-                      'Protein İçerir seçiliyse detayda et ikonu, %42 ve etiket '
+                      'Protein Değeri seçiliyse detayda et ikonu, %42 ve etiket '
                       'Puan / Çok Satan Ürün ile aynı yapıda gösterilir.',
                       style: TextStyle(
                         color: AppColors.subText,
@@ -1449,7 +1618,8 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
     return _panel(
       title: 'Ürün Resimleri',
       subtitle:
-          'Ana ürün görselini ve galeri resimlerini yükleyin. PNG, JPG veya WEBP kullanabilirsiniz.',
+          'Ana ürün görselini ve galeri resimlerini yükleyin. '
+          'Galeriye birden fazla görsel seçebilirsiniz. PNG, JPG veya WEBP kullanabilirsiniz.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1795,9 +1965,29 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
       child: Row(
         children: [
           OutlinedButton(
-            onPressed: _saving ? null : _close,
+            onPressed: _saving || _deleting ? null : _close,
             child: const Text('Listeye dön'),
           ),
+          if (_isEdit) ...[
+            const SizedBox(width: 8),
+            OutlinedButton.icon(
+              onPressed: _saving || _uploading || _deleting
+                  ? null
+                  : _deleteProduct,
+              icon: _deleting
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.delete_outline, color: AppColors.error),
+              label: const Text('Ürünü sil'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.error,
+                side: const BorderSide(color: AppColors.error),
+              ),
+            ),
+          ],
           const Spacer(),
           if (_section > 0)
             OutlinedButton.icon(
@@ -1814,7 +2004,7 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
             ),
           if (_section < _steps.length - 1) const SizedBox(width: 8),
           FilledButton.icon(
-            onPressed: _saving || _uploading ? null : _save,
+            onPressed: _saving || _uploading || _deleting ? null : _save,
             icon: _saving
                 ? const SizedBox(
                     width: 17,
@@ -1867,12 +2057,26 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
     if (files.isEmpty) return;
     setState(() => _uploading = true);
     try {
+      var added = 0;
       for (final file in files) {
         final bytes = await file.readAsBytes();
         final url = await _uploadBytes(bytes, file.name, 'products/gallery');
-        _gallery.add(url);
+        if (!_gallery.contains(url)) {
+          _gallery.add(url);
+          added++;
+        }
       }
-      if (mounted) setState(() {});
+      if (!mounted) return;
+      setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            added == 1
+                ? '1 galeri görseli eklendi. Kaydetmeyi unutmayın.'
+                : '$added galeri görseli eklendi. Kaydetmeyi unutmayın.',
+          ),
+        ),
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
@@ -1881,6 +2085,64 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
       }
     } finally {
       if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  Future<void> _deleteProduct() async {
+    final product = widget.product;
+    if (product == null || product.id.isEmpty || _deleting) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Ürünü sil'),
+        content: Text(
+          '“${product.title}” kalıcı olarak silinsin mi? '
+          'Bu işlem geri alınamaz.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Sil'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _deleting = true);
+    try {
+      await FirebaseFirestore.instance
+          .collection(FirestoreCollections.products)
+          .doc(product.id)
+          .delete();
+      final urls = <String>{
+        product.imageUrl.trim(),
+        _imageUrl.text.trim(),
+        for (final url in product.gallery) url.trim(),
+        for (final url in _gallery) url.trim(),
+      };
+      for (final url in urls) {
+        if (url.isEmpty || !url.startsWith('http')) continue;
+        try {
+          await FirebaseStorage.instance.refFromURL(url).delete();
+        } catch (_) {}
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('“${product.title}” silindi.')),
+      );
+      _close();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Ürün silinemedi: $e')));
+    } finally {
+      if (mounted) setState(() => _deleting = false);
     }
   }
 
@@ -2391,16 +2653,17 @@ class _AdvantageChoiceTile extends StatelessWidget {
     required this.selected,
     required this.onTap,
     this.order,
+    this.showDragHandle = false,
   });
 
   final AppProductAdvantage item;
   final bool selected;
   final VoidCallback onTap;
   final int? order;
+  final bool showDragHandle;
 
   @override
   Widget build(BuildContext context) {
-    final isStat = ProductAdvantageRepository.displaysAsStat(item);
     final fallback = Center(
       child: Text(
         item.name.isEmpty ? '?' : item.name.characters.first,
@@ -2410,9 +2673,9 @@ class _AdvantageChoiceTile extends StatelessWidget {
         ),
       ),
     );
-    final imagePath = isStat
-        ? ProductAdvantageRepository.proteinIconPath
-        : (item.imageUrl.isNotEmpty ? item.imageUrl : item.assetPath);
+    final imagePath = ProductAdvantageRepository.displayImageUrl(item).isNotEmpty
+        ? ProductAdvantageRepository.displayImageUrl(item)
+        : ProductAdvantageRepository.displayAssetPath(item);
     final image = imagePath.isNotEmpty
         ? buildProductImage(
             imagePath,
@@ -2430,8 +2693,7 @@ class _AdvantageChoiceTile extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(18),
         child: Container(
-          width: 170,
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.fromLTRB(8, 8, 8, 6),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
@@ -2440,10 +2702,8 @@ class _AdvantageChoiceTile extends StatelessWidget {
             ),
           ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              SizedBox(
-                height: 56,
+              Expanded(
                 child: Stack(
                   children: [
                     Positioned.fill(child: image),
@@ -2456,7 +2716,9 @@ class _AdvantageChoiceTile extends StatelessWidget {
                           height: 22,
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
-                            color: AppColors.primary,
+                            color: isHeroSlot
+                                ? AppColors.primary
+                                : AppColors.subText,
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
@@ -2472,7 +2734,7 @@ class _AdvantageChoiceTile extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 6),
               Text(
                 item.name,
                 maxLines: 2,
@@ -2480,27 +2742,18 @@ class _AdvantageChoiceTile extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: selected ? AppColors.primary : AppColors.text,
-                  fontSize: 12,
+                  fontSize: 11,
                   fontWeight: FontWeight.w800,
+                  height: 1.15,
                 ),
               ),
-              if (order != null) ...[
-                const SizedBox(height: 4),
-                Text(
-                  isHeroSlot ? 'Sağ sütun' : 'Alt alan',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: selected ? AppColors.primary : AppColors.subText,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               Icon(
                 selected
-                    ? Icons.check_circle_rounded
-                    : Icons.radio_button_unchecked_rounded,
+                    ? (showDragHandle
+                          ? Icons.drag_indicator_rounded
+                          : Icons.check_circle_rounded)
+                    : Icons.add_circle_outline_rounded,
                 size: 18,
                 color: selected ? AppColors.primary : AppColors.subText,
               ),
@@ -2534,23 +2787,13 @@ class _TrustBadgeChoiceTile extends StatelessWidget {
         ),
       ),
     );
-    final isPreferred =
-        badge.id == 'en-cok-tercih' ||
-        badge.name.toLowerCase().contains('tercih');
-    final isProtein = TrustBadgeRepository.isProteinBadge(badge);
-    final isRepurchase = TrustBadgeRepository.isRepurchaseBadge(badge);
-    final isAffordable = TrustBadgeRepository.isAffordableBadge(badge);
-    final imagePath = isPreferred
-        ? TrustBadgeRepository.preferredIconPath
-        : isProtein
-        ? TrustBadgeRepository.proteinIconPath
-        : isRepurchase
-        ? TrustBadgeRepository.repurchaseIconPath
-        : isAffordable
-        ? TrustBadgeRepository.affordableIconPath
-        : (badge.imageUrl.isNotEmpty ? badge.imageUrl : badge.assetPath);
+    final isPreferred = TrustBadgeRepository.isPreferredBadge(badge);
+    final imageUrl = TrustBadgeRepository.displayImageUrl(badge);
+    final imagePath = imageUrl.isNotEmpty
+        ? imageUrl
+        : TrustBadgeRepository.displayAssetPath(badge);
     final Widget image;
-    if (isPreferred && imagePath.isNotEmpty) {
+    if (isPreferred && imageUrl.isEmpty) {
       image = PreferredRankMedal(rank: '2.', errorWidget: fallback);
     } else {
       image = imagePath.isNotEmpty

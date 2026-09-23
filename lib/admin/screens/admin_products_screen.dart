@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:geliyor_app/admin/admin_models.dart';
 import 'package:geliyor_app/admin/admin_ui.dart';
@@ -27,6 +28,7 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
   String _main = 'all';
   String _status = 'all';
   bool _lowStockOnly = false;
+  String? _deletingId;
 
   @override
   void dispose() {
@@ -35,11 +37,15 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
   }
 
   Future<void> _deleteProduct(AdminProduct product) async {
+    if (_deletingId != null) return;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Ürünü sil'),
-        content: Text('${product.title} silinsin mi?'),
+        content: Text(
+          '“${product.title}” kalıcı olarak silinsin mi? '
+          'Bu işlem geri alınamaz.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -53,11 +59,39 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
         ],
       ),
     );
-    if (ok != true) return;
-    await FirebaseFirestore.instance
-        .collection(FirestoreCollections.products)
-        .doc(product.id)
-        .delete();
+    if (ok != true || !mounted) return;
+    setState(() => _deletingId = product.id);
+    try {
+      await FirebaseFirestore.instance
+          .collection(FirestoreCollections.products)
+          .doc(product.id)
+          .delete();
+      await _deleteProductImages(product);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('“${product.title}” silindi.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ürün silinemedi: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _deletingId = null);
+    }
+  }
+
+  static Future<void> _deleteProductImages(AdminProduct product) async {
+    final urls = <String>{
+      product.imageUrl.trim(),
+      for (final url in product.gallery) url.trim(),
+    };
+    for (final url in urls) {
+      if (url.isEmpty || !url.startsWith('http')) continue;
+      try {
+        await FirebaseStorage.instance.refFromURL(url).delete();
+      } catch (_) {}
+    }
   }
 
   Future<void> _toggleActive(AdminProduct product) async {
@@ -243,132 +277,157 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
   }
 
   Widget _row(AdminProduct product) {
-    return InkWell(
-      onTap: () => widget.onEditProduct?.call(product),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
-        child: Row(
-          children: [
-            ClipRRect(
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: InkWell(
+              onTap: () => widget.onEditProduct?.call(product),
               borderRadius: BorderRadius.circular(12),
-              child: SizedBox(
-                width: 52,
-                height: 52,
-                child: ColoredBox(
-                  color: AppColors.background,
-                  child: buildProductImage(
-                    product.imageUrl,
-                    fit: BoxFit.contain,
-                    errorWidget: const Icon(Icons.pets_rounded, size: 22),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  Text(
-                    product.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 13,
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: SizedBox(
+                      width: 52,
+                      height: 52,
+                      child: ColoredBox(
+                        color: AppColors.background,
+                        child: buildProductImage(
+                          product.imageUrl,
+                          fit: BoxFit.contain,
+                          errorWidget: const Icon(
+                            Icons.pets_rounded,
+                            size: 22,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 3),
-                  Text(
-                    [
-                      if (product.brand.isNotEmpty) product.brand,
-                      if (product.weight.isNotEmpty) product.weight,
-                      if (product.skt.isNotEmpty)
-                        'SKT ${product.skt}'
-                      else
-                        'SKT yok',
-                      if (product.category.isNotEmpty) product.category,
-                      if (product.extraCategories.isNotEmpty)
-                        '+ ${product.extraCategories.join(', ')}',
-                    ].join(' · '),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.subText,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          product.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          [
+                            if (product.brand.isNotEmpty) product.brand,
+                            if (product.weight.isNotEmpty) product.weight,
+                            if (product.skt.isNotEmpty)
+                              'SKT ${product.skt}'
+                            else
+                              'SKT yok',
+                            if (product.category.isNotEmpty) product.category,
+                            if (product.extraCategories.isNotEmpty)
+                              '+ ${product.extraCategories.join(', ')}',
+                          ].join(' · '),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: AppColors.subText,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            SizedBox(
-              width: 88,
-              child: Text(
-                AdminUi.money(product.unitPrice),
-                textAlign: TextAlign.right,
-                style: const TextStyle(fontWeight: FontWeight.w800),
-              ),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 88,
+            child: Text(
+              AdminUi.money(product.unitPrice),
+              textAlign: TextAlign.right,
+              style: const TextStyle(fontWeight: FontWeight.w800),
             ),
+          ),
+          const SizedBox(width: 8),
+          AdminStatusChip(
+            label: 'KDV %${product.vatRate}',
+            color: AppColors.primary,
+          ),
+          const SizedBox(width: 10),
+          AdminStatusChip(
+            label: 'Stok ${product.stock}',
+            color: product.stock <= 0
+                ? AppColors.error
+                : product.stock <= 5
+                ? AppColors.warning
+                : AppColors.success,
+          ),
+          const SizedBox(width: 8),
+          AdminStatusChip(
+            label: product.active ? 'Vitrinde' : 'Gizli',
+            color: product.active ? AppColors.success : AppColors.subText,
+          ),
+          if (product.showAsGift || product.showAsPremiumGift) ...[
             const SizedBox(width: 8),
             AdminStatusChip(
-              label: 'KDV %${product.vatRate}',
+              label: product.showAsGift && product.showAsPremiumGift
+                  ? 'Hediye + Premium'
+                  : product.showAsPremiumGift
+                  ? 'Premium hediye'
+                  : 'Hediye',
               color: AppColors.primary,
             ),
-            const SizedBox(width: 10),
-            AdminStatusChip(
-              label: 'Stok ${product.stock}',
-              color: product.stock <= 0
-                  ? AppColors.error
-                  : product.stock <= 5
-                  ? AppColors.warning
-                  : AppColors.success,
-            ),
-            const SizedBox(width: 8),
-            AdminStatusChip(
-              label: product.active ? 'Vitrinde' : 'Gizli',
-              color: product.active ? AppColors.success : AppColors.subText,
-            ),
-            if (product.showAsGift || product.showAsPremiumGift) ...[
-              const SizedBox(width: 8),
-              AdminStatusChip(
-                label: product.showAsGift && product.showAsPremiumGift
-                    ? 'Hediye + Premium'
-                    : product.showAsPremiumGift
-                    ? 'Premium hediye'
-                    : 'Hediye',
-                color: AppColors.primary,
-              ),
-            ],
-            PopupMenuButton<String>(
-              onSelected: (value) {
-                switch (value) {
-                  case 'edit':
-                    widget.onEditProduct?.call(product);
-                  case 'copy':
-                    widget.onCopyProduct?.call(product);
-                  case 'toggle':
-                    _toggleActive(product);
-                  case 'delete':
-                    _deleteProduct(product);
-                }
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem(value: 'edit', child: Text('Düzenle')),
-                const PopupMenuItem(
-                  value: 'copy',
-                  child: Text('Ürüne kopyala'),
-                ),
-                PopupMenuItem(
-                  value: 'toggle',
-                  child: Text(product.active ? 'Vitrinden kaldır' : 'Vitrine al'),
-                ),
-                const PopupMenuItem(value: 'delete', child: Text('Sil')),
-              ],
-            ),
           ],
-        ),
+          IconButton(
+            tooltip: 'Ürünü sil',
+            onPressed: _deletingId == product.id
+                ? null
+                : () => _deleteProduct(product),
+            icon: _deletingId == product.id
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.delete_outline, color: AppColors.error),
+          ),
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              switch (value) {
+                case 'edit':
+                  widget.onEditProduct?.call(product);
+                case 'copy':
+                  widget.onCopyProduct?.call(product);
+                case 'toggle':
+                  _toggleActive(product);
+                case 'delete':
+                  _deleteProduct(product);
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(value: 'edit', child: Text('Düzenle')),
+              const PopupMenuItem(
+                value: 'copy',
+                child: Text('Ürüne kopyala'),
+              ),
+              PopupMenuItem(
+                value: 'toggle',
+                child: Text(
+                  product.active ? 'Vitrinden kaldır' : 'Vitrine al',
+                ),
+              ),
+              const PopupMenuItem(value: 'delete', child: Text('Sil')),
+            ],
+          ),
+        ],
       ),
     );
   }

@@ -82,7 +82,7 @@ class _AdminProductAdvantagesScreenState
                   TextField(
                     controller: name,
                     decoration: InputDecoration(
-                      labelText: isStat ? 'Etiket (ör. Protein İçerir)' : 'Özellik adı',
+                      labelText: isStat ? 'Etiket (ör. Protein Değeri)' : 'Özellik adı',
                       border: const OutlineInputBorder(),
                     ),
                   ),
@@ -148,34 +148,33 @@ class _AdminProductAdvantagesScreenState
                     ),
                   ),
                   const SizedBox(height: 12),
-                  if (!isStat) ...[
-                    TextField(
-                      controller: imageUrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Görsel URL',
-                        border: OutlineInputBorder(),
-                      ),
+                  TextField(
+                    controller: imageUrl,
+                    onChanged: (_) => setDialogState(() {}),
+                    decoration: const InputDecoration(
+                      labelText: 'İkon görseli URL',
+                      border: OutlineInputBorder(),
                     ),
-                    const SizedBox(height: 10),
-                    OutlinedButton.icon(
-                      onPressed: dialogUploading
-                          ? null
-                          : () async {
-                              setDialogState(() => dialogUploading = true);
-                              final url = await _pickAndUpload();
-                              if (url != null) {
-                                imageUrl.text = url;
-                                setDialogState(() {});
-                              }
-                              setDialogState(() => dialogUploading = false);
-                            },
-                      icon: const Icon(Icons.upload_rounded),
-                      label: Text(
-                        dialogUploading ? 'Yükleniyor...' : 'Görsel Ekle',
-                      ),
+                  ),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    onPressed: dialogUploading
+                        ? null
+                        : () async {
+                            setDialogState(() => dialogUploading = true);
+                            final url = await _pickAndUpload();
+                            if (url != null) {
+                              imageUrl.text = url;
+                              setDialogState(() {});
+                            }
+                            setDialogState(() => dialogUploading = false);
+                          },
+                    icon: const Icon(Icons.upload_rounded),
+                    label: Text(
+                      dialogUploading ? 'Yükleniyor...' : 'İkon Ekle / Değiştir',
                     ),
-                    const SizedBox(height: 10),
-                  ],
+                  ),
+                  const SizedBox(height: 10),
                   Material(
                     color: AppColors.background,
                     borderRadius: BorderRadius.circular(18),
@@ -243,7 +242,9 @@ class _AdminProductAdvantagesScreenState
         value: itemValue,
         isStat: isStat,
         imageUrl: uploadedImage,
-        assetPath: existing?.assetPath ?? '',
+        assetPath: uploadedImage.isNotEmpty
+            ? ''
+            : (existing?.assetPath ?? ''),
         order: itemOrder,
         active: active,
       ),
@@ -254,7 +255,7 @@ class _AdminProductAdvantagesScreenState
     final url = await _pickAndUpload();
     if (url == null) return;
     await ProductAdvantageRepository.instance.save(
-      item.copyWith(imageUrl: url),
+      item.copyWith(imageUrl: url, assetPath: ''),
     );
   }
 
@@ -352,7 +353,8 @@ class _AdminProductAdvantagesScreenState
             ),
             const SizedBox(height: 6),
             const Text(
-              'Ürün detayında görselin sağında (ilk 5) ve alt listede gösterilen özellikleri yönetin.',
+              'Ürün detayında görselin sağında (ilk 5) ve alt listede gösterilen özellikleri yönetin. '
+              'İkonu tablodaki resme tıklayarak veya düzenle penceresinden değiştirebilirsiniz.',
               style: TextStyle(
                 color: AppColors.subText,
                 fontWeight: FontWeight.w600,
@@ -540,11 +542,12 @@ class _AdminProductAdvantagesScreenState
         ),
       ),
     );
-    final isProtein = name.toLowerCase().contains('protein');
-    final resolvedAsset = isProtein
-        ? ProductAdvantageRepository.proteinIconPath
-        : assetPath;
-    final child = imageUrl.isNotEmpty
+    final resolvedAsset = assetPath.trim().isNotEmpty
+        ? assetPath.trim()
+        : (name.toLowerCase().contains('protein')
+            ? ProductAdvantageRepository.proteinIconPath
+            : '');
+    final child = imageUrl.trim().isNotEmpty
         ? buildProductImage(
             imageUrl,
             fit: BoxFit.contain,

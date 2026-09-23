@@ -389,7 +389,7 @@ final defaultProductAdvantages = <AppProductAdvantage>[
   ),
   _defaultAdvantage(
     'protein',
-    'Protein İçerir',
+    'Protein Değeri',
     41,
     isStat: true,
     value: '%42',
@@ -709,18 +709,25 @@ class ProductAdvantageRepository {
       final proteinDoc = existingById['protein'];
       if (proteinDoc != null) {
         final data = proteinDoc.data();
-        final assetPath = (data[ProductAdvantageFields.assetPath] as String?) ?? '';
-        final needsIcon =
-            assetPath.isEmpty || !assetPath.endsWith('/protein.png');
-        if (needsIcon || data[ProductAdvantageFields.isStat] != true) {
-          batch.set(_collection.doc('protein'), {
-            ProductAdvantageFields.name: 'Protein İçerir',
-            ProductAdvantageFields.isStat: true,
-            ProductAdvantageFields.value: '%42',
-            ProductAdvantageFields.assetPath:
-                'assets/images/app_ikonlar/protein.png',
-            ProductAdvantageFields.updatedAt: FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
+        final imageUrl =
+            ((data[ProductAdvantageFields.imageUrl] as String?) ?? '').trim();
+        final assetPath =
+            ((data[ProductAdvantageFields.assetPath] as String?) ?? '').trim();
+        final updates = <String, dynamic>{};
+        if (data[ProductAdvantageFields.isStat] != true) {
+          updates[ProductAdvantageFields.isStat] = true;
+        }
+        if (imageUrl.isEmpty && assetPath.isEmpty) {
+          updates[ProductAdvantageFields.assetPath] = proteinIconPath;
+        }
+        if (updates.isNotEmpty) {
+          updates[ProductAdvantageFields.updatedAt] =
+              FieldValue.serverTimestamp();
+          batch.set(
+            _collection.doc('protein'),
+            updates,
+            SetOptions(merge: true),
+          );
           hasWrites = true;
         }
       }
@@ -746,6 +753,16 @@ class ProductAdvantageRepository {
     final value = raw.trim();
     if (value.isEmpty) return '';
     return value.startsWith('%') ? value : '%$value';
+  }
+
+  static String displayImageUrl(AppProductAdvantage item) =>
+      item.imageUrl.trim();
+
+  static String displayAssetPath(AppProductAdvantage item) {
+    final asset = item.assetPath.trim();
+    if (asset.isNotEmpty) return asset;
+    if (displaysAsStat(item)) return proteinIconPath;
+    return '';
   }
 
   static String explanationFor(AppProductAdvantage item) {

@@ -183,7 +183,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: ClipRect(
                     child: Align(
                       alignment: Alignment.centerRight,
-                      widthFactor: 0.72,
+                      widthFactor: 0.74,
                       child: Image.asset(
                         'assets/images/ana_logo.png',
                         height: 46,
@@ -339,7 +339,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildSmartPlanCard() {
     final estimate = FoodRemainingEstimator.compute();
     final remaining = estimate?.remainingDays;
-    final ratio = estimate?.remainingRatio ?? 0.0;
+    final ratio = remaining == null
+        ? 0.0
+        : (estimate?.remainingRatio ?? 0.0);
     final level = estimate?.stockLevel ?? FoodStockLevel.safe;
     final textColor =
         remaining == null ? AppColors.primary : _stockRingColor(level);
@@ -389,11 +391,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         width: ringD,
                         height: ringD,
                         child: CircularProgressIndicator(
-                          value: remaining == null ? 0.72 : ratio,
-                          strokeWidth: (overlayD * 0.068).clamp(3.5, 5.5),
-                          backgroundColor: AppColors.primary.withValues(
-                            alpha: 0.18,
-                          ),
+                          value: ratio,
+                          strokeWidth: (overlayD * 0.07).clamp(3.5, 5.0),
+                          backgroundColor: AppColors.selected,
                           color: AppColors.primary,
                           strokeCap: StrokeCap.round,
                         ),

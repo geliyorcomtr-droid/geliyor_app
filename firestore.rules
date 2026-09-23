@@ -149,7 +149,9 @@ service cloud.firestore {
     }
 
     match /settings/{docId} {
-      allow read: if isAdmin() || docId == 'bank_transfer';
+      allow read: if isAdmin()
+        || docId == 'bank_transfer'
+        || docId == 'feeding_guides';
       allow write: if isAdmin();
     }
 

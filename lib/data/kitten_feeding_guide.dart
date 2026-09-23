@@ -1,46 +1,171 @@
-/// Yavru kedi kuru mama tüketimi (g/gün). Esas: ay.
-class KittenFeedingRow {
-  const KittenFeedingRow({
-    required this.months,
-    required this.dailyGrams,
-  });
+/// Yavru kedi kuru mama tüketimi (g/gün).
+/// Excel: kilo satırı × yaş sütunu. Boş hücre o kombinasyon için referans yok.
+class KittenAgeColumn {
+  const KittenAgeColumn({required this.label, required this.months});
 
-  final int months;
-  final int dailyGrams;
+  final String label;
+  final List<int> months;
 
-  String get monthLabel => '$months ay';
+  bool covers(int month) => months.contains(month);
 }
 
 abstract final class KittenFeedingGuide {
-  static const List<KittenFeedingRow> rows = [
-    KittenFeedingRow(months: 1, dailyGrams: 25),
-    KittenFeedingRow(months: 2, dailyGrams: 40),
-    KittenFeedingRow(months: 3, dailyGrams: 50),
-    KittenFeedingRow(months: 4, dailyGrams: 55),
-    KittenFeedingRow(months: 5, dailyGrams: 60),
-    KittenFeedingRow(months: 6, dailyGrams: 65),
-    KittenFeedingRow(months: 7, dailyGrams: 70),
-    KittenFeedingRow(months: 8, dailyGrams: 70),
-    KittenFeedingRow(months: 9, dailyGrams: 70),
-    KittenFeedingRow(months: 10, dailyGrams: 70),
-    KittenFeedingRow(months: 11, dailyGrams: 70),
-    KittenFeedingRow(months: 12, dailyGrams: 70),
+  static Map<String, int> gramsOverride = const {};
+
+  static const List<double> kgRows = [
+    0.5,
+    1.0,
+    1.5,
+    2.0,
+    2.5,
+    3.0,
+    3.5,
+    4.0,
+    4.5,
+    5.0,
   ];
 
-  static List<int> get monthRows => [
-        for (final row in rows) row.months,
+  static const List<KittenAgeColumn> ageColumns = [
+    KittenAgeColumn(label: '1-2 ay', months: [1, 2]),
+    KittenAgeColumn(label: '3 ay', months: [3]),
+    KittenAgeColumn(label: '4 ay', months: [4]),
+    KittenAgeColumn(label: '5 ay', months: [5]),
+    KittenAgeColumn(label: '6 ay', months: [6]),
+    KittenAgeColumn(label: '7 ay', months: [7]),
+    KittenAgeColumn(label: '8 ay', months: [8]),
+    KittenAgeColumn(label: '9 ay', months: [9]),
+    KittenAgeColumn(label: '10 ay', months: [10]),
+    KittenAgeColumn(label: '11 ay', months: [11]),
+    KittenAgeColumn(label: '12 ay', months: [12]),
+  ];
+
+  static const List<int> monthRows = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
+  static List<String> get weightLabels => [
+        for (final kg in kgRows) kgLabel(kg),
       ];
 
-  static KittenFeedingRow lookup(int months) {
-    final clamped = months.clamp(rows.first.months, rows.last.months);
-    return rows.firstWhere(
-      (row) => row.months == clamped,
-      orElse: () => rows.first,
-    );
+  /// Satırlar [kgRows], sütunlar [ageColumns].
+  static const List<List<int?>> table = [
+    [30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30],
+    [45, 50, 50, 50, 50, 45, 45, 45, 40, 40, 40],
+    [50, 55, 60, 60, 60, 55, 55, 55, 50, 50, 50],
+    [null, 60, 65, 70, 70, 65, 65, 60, 60, 55, 55],
+    [null, 65, 70, 70, 75, 70, 70, 70, 65, 65, 60],
+    [null, null, 75, 75, 80, 75, 75, 75, 70, 70, 65],
+    [null, null, 80, 80, 85, 80, 80, 80, 75, 75, 70],
+    [null, null, null, 85, 90, 85, 85, 80, 80, 75, 75],
+    [null, null, null, null, 95, 90, 90, 85, 85, 80, 80],
+    [null, null, null, null, 100, 95, 95, 90, 85, 85, 80],
+  ];
+
+  static String kgLabel(double kg) {
+    if (kg == kg.roundToDouble()) return '${kg.toInt()} kg';
+    return '${kg.toStringAsFixed(1).replaceAll('.', ',')} kg';
   }
 
-  static int? dailyGramsFor(int? months) {
-    if (months == null || months <= 0) return null;
-    return lookup(months).dailyGrams;
+  static String cellKey(String kgLabel, String ageLabel) =>
+      '$kgLabel|$ageLabel';
+
+  static List<String> get cellKeys => [
+        for (final kg in kgRows)
+          for (final col in ageColumns) cellKey(kgLabel(kg), col.label),
+      ];
+
+  static Map<String, int> get defaultGrams {
+    final out = <String, int>{};
+    for (var r = 0; r < kgRows.length; r++) {
+      for (var c = 0; c < ageColumns.length; c++) {
+        final grams = table[r][c];
+        if (grams == null || grams <= 0) continue;
+        out[cellKey(kgLabel(kgRows[r]), ageColumns[c].label)] = grams;
+      }
+    }
+    return out;
+  }
+
+  static int columnIndexForMonth(int months) {
+    final clamped = months.clamp(1, 12);
+    for (var i = 0; i < ageColumns.length; i++) {
+      if (ageColumns[i].covers(clamped)) return i;
+    }
+    return 0;
+  }
+
+  static int kgIndexOf(double kg) {
+    var best = 0;
+    var bestDelta = (kgRows.first - kg).abs();
+    for (var i = 1; i < kgRows.length; i++) {
+      final delta = (kgRows[i] - kg).abs();
+      if (delta < bestDelta) {
+        best = i;
+        bestDelta = delta;
+      }
+    }
+    return best;
+  }
+
+  static int? _rawCell(int kgIndex, int colIndex) {
+    final key = cellKey(kgLabel(kgRows[kgIndex]), ageColumns[colIndex].label);
+    final override = gramsOverride[key];
+    if (override != null && override > 0) return override;
+    return table[kgIndex][colIndex];
+  }
+
+  static int? gramsAt({required double kg, required int months}) {
+    final kgIndex = kgIndexOf(kg.clamp(kgRows.first, kgRows.last));
+    final colIndex = columnIndexForMonth(months);
+    final exact = _rawCell(kgIndex, colIndex);
+    if (exact != null) return exact;
+
+    var bestKg = -1;
+    var bestDelta = double.infinity;
+    for (var r = 0; r < kgRows.length; r++) {
+      if (_rawCell(r, colIndex) == null) continue;
+      final delta = (kgRows[r] - kgRows[kgIndex]).abs();
+      if (delta < bestDelta) {
+        bestKg = r;
+        bestDelta = delta;
+      }
+    }
+    if (bestKg >= 0) return _rawCell(bestKg, colIndex);
+
+    var bestCol = -1;
+    var bestMonthDelta = 99;
+    for (var c = 0; c < ageColumns.length; c++) {
+      if (_rawCell(kgIndex, c) == null) continue;
+      final delta = (ageColumns[c].months.first - months).abs();
+      if (delta < bestMonthDelta) {
+        bestCol = c;
+        bestMonthDelta = delta;
+      }
+    }
+    if (bestCol >= 0) return _rawCell(kgIndex, bestCol);
+    return null;
+  }
+
+  static int? dailyGramsFor({String? weightLabel, int? months}) {
+    final kg = kgFromLabel(weightLabel);
+    if (kg == null || months == null || months <= 0) return null;
+    return gramsAt(kg: kg, months: months);
+  }
+
+  static String nearestWeightLabel(String? label) {
+    final kg = kgFromLabel(label);
+    if (kg == null) return weightLabels.first;
+    return kgLabel(kgRows[kgIndexOf(kg)]);
+  }
+
+  static double? kgFromLabel(String? label) {
+    if (label == null || label.trim().isEmpty) return null;
+    final numbers = RegExp(r'(\d+(?:[.,]\d+)?)')
+        .allMatches(label)
+        .map((m) => double.tryParse(m.group(1)!.replaceAll(',', '.')))
+        .whereType<double>()
+        .toList();
+    if (numbers.isEmpty) return null;
+    return numbers.length == 1
+        ? numbers.first
+        : (numbers.first + numbers.last) / 2;
   }
 }

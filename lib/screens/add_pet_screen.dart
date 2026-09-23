@@ -3,9 +3,13 @@ import 'dart:typed_data';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:geliyor_app/data/cat_feeding_guide.dart';
-import 'package:geliyor_app/data/dog_feeding_guide.dart';
 import 'package:geliyor_app/data/kitten_feeding_guide.dart';
+import 'package:geliyor_app/data/adult_dog_feeding_guide.dart';
+import 'package:geliyor_app/data/mini_adult_dog_feeding_guide.dart';
+import 'package:geliyor_app/data/mini_puppy_feeding_guide.dart';
+import 'package:geliyor_app/data/pet_consumption.dart';
 import 'package:geliyor_app/data/pet_life_stage.dart';
+import 'package:geliyor_app/data/standard_puppy_feeding_guide.dart';
 import 'package:geliyor_app/state/auth_store.dart';
 import 'package:geliyor_app/state/pet_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
@@ -38,39 +42,25 @@ class _AddPetScreenState extends State<AddPetScreen> {
 
   final TextEditingController _nameController = TextEditingController();
   String? _species = 'Kedi';
-  String? _ageRange = 'Yavru';
+  String? _ageRange = PetLifeStage.petCatKitten;
   int _ageMonths = 4;
-  String? _weight = '1-2 kg';
+  String? _weight = CatFeedingGuide.weightLabels.first;
   String? _neutered;
   String? _bodyType = 'İdeal';
   String? _activityLevel = 'Orta';
   String? _extraFood;
   String? _gender;
+  String _puppyAgeBand = MiniPuppyFeedingGuide.ageColumns[1].label;
   Uint8List? _photoBytes;
   String? _photoUrl;
   bool _saving = false;
 
-  static const _ageOptions = ['Yavru', 'Genç', 'Yetişkin', 'Senior'];
-
-  static const _dogSizeOptions = [
-    'X-Small (0-4 kg)',
-    'Mini (5-10 kg)',
-    'Medium (11-25 kg)',
-    'Maxi (26-44 kg)',
-    'Giant (45 kg+)',
-  ];
-
   static const _activityOptions = ['Düşük', 'Orta', 'Yüksek'];
-  static const _catWeightOptions = [
-    '1-2 kg',
-    '2-3 kg',
-    '3-4 kg',
-    '4-5 kg',
-    '5-6 kg',
-    '6-7 kg',
-    '7-8 kg',
-    '8-9 kg',
-    '9-10 kg',
+  static const _miniActivityOptions = [
+    'Düşük',
+    'Orta',
+    'Yüksek',
+    'Çok yüksek',
   ];
   static const _dogWeightOptions = [
     '0-5 kg',
@@ -89,10 +79,46 @@ class _AddPetScreenState extends State<AddPetScreen> {
     'Her ikisi',
   ];
 
-  List<String> get _weightOptions =>
-      _species == 'Köpek' ? _dogWeightOptions : _catWeightOptions;
+  bool get _isStandardAdultDog =>
+      _isDog && _ageRange == PetLifeStage.petDogAdult;
+
+  bool get _isStandardPuppyDog =>
+      _isDog && _ageRange == PetLifeStage.petDogPuppy;
+
+  bool get _needsPuppyAgeBand => _isMiniPuppyDog || _isStandardPuppyDog;
+
+  bool get _usesKgActivity =>
+      _isMiniAdultDog ||
+      _isMiniPuppyDog ||
+      _isStandardAdultDog ||
+      _isStandardPuppyDog;
+
+  List<String> get _puppyAgeLabels => _isMiniPuppyDog
+      ? MiniPuppyFeedingGuide.ageLabels
+      : StandardPuppyFeedingGuide.ageLabels;
+
+  List<String> get _weightOptions {
+    if (_isMiniAdultDog) return MiniAdultDogFeedingGuide.weightLabels;
+    if (_isMiniPuppyDog) return MiniPuppyFeedingGuide.weightLabels;
+    if (_isStandardAdultDog || _isStandardPuppyDog) {
+      return AdultDogFeedingGuide.weightLabels;
+    }
+    if (_isDog) return _dogWeightOptions;
+    if (_isCatKitten) return KittenFeedingGuide.weightLabels;
+    return CatFeedingGuide.weightLabels;
+  }
 
   bool get _isDog => _species == 'Köpek';
+
+  bool get _isMiniAdultDog =>
+      _isDog && _ageRange == PetLifeStage.petDogMini;
+
+  bool get _isMiniPuppyDog =>
+      _isDog && _ageRange == PetLifeStage.petDogMiniPuppy;
+
+  bool get _isCatKitten =>
+      !_isDog &&
+      PetLifeStage.catAgeOf(_ageRange) == PetLifeStage.petCatKitten;
 
   PetData get _previewPet => PetData(
     name: _nameController.text.trim().isEmpty
@@ -110,12 +136,28 @@ class _AddPetScreenState extends State<AddPetScreen> {
       _nameController.text = pet.name;
       _species = pet.species;
       _ageRange = _isDog
-          ? pet.ageRange
-          : PetLifeStage.ageGroupOf(pet.ageRange).isEmpty
-              ? pet.ageRange
-              : PetLifeStage.ageGroupOf(pet.ageRange);
+          ? PetLifeStage.dogTypeOf(pet.ageRange)
+          : PetLifeStage.catAgeOf(pet.ageRange);
       _ageMonths = PetLifeStage.monthsFromLabel(pet.ageRange) ?? 4;
-      _weight = pet.weight;
+      _puppyAgeBand = _isMiniPuppyDog
+          ? (MiniPuppyFeedingGuide.ageBandFromLabel(pet.ageRange) ??
+              MiniPuppyFeedingGuide.nearestAgeLabel(_ageMonths))
+          : (StandardPuppyFeedingGuide.ageBandFromLabel(pet.ageRange) ??
+              StandardPuppyFeedingGuide.nearestAgeLabel(_ageMonths));
+      _weight = _isDog
+          ? (_isMiniAdultDog
+                ? MiniAdultDogFeedingGuide.nearestWeightLabel(pet.weight)
+                : (_isMiniPuppyDog
+                      ? MiniPuppyFeedingGuide.nearestWeightLabel(pet.weight)
+                      : (_isStandardAdultDog || _isStandardPuppyDog
+                            ? AdultDogFeedingGuide.nearestWeightLabel(pet.weight)
+                            : (pet.weight != null &&
+                                      _dogWeightOptions.contains(pet.weight)
+                                  ? pet.weight
+                                  : _dogWeightOptions.first))))
+          : (_isCatKitten
+                ? KittenFeedingGuide.nearestWeightLabel(pet.weight)
+                : CatFeedingGuide.nearestWeightLabel(pet.weight));
       _neutered = pet.neutered;
       _bodyType = pet.bodyType ?? 'İdeal';
       _activityLevel = pet.activityLevel;
@@ -126,11 +168,19 @@ class _AddPetScreenState extends State<AddPetScreen> {
   }
 
   String _savedAgeRange(String species) {
-    if (species == 'Köpek') return _ageRange ?? _dogSizeOptions.first;
-    final group = _ageRange ?? 'Yavru';
-    if (PetLifeStage.ageGroupOf(group) == 'Yavru') {
+    if (species == 'Köpek') {
+      if (_ageRange == PetLifeStage.petDogMiniPuppy) {
+        return '${PetLifeStage.petDogMiniPuppy} · $_puppyAgeBand';
+      }
+      if (_ageRange == PetLifeStage.petDogPuppy) {
+        return '${PetLifeStage.petDogPuppy} · $_puppyAgeBand';
+      }
+      return _ageRange ?? PetLifeStage.petDogAdult;
+    }
+    final group = PetLifeStage.catAgeOf(_ageRange);
+    if (group == PetLifeStage.petCatKitten) {
       return PetLifeStage.persistAgeRange(
-        ageGroup: 'Yavru',
+        ageGroup: PetLifeStage.petCatKitten,
         months: _ageMonths,
       );
     }
@@ -138,36 +188,75 @@ class _AddPetScreenState extends State<AddPetScreen> {
   }
 
   int? _dailyGramsFor(String species, String savedAge) {
-    if (species == 'Köpek') {
-      return DogFeedingGuide.dailyGramsFor(
-        sizeLabel: savedAge,
+    return PetConsumption.dailyGrams(
+      PetData(
+        name: _nameController.text.trim().isEmpty ? 'Dost' : _nameController.text.trim(),
+        species: species,
+        ageRange: savedAge,
+        weight: _weight,
+        bodyType: _bodyType,
+        neutered: _neutered,
         activityLevel: _activityLevel,
-      );
-    }
-    if (PetLifeStage.inferIsPuppy(ageRange: savedAge)) {
-      return KittenFeedingGuide.dailyGramsFor(_ageMonths);
-    }
-    return CatFeedingGuide.dailyGramsFor(
-      weightLabel: _weight,
-      bodyType: _bodyType ?? 'İdeal',
-      activityLevel: _activityLevel,
+        extraFood: _extraFood,
+        gender: _gender,
+      ),
     );
   }
 
   void _selectSpecies(String species) {
     setState(() {
       _species = species;
-      final weightOpts = species == 'Köpek'
-          ? _dogWeightOptions
-          : _catWeightOptions;
-      if (_weight == null || !weightOpts.contains(_weight)) {
-        _weight = weightOpts.first;
-      }
-      final rangeOpts = species == 'Köpek' ? _dogSizeOptions : _ageOptions;
+      final rangeOpts = species == 'Köpek'
+          ? PetLifeStage.dogTypeOptions
+          : PetLifeStage.catAgeOptions;
       if (_ageRange == null || !rangeOpts.contains(_ageRange)) {
         _ageRange = rangeOpts.first;
       }
+      _syncWeightChoice();
+      _syncActivityChoice();
+      _syncPuppyAgeBand();
     });
+  }
+
+  void _syncWeightChoice() {
+    final opts = _weightOptions;
+    if (_weight != null && opts.contains(_weight)) return;
+    if (_isMiniAdultDog) {
+      _weight = MiniAdultDogFeedingGuide.nearestWeightLabel(_weight);
+      return;
+    }
+    if (_isMiniPuppyDog) {
+      _weight = MiniPuppyFeedingGuide.nearestWeightLabel(_weight);
+      return;
+    }
+    if (_isStandardAdultDog || _isStandardPuppyDog) {
+      _weight = AdultDogFeedingGuide.nearestWeightLabel(_weight);
+      return;
+    }
+    if (_isDog) {
+      _weight = opts.first;
+      return;
+    }
+    _weight = _isCatKitten
+        ? KittenFeedingGuide.nearestWeightLabel(_weight)
+        : CatFeedingGuide.nearestWeightLabel(_weight);
+  }
+
+  void _syncActivityChoice() {
+    final opts = _usesKgActivity ? _miniActivityOptions : _activityOptions;
+    if (_activityLevel == null || !opts.contains(_activityLevel)) {
+      _activityLevel = 'Orta';
+    }
+  }
+
+  void _syncPuppyAgeBand() {
+    if (!_needsPuppyAgeBand) return;
+    final labels = _puppyAgeLabels;
+    if (!labels.contains(_puppyAgeBand)) {
+      _puppyAgeBand = _isMiniPuppyDog
+          ? MiniPuppyFeedingGuide.nearestAgeLabel(_ageMonths)
+          : StandardPuppyFeedingGuide.nearestAgeLabel(_ageMonths);
+    }
   }
 
   @override
@@ -441,83 +530,108 @@ class _AddPetScreenState extends State<AddPetScreen> {
                 child: _buildNeuteredRow(),
               ),
               const SizedBox(height: 10),
-              if (_isDog)
+              _buildQuestion(
+                number: '3',
+                title: 'Yaş aralığı nedir?',
+                child: _isDog
+                    ? _buildSelectDropdown(
+                        value: _ageRange,
+                        placeholder: 'Tip seç',
+                        compact: true,
+                        onTap: () => _openSelectSheet(
+                          title: 'Yaş aralığı',
+                          options: PetLifeStage.dogTypeOptions,
+                          selected: _ageRange,
+                          onSelect: (v) => setState(() {
+                            _ageRange = v;
+                            _syncWeightChoice();
+                            _syncActivityChoice();
+                            _syncPuppyAgeBand();
+                          }),
+                        ),
+                      )
+                    : _buildOptionRow(
+                        options: PetLifeStage.catAgeOptions,
+                        selected: _ageRange,
+                        onSelect: (v) => setState(() {
+                          _ageRange = v;
+                          _syncWeightChoice();
+                        }),
+                      ),
+              ),
+              if (!_isDog &&
+                  PetLifeStage.catAgeOf(_ageRange) ==
+                      PetLifeStage.petCatKitten) ...[
+                const SizedBox(height: 10),
                 _buildQuestion(
-                  number: '3',
-                  title: 'Boyuta Göre',
+                  title: 'Yavru kaç aylık?',
                   child: _buildSelectDropdown(
-                    value: _ageRange,
-                    placeholder: 'Boyut seç',
+                    value: PetLifeStage.monthLabel(_ageMonths),
+                    placeholder: 'Ay seç',
                     compact: true,
                     onTap: () => _openSelectSheet(
-                      title: 'Boyuta Göre',
-                      options: _dogSizeOptions,
-                      selected: _ageRange,
-                      onSelect: (v) => setState(() => _ageRange = v),
-                    ),
-                  ),
-                )
-              else ...[
-                _buildQuestion(
-                  number: '3',
-                  title: 'Yaş aralığı nedir?',
-                  child: _buildSelectDropdown(
-                    value: _ageRange,
-                    placeholder: 'Yaş seç',
-                    compact: true,
-                    onTap: () => _openSelectSheet(
-                      title: 'Yaş Aralığı',
-                      options: _ageOptions,
-                      selected: _ageRange,
-                      onSelect: (v) => setState(() => _ageRange = v),
+                      title: 'Yavru kaç aylık?',
+                      options: [
+                        for (final months in PetLifeStage.monthOptions)
+                          PetLifeStage.monthLabel(months),
+                      ],
+                      selected: PetLifeStage.monthLabel(_ageMonths),
+                      onSelect: (v) {
+                        final parsed = int.tryParse(v.split(' ').first);
+                        if (parsed != null) {
+                          setState(() => _ageMonths = parsed.clamp(1, 12));
+                        }
+                      },
                     ),
                   ),
                 ),
-                if (PetLifeStage.ageGroupOf(_ageRange) == 'Yavru') ...[
-                  const SizedBox(height: 10),
-                  _buildQuestion(
-                    title: 'Yavru kaç aylık?',
-                    child: _buildSelectDropdown(
-                      value: PetLifeStage.monthLabel(_ageMonths),
-                      placeholder: 'Ay seç',
-                      compact: true,
-                      onTap: () => _openSelectSheet(
-                        title: 'Yavru kaç aylık?',
-                        options: [
-                          for (final months in PetLifeStage.monthOptions)
-                            PetLifeStage.monthLabel(months),
-                        ],
-                        selected: PetLifeStage.monthLabel(_ageMonths),
-                        onSelect: (v) {
-                          final parsed = int.tryParse(v.split(' ').first);
-                          if (parsed != null) {
-                            setState(() => _ageMonths = parsed.clamp(1, 12));
-                          }
-                        },
-                      ),
-                    ),
-                  ),
-                ],
+              ],
+              if (_needsPuppyAgeBand) ...[
                 const SizedBox(height: 10),
                 _buildQuestion(
-                  number: '4',
-                  title: 'Kilosu nedir?',
+                  title: 'Yavru kaç aylık?',
                   child: _buildSelectDropdown(
-                    value: _weight,
-                    placeholder: 'Kilo seç',
+                    value: _puppyAgeBand,
+                    placeholder: 'Ay aralığı seç',
                     compact: true,
                     onTap: () => _openSelectSheet(
-                      title: 'Kilo',
-                      options: _weightOptions,
-                      selected: _weight,
-                      onSelect: (v) => setState(() => _weight = v),
+                      title: 'Yavru kaç aylık?',
+                      options: _puppyAgeLabels,
+                      selected: _puppyAgeBand,
+                      onSelect: (v) => setState(() {
+                        _puppyAgeBand = v;
+                        _ageMonths = _isMiniPuppyDog
+                            ? MiniPuppyFeedingGuide.monthsFromAgeLabel(v) ?? 4
+                            : StandardPuppyFeedingGuide.monthsFromAgeLabel(
+                                  v,
+                                ) ??
+                                4;
+                      }),
                     ),
                   ),
                 ),
               ],
               const SizedBox(height: 10),
               _buildQuestion(
-                number: _isDog ? '4' : '5',
+                number: '4',
+                title: _needsPuppyAgeBand
+                    ? 'Hedef yetişkin kilosu nedir?'
+                    : 'Kilosu nedir?',
+                child: _buildSelectDropdown(
+                  value: _weight,
+                  placeholder: 'Kilo seç',
+                  compact: true,
+                  onTap: () => _openSelectSheet(
+                    title: 'Kilo',
+                    options: _weightOptions,
+                    selected: _weight,
+                    onSelect: (v) => setState(() => _weight = v),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              _buildQuestion(
+                number: '5',
                 title: 'Vücut yapısı?',
                 child: _buildOptionRow(
                   options: _bodyTypeOptions,
@@ -527,17 +641,18 @@ class _AddPetScreenState extends State<AddPetScreen> {
               ),
               const SizedBox(height: 10),
               _buildQuestion(
-                number: _isDog ? '5' : '6',
+                number: '6',
                 title: 'Aktivite seviyesi nedir?',
                 child: _buildOptionRow(
-                  options: _activityOptions,
+                  options: _usesKgActivity
+                      ? _miniActivityOptions
+                      : _activityOptions,
                   selected: _activityLevel,
                   onSelect: (v) => setState(() => _activityLevel = v),
                 ),
               ),
               const SizedBox(height: 10),
               _buildQuestion(
-                number: _isDog ? '6' : '7',
                 title: 'Kuru mama dışında düzenli besin tüketiyor mu?',
                 child: _buildOptionRow(
                   options: _extraFoodOptions,

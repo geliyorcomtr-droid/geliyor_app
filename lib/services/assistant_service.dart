@@ -496,6 +496,8 @@ Kayıtlı dost bilgileri: $petContext
         final daily = row.gramsFor(
           bodyType: cat.bodyType,
           activityLevel: cat.activityLevel,
+          neutered: cat.neutered,
+          extraFood: cat.extraFood,
         );
         final profile = CatFeedingGuide.profileLabel(
           bodyType: cat.bodyType,

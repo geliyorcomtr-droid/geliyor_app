@@ -510,71 +510,72 @@ class _HealthScreenState extends State<HealthScreen> {
     required Color color,
     VoidCallback? onTap,
   }) {
-    final softBorder = _softBorderColor(color);
-    final softCircle = _softCircleColor(color);
     return Expanded(
       child: GestureDetector(
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.fromLTRB(6, 10, 6, 8),
+          padding: const EdgeInsets.all(3),
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: softBorder, width: 1),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 6,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            border: Border.all(color: color.withValues(alpha: 0.25)),
           ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Image.asset(
-                iconPath,
-                width: 42,
-                height: 42,
-                fit: BoxFit.contain,
-                filterQuality: FilterQuality.high,
-                errorBuilder: (context, error, stackTrace) {
-                  return Icon(Icons.pets_rounded, color: color, size: 34);
-                },
-              ),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  height: 1.15,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(6, 10, 6, 8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                ColorFiltered(
+                  colorFilter: const ColorFilter.matrix(<double>[
+                    1, 0, 0, 0, 0,
+                    0, 1, 0, 0, 0,
+                    0, 0, 1, 0, 0,
+                    -1, -1, -1, 3, 0,
+                  ]),
+                  child: Image.asset(
+                    iconPath,
+                    width: 34,
+                    height: 34,
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.high,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Icon(Icons.pets_rounded, color: color, size: 34);
+                    },
+                  ),
                 ),
-              ),
-              Container(
-                width: 22,
-                height: 22,
-                decoration: BoxDecoration(
-                  color: softCircle,
-                  shape: BoxShape.circle,
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    height: 1.15,
+                  ),
                 ),
-                child: Icon(
-                  Icons.chevron_right_rounded,
-                  color: color,
-                  size: 16,
+                Container(
+                  width: 22,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppColors.surface,
+                    size: 16,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
-  }
-
-  Color _softCircleColor(Color color) {
-    return Color.lerp(color, Colors.white, 0.72) ??
-        color.withValues(alpha: 0.22);
   }
 
   Color _softBorderColor(Color color) {

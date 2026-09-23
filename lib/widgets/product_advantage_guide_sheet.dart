@@ -11,17 +11,13 @@ class ProductAdvantageGuideSheet {
     required AppProductAdvantage item,
     String mainCategory = 'cat',
   }) {
-    final iconPath = ProductAdvantageRepository.displaysAsStat(item)
-        ? ProductAdvantageRepository.proteinIconPath
-        : item.assetPath;
+    final iconPath = ProductAdvantageRepository.displayAssetPath(item);
     return InfoGuideSheet.show(
       context,
       title: item.name,
       guide: ProductAdvantageRepository.guideFor(item),
       iconPath: iconPath,
-      imageUrl: ProductAdvantageRepository.displaysAsStat(item)
-          ? ''
-          : item.imageUrl,
+      imageUrl: ProductAdvantageRepository.displayImageUrl(item),
       onSeeProducts: () {
         Navigator.of(context).push(
           MaterialPageRoute(

@@ -133,6 +133,7 @@ class FoodTrackingFields {
   static const lifeStage = 'lifeStage';
   static const isMiniBreed = 'isMiniBreed';
   static const ageMonths = 'ageMonths';
+  static const feedingVariant = 'feedingVariant';
 }
 
 class PetFields {
@@ -451,6 +452,25 @@ class SettingsDocs {
 
   static const bankTransfer = 'bank_transfer';
   static const foodCoupon = 'food_coupon';
+  static const feedingGuides = 'feeding_guides';
+}
+
+/// `settings/feeding_guides` — 6 profil gram tablosu + kedi çarpanları
+class FeedingGuideFields {
+  FeedingGuideFields._();
+
+  static const catAdult = 'catAdult';
+  static const catKitten = 'catKitten';
+  static const dogAdult = 'dogAdult';
+  static const dogPuppy = 'dogPuppy';
+  static const dogMiniAdult = 'dogMiniAdult';
+  static const dogMiniPuppy = 'dogMiniPuppy';
+  static const factors = 'factors';
+  static const miniAdultDogFactors = 'miniAdultDogFactors';
+  static const miniPuppyFactors = 'miniPuppyFactors';
+  static const adultDogFactors = 'adultDogFactors';
+  static const puppyDogFactors = 'puppyDogFactors';
+  static const updatedAt = 'updatedAt';
 }
 
 /// `settings/bank_transfer` alanları — Havale / EFT alıcı bilgileri
@@ -564,7 +584,7 @@ class AdoptionCategories {
   static const values = <String>[adopt, lost, found];
 
   static String label(String value) => switch (value) {
-    lost => 'Aranıyor',
+    lost => 'Aranıyor (Kayıp)',
     found => 'Bulundu',
     _ => 'Sahiplendirme',
   };

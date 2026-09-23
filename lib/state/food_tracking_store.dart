@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'package:geliyor_app/data/feeding_variant.dart';
 import 'package:geliyor_app/data/firestore_collections.dart';
 import 'package:geliyor_app/data/pet_life_stage.dart';
 import 'package:geliyor_app/state/auth_store.dart';
@@ -22,6 +23,7 @@ class FoodTrackingStore extends ChangeNotifier {
   String _lifeStage = PetLifeStage.adult;
   bool _isMiniBreed = false;
   int _ageMonths = 4;
+  FeedingVariant? _feedingVariant;
   bool _suppressPersist = false;
   bool _bound = false;
 
@@ -36,6 +38,7 @@ class FoodTrackingStore extends ChangeNotifier {
   bool get isMiniBreed => _isMiniBreed;
   int get ageMonths => _ageMonths;
   bool get isPuppy => _lifeStage == PetLifeStage.puppy;
+  FeedingVariant? get feedingVariant => _feedingVariant;
 
   PetLifeStageProfile get lifeProfile => PetLifeStageProfile(
         isPuppy: isPuppy,
@@ -56,6 +59,7 @@ class FoodTrackingStore extends ChangeNotifier {
     _lifeStage = PetLifeStage.adult;
     _isMiniBreed = false;
     _ageMonths = 4;
+    _feedingVariant = null;
     _suppressPersist = false;
     notifyListeners();
   }
@@ -75,6 +79,7 @@ class FoodTrackingStore extends ChangeNotifier {
       _lifeStage = PetLifeStage.adult;
       _isMiniBreed = false;
       _ageMonths = 4;
+      _feedingVariant = null;
     } else {
       _isActive = true;
       _foodName = (data[FoodTrackingFields.foodName] as String?)?.trim() ?? '';
@@ -93,6 +98,9 @@ class FoodTrackingStore extends ChangeNotifier {
       _ageMonths =
           ((data[FoodTrackingFields.ageMonths] as num?)?.toInt() ?? 4)
               .clamp(1, 12);
+      _feedingVariant = FeedingVariant.tryParse(
+        data[FoodTrackingFields.feedingVariant] as String?,
+      );
     }
     _suppressPersist = false;
     notifyListeners();
@@ -108,6 +116,7 @@ class FoodTrackingStore extends ChangeNotifier {
     bool isPuppy = false,
     bool isMiniBreed = false,
     int ageMonths = 4,
+    FeedingVariant? variant,
   }) {
     if (bagKg <= 0) return;
     _isActive = true;
@@ -124,6 +133,13 @@ class FoodTrackingStore extends ChangeNotifier {
     _lifeStage = isPuppy ? PetLifeStage.puppy : PetLifeStage.adult;
     _isMiniBreed = isMiniBreed;
     _ageMonths = ageMonths.clamp(1, 12);
+    _feedingVariant = variant ??
+        FeedingVariant.resolve(
+          isDog: (_petSpecies ?? '').toLowerCase().contains('köpek') ||
+              (_petSpecies ?? '').toLowerCase().contains('kopek'),
+          isPuppy: isPuppy,
+          isMiniBreed: isMiniBreed,
+        );
     notifyListeners();
     unawaited(_persist());
   }
@@ -138,6 +154,7 @@ class FoodTrackingStore extends ChangeNotifier {
     _lifeStage = PetLifeStage.adult;
     _isMiniBreed = false;
     _ageMonths = 4;
+    _feedingVariant = null;
     notifyListeners();
     unawaited(_persist());
   }
@@ -162,6 +179,8 @@ class FoodTrackingStore extends ChangeNotifier {
       FoodTrackingFields.lifeStage: _lifeStage,
       FoodTrackingFields.isMiniBreed: _isMiniBreed,
       FoodTrackingFields.ageMonths: _ageMonths,
+      if (_feedingVariant != null)
+        FoodTrackingFields.feedingVariant: _feedingVariant!.name,
     };
   }
 

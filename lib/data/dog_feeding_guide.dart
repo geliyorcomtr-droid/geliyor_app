@@ -49,6 +49,9 @@ class DogFeedingRow {
 }
 
 abstract final class DogFeedingGuide {
+  static Map<String, int> gramsOverride = const {};
+  static Map<String, int> miniGramsOverride = const {};
+
   static const List<DogFeedingRow> rows = [
     DogFeedingRow(
       size: 'X-Small',
@@ -126,7 +129,12 @@ abstract final class DogFeedingGuide {
   static int? dailyGramsFor({
     required String? sizeLabel,
     required String? activityLevel,
+    bool isMini = false,
   }) {
-    return fromSizeLabel(sizeLabel)?.gramsFor(activityLevel);
+    final row = fromSizeLabel(sizeLabel);
+    if (row == null) return null;
+    final override = (isMini ? miniGramsOverride : gramsOverride)[row.size];
+    if (override != null && override > 0) return override;
+    return row.gramsFor(activityLevel);
   }
 }

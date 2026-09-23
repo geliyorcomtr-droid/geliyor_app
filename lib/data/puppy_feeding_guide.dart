@@ -17,6 +17,9 @@ class PuppyFeedingRow {
 }
 
 abstract final class PuppyFeedingGuide {
+  static Map<int, int> standardOverride = const {};
+  static Map<int, int> miniOverride = const {};
+
   static const List<PuppyFeedingRow> rows = [
     PuppyFeedingRow(months: 1, standardGrams: 100, miniGrams: 50),
     PuppyFeedingRow(months: 2, standardGrams: 195, miniGrams: 80),
@@ -46,6 +49,10 @@ abstract final class PuppyFeedingGuide {
 
   static int? dailyGramsFor(int? months, {required bool isMini}) {
     if (months == null || months <= 0) return null;
+    final clamped =
+        months.clamp(rows.first.months, rows.last.months).toInt();
+    final override = isMini ? miniOverride[clamped] : standardOverride[clamped];
+    if (override != null && override > 0) return override;
     return lookup(months).gramsFor(isMini: isMini);
   }
 }

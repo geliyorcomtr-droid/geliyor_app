@@ -1,7 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geliyor_app/data/brand_feeding_guide.dart';
 import 'package:geliyor_app/data/brand_repository.dart';
+import 'package:geliyor_app/data/feeding_scale.dart';
+import 'package:geliyor_app/data/feeding_variant.dart';
 import 'package:geliyor_app/data/food_tracking_choices.dart';
+import 'package:geliyor_app/data/pro_plan_mini_puppy_guide.dart';
+import 'package:geliyor_app/state/pet_store.dart';
 
 void main() {
   test('standard and empty food ids use fallback path', () {
@@ -113,18 +117,19 @@ void main() {
     );
   });
 
-  test('product text prefers Pro Plan Yavru brand over Pro Plan', () {
+  test('yavru labeled brand copies are ignored in product match', () {
     const brands = [
       AppBrand(id: 'pro-plan', name: 'Pro Plan'),
       AppBrand(id: 'pro-plan-yavru', name: 'Pro Plan Yavru'),
     ];
+    expect(BrandRepository.isYavruLabeled(brands[1]), isTrue);
     expect(
       BrandRepository.matchId(
         brands,
         brandName: 'Pro Plan',
         title: 'Yavru Kedi Mama 2kg',
       ),
-      'pro-plan-yavru',
+      'pro-plan',
     );
     expect(
       BrandRepository.matchId(
@@ -152,7 +157,8 @@ void main() {
     );
     expect(yavru.id, 'pro-plan');
     expect(yavru.isPuppy, isTrue);
-    expect(yavru.label, 'Pro Plan Yavru');
+    expect(yavru.variant, FeedingVariant.catKitten);
+    expect(yavru.label, 'Pro Plan Yavru Kedi');
 
     final adult = FoodTrackingChoice.resolveFromProduct(
       brandName: 'Pro Plan',
@@ -161,6 +167,149 @@ void main() {
     );
     expect(adult.id, 'pro-plan');
     expect(adult.isPuppy, isFalse);
-    expect(adult.label, 'Pro Plan');
+    expect(adult.variant, FeedingVariant.catAdult);
+    expect(adult.label, 'Pro Plan Yetişkin Kedi');
+  });
+
+  test('picksFor lists each filled table with product-style names', () {
+    const brand = AppBrand(
+      id: 'pro-plan',
+      name: 'Pro Plan',
+      feeding: BrandFeedingGuide(
+        catGrams: {'4.0': 60},
+        catKittenGrams: {'4': 55},
+        dogGrams: {'Medium': 240, 'Mini': 110},
+        dogPuppyGrams: {'3': 255},
+        dogMiniPuppyGrams: {'3': 110},
+      ),
+    );
+    final picks = FoodTrackingChoice.picksFor(brand);
+    expect(
+      picks.map((pick) => pick.label).toList(),
+      [
+        'Pro Plan Yetişkin Kedi',
+        'Pro Plan Yavru Kedi',
+        'Pro Plan Yetişkin Köpek',
+        'Pro Plan Yavru Köpek',
+        'Pro Plan Mini Irk Köpek',
+        'Pro Plan Small & Mini Puppy',
+      ],
+    );
+  });
+
+  test('product category Mini Irk Yavru maps to mini puppy table', () {
+    const brand = AppBrand(
+      id: 'pro-plan',
+      name: 'Pro Plan',
+      feeding: BrandFeedingGuide(
+        dogGrams: {'Mini': 110},
+        dogMiniPuppyGrams: {'4': 115},
+      ),
+    );
+    final match = FoodTrackingChoice.resolveFromProduct(
+      brandName: 'Pro Plan',
+      title: 'Pro Plan Mini',
+      mainCategory: 'dog',
+      category: 'Mini Irk Yavru',
+      brands: const [brand],
+    );
+    expect(match.variant, FeedingVariant.dogMiniPuppy);
+    expect(match.label, 'Pro Plan Small & Mini Puppy');
+  });
+
+  test('standard grams stay as-is for ideal orta adult cat', () {
+    const pet = PetData(
+      name: 'Milo',
+      species: 'Kedi',
+      ageRange: 'Yetişkin',
+      weight: '4 kg',
+      bodyType: 'İdeal',
+      activityLevel: 'Orta',
+    );
+    expect(
+      FeedingScale.apply(
+        standardGrams: 60,
+        pet: pet,
+        variant: FeedingVariant.catAdult,
+      ),
+      60,
+    );
+  });
+
+  test('high activity and young age scale standard grams', () {
+    const active = PetData(
+      name: 'Milo',
+      species: 'Kedi',
+      ageRange: 'Yetişkin',
+      weight: '4 kg',
+      bodyType: 'İdeal',
+      activityLevel: 'Yüksek',
+    );
+    expect(
+      FeedingScale.apply(
+        standardGrams: 60,
+        pet: active,
+        variant: FeedingVariant.catAdult,
+      ),
+      70,
+    );
+
+    const young = PetData(
+      name: 'Milo',
+      species: 'Kedi',
+      ageRange: 'Genç',
+      weight: '4 kg',
+      bodyType: 'İdeal',
+      activityLevel: 'Orta',
+    );
+    expect(
+      FeedingScale.apply(
+        standardGrams: 60,
+        pet: young,
+        variant: FeedingVariant.catAdult,
+      ),
+      65,
+    );
+  });
+
+  test('replacing dog adult keeps mini adult grams', () {
+    const guide = BrandFeedingGuide(
+      dogGrams: {'Mini': 110, 'Medium': 240},
+    );
+    final next = guide.replacing(
+      FeedingVariant.dogAdult,
+      grams: const {'Medium': 250, 'Maxi': 400},
+    );
+    expect(next.dogGrams['Mini'], 110);
+    expect(next.dogGrams['Medium'], 250);
+    expect(next.dogGrams['Maxi'], 400);
+  });
+
+  test('pro plan mini puppy table uses expected adult kg and age band', () {
+    const guide = BrandFeedingGuide(
+      dogMiniPuppyCells: ProPlanMiniPuppyGuide.cells,
+    );
+    expect(ProPlanMiniPuppyGuide.parseCell('30-45'), 38);
+    expect(ProPlanMiniPuppyGuide.parseCell('88'), 88);
+    expect(
+      guide.dailyGramsFor(
+        isDog: true,
+        isPuppy: true,
+        isMiniBreed: true,
+        weightLabel: '5 kg',
+        ageMonths: 4,
+      ),
+      128,
+    );
+    expect(
+      guide.dailyGramsFor(
+        isDog: true,
+        isPuppy: true,
+        isMiniBreed: true,
+        sizeLabel: 'Mini',
+        ageMonths: 12,
+      ),
+      132,
+    );
   });
 }

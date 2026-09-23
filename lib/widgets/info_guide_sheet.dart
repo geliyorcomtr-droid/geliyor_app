@@ -161,6 +161,7 @@ class InfoGuideSheet {
     required Widget Function(BuildContext sheetContext) builder,
     bool dismissOnContentTap = true,
     double? height,
+    double? maxWidth,
   }) {
     return showGeneralDialog<void>(
       context: context,
@@ -170,6 +171,10 @@ class InfoGuideSheet {
       pageBuilder: (sheetContext, animation, secondaryAnimation) {
         final media = MediaQuery.of(sheetContext);
         final panelH = height ?? panelHeight(media);
+        final panelW = (maxWidth ?? AppPageFrame.width).clamp(
+          0.0,
+          media.size.width,
+        );
         final verticalGap = ((media.size.height - panelH) / 2).clamp(
           24.0,
           media.size.height,
@@ -187,14 +192,14 @@ class InfoGuideSheet {
           child: Align(
             alignment: Alignment.center,
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: AppPageFrame.width),
+              constraints: BoxConstraints(maxWidth: panelW),
               child: Material(
                 color: AppColors.surface,
                 clipBehavior: Clip.antiAlias,
                 borderRadius: BorderRadius.circular(28),
                 child: SizedBox(
                   height: panelH,
-                  width: media.size.width,
+                  width: panelW,
                   child: panel,
                 ),
               ),

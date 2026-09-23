@@ -1,37 +1,21 @@
-/// Yetişkin kedi kuru mama tüketimi (g/gün).
-/// Sütunlar: vücut tipi × aktivite. Baz = İdeal + Orta.
+import 'package:geliyor_app/data/feeding_factors.dart';
+
+/// Yetişkin kedi kuru mama tüketimi — Excel: Temel Gram × çarpanlar.
+///
+/// Formül: Temel Gram × Kısır × Vücut × Aktivite × Ek Besin
+/// Sonuç temel tüketimin %75–%125 aralığında tutulur, en yakın grama yuvarlanır.
 class CatFeedingRow {
   const CatFeedingRow({
     required this.catKg,
     required this.baseGrams,
-    required this.thinLow,
-    required this.thinMid,
-    required this.thinHigh,
-    required this.idealLow,
-    required this.idealMid,
-    required this.idealHigh,
-    required this.heavyLow,
-    required this.heavyMid,
-    required this.heavyHigh,
   });
 
   final double catKg;
   final int baseGrams;
-  final int thinLow;
-  final int thinMid;
-  final int thinHigh;
-  final int idealLow;
-  final int idealMid;
-  final int idealHigh;
-  final int heavyLow;
-  final int heavyMid;
-  final int heavyHigh;
 
-  /// Varsayılan: İdeal + Orta (baz).
-  int get dailyGrams => idealMid;
+  int get dailyGrams => baseGrams;
 
-  String get catKgLabel =>
-      '${catKg.toStringAsFixed(1).replaceAll('.', ',')} kg';
+  String get catKgLabel => CatFeedingGuide.kgLabel(catKg);
 
   String get dailyLabel => '$dailyGrams g';
 
@@ -39,21 +23,19 @@ class CatFeedingRow {
 
   String get daysFor10kgLabel => '${daysForBagKg(10)} gün';
 
-  int gramsFor({String? bodyType, String? activityLevel}) {
-    final body = CatFeedingGuide.normalizeBody(bodyType);
-    final activity = CatFeedingGuide.normalizeActivity(activityLevel);
-    return switch ((body, activity)) {
-      ('Zayıf', 'Düşük') => thinLow,
-      ('Zayıf', 'Orta') => thinMid,
-      ('Zayıf', 'Yüksek') => thinHigh,
-      ('İdeal', 'Düşük') => idealLow,
-      ('İdeal', 'Orta') => idealMid,
-      ('İdeal', 'Yüksek') => idealHigh,
-      ('Kilolu', 'Düşük') => heavyLow,
-      ('Kilolu', 'Orta') => heavyMid,
-      ('Kilolu', 'Yüksek') => heavyHigh,
-      _ => idealMid,
-    };
+  int gramsFor({
+    String? bodyType,
+    String? activityLevel,
+    String? neutered,
+    String? extraFood,
+  }) {
+    return CatFeedingGuide.finalizeGrams(
+      baseGrams: baseGrams,
+      bodyType: bodyType,
+      activityLevel: activityLevel,
+      neutered: neutered,
+      extraFood: extraFood,
+    );
   }
 
   int daysForBagKg(double bagKg, {int? daily}) {
@@ -71,110 +53,54 @@ class CatFeedingRow {
 }
 
 abstract final class CatFeedingGuide {
+  /// Admin kaydı; boşsa Excel satırları kullanılır.
+  static Map<String, int> gramsOverride = const {};
+  static FeedingFactors factors = FeedingFactors.defaults;
+
   static const List<CatFeedingRow> rows = [
-    CatFeedingRow(
-      catKg: 2.0, baseGrams: 30,
-      thinLow: 30, thinMid: 35, thinHigh: 40,
-      idealLow: 25, idealMid: 30, idealHigh: 35,
-      heavyLow: 25, heavyMid: 25, heavyHigh: 30,
-    ),
-    CatFeedingRow(
-      catKg: 2.5, baseGrams: 40,
-      thinLow: 40, thinMid: 45, thinHigh: 50,
-      idealLow: 35, idealMid: 40, idealHigh: 45,
-      heavyLow: 30, heavyMid: 35, heavyHigh: 40,
-    ),
-    CatFeedingRow(
-      catKg: 3.0, baseGrams: 50,
-      thinLow: 50, thinMid: 55, thinHigh: 65,
-      idealLow: 45, idealMid: 50, idealHigh: 55,
-      heavyLow: 40, heavyMid: 40, heavyHigh: 50,
-    ),
-    CatFeedingRow(
-      catKg: 3.5, baseGrams: 55,
-      thinLow: 55, thinMid: 60, thinHigh: 70,
-      idealLow: 50, idealMid: 55, idealHigh: 65,
-      heavyLow: 40, heavyMid: 45, heavyHigh: 55,
-    ),
-    CatFeedingRow(
-      catKg: 4.0, baseGrams: 60,
-      thinLow: 60, thinMid: 65, thinHigh: 75,
-      idealLow: 55, idealMid: 60, idealHigh: 70,
-      heavyLow: 45, heavyMid: 50, heavyHigh: 60,
-    ),
-    CatFeedingRow(
-      catKg: 4.5, baseGrams: 65,
-      thinLow: 65, thinMid: 70, thinHigh: 80,
-      idealLow: 60, idealMid: 65, idealHigh: 75,
-      heavyLow: 50, heavyMid: 55, heavyHigh: 65,
-    ),
-    CatFeedingRow(
-      catKg: 5.0, baseGrams: 70,
-      thinLow: 70, thinMid: 75, thinHigh: 90,
-      idealLow: 65, idealMid: 70, idealHigh: 80,
-      heavyLow: 55, heavyMid: 60, heavyHigh: 70,
-    ),
-    CatFeedingRow(
-      catKg: 5.5, baseGrams: 75,
-      thinLow: 75, thinMid: 80, thinHigh: 95,
-      idealLow: 70, idealMid: 75, idealHigh: 85,
-      heavyLow: 55, heavyMid: 65, heavyHigh: 75,
-    ),
-    CatFeedingRow(
-      catKg: 6.0, baseGrams: 80,
-      thinLow: 80, thinMid: 90, thinHigh: 100,
-      idealLow: 70, idealMid: 80, idealHigh: 90,
-      heavyLow: 60, heavyMid: 70, heavyHigh: 80,
-    ),
-    CatFeedingRow(
-      catKg: 6.5, baseGrams: 85,
-      thinLow: 85, thinMid: 95, thinHigh: 110,
-      idealLow: 75, idealMid: 85, idealHigh: 100,
-      heavyLow: 65, heavyMid: 70, heavyHigh: 85,
-    ),
-    CatFeedingRow(
-      catKg: 7.0, baseGrams: 90,
-      thinLow: 90, thinMid: 100, thinHigh: 115,
-      idealLow: 80, idealMid: 90, idealHigh: 105,
-      heavyLow: 70, heavyMid: 75, heavyHigh: 90,
-    ),
-    CatFeedingRow(
-      catKg: 7.5, baseGrams: 95,
-      thinLow: 95, thinMid: 105, thinHigh: 120,
-      idealLow: 85, idealMid: 95, idealHigh: 110,
-      heavyLow: 75, heavyMid: 80, heavyHigh: 95,
-    ),
-    CatFeedingRow(
-      catKg: 8.0, baseGrams: 100,
-      thinLow: 100, thinMid: 110, thinHigh: 125,
-      idealLow: 90, idealMid: 100, idealHigh: 115,
-      heavyLow: 75, heavyMid: 85, heavyHigh: 100,
-    ),
-    CatFeedingRow(
-      catKg: 8.5, baseGrams: 100,
-      thinLow: 100, thinMid: 110, thinHigh: 125,
-      idealLow: 90, idealMid: 100, idealHigh: 115,
-      heavyLow: 75, heavyMid: 85, heavyHigh: 100,
-    ),
-    CatFeedingRow(
-      catKg: 9.0, baseGrams: 100,
-      thinLow: 100, thinMid: 110, thinHigh: 125,
-      idealLow: 90, idealMid: 100, idealHigh: 115,
-      heavyLow: 75, heavyMid: 85, heavyHigh: 100,
-    ),
-    CatFeedingRow(
-      catKg: 9.5, baseGrams: 105,
-      thinLow: 105, thinMid: 115, thinHigh: 135,
-      idealLow: 95, idealMid: 105, idealHigh: 120,
-      heavyLow: 80, heavyMid: 90, heavyHigh: 105,
-    ),
-    CatFeedingRow(
-      catKg: 10.0, baseGrams: 110,
-      thinLow: 110, thinMid: 120, thinHigh: 140,
-      idealLow: 100, idealMid: 110, idealHigh: 125,
-      heavyLow: 85, heavyMid: 95, heavyHigh: 110,
-    ),
+    CatFeedingRow(catKg: 2.0, baseGrams: 31),
+    CatFeedingRow(catKg: 2.5, baseGrams: 37),
+    CatFeedingRow(catKg: 3.0, baseGrams: 44),
+    CatFeedingRow(catKg: 3.5, baseGrams: 49),
+    CatFeedingRow(catKg: 4.0, baseGrams: 55),
+    CatFeedingRow(catKg: 4.5, baseGrams: 59),
+    CatFeedingRow(catKg: 5.0, baseGrams: 64),
+    CatFeedingRow(catKg: 5.5, baseGrams: 69),
+    CatFeedingRow(catKg: 6.0, baseGrams: 74),
+    CatFeedingRow(catKg: 6.5, baseGrams: 78),
+    CatFeedingRow(catKg: 7.0, baseGrams: 82),
+    CatFeedingRow(catKg: 7.5, baseGrams: 86),
+    CatFeedingRow(catKg: 8.0, baseGrams: 90),
+    CatFeedingRow(catKg: 9.0, baseGrams: 98),
+    CatFeedingRow(catKg: 10.0, baseGrams: 105),
   ];
+
+  static const weightLabels = [
+    '2 kg',
+    '2,5 kg',
+    '3 kg',
+    '3,5 kg',
+    '4 kg',
+    '4,5 kg',
+    '5 kg',
+    '5,5 kg',
+    '6 kg',
+    '6,5 kg',
+    '7 kg',
+    '7,5 kg',
+    '8 kg',
+    '9 kg',
+    '10 kg',
+    '10+ kg',
+  ];
+
+  static String kgLabel(double kg) {
+    if (kg > 10) return '10+ kg';
+    if (kg == kg.roundToDouble()) {
+      return '${kg.toInt()} kg';
+    }
+    return '${kg.toStringAsFixed(1).replaceAll('.', ',')} kg';
+  }
 
   static String normalizeBody(String? value) {
     final v = (value ?? '').toLowerCase();
@@ -196,11 +122,86 @@ abstract final class CatFeedingGuide {
     return '${normalizeBody(bodyType)} + ${normalizeActivity(activityLevel)}';
   }
 
+  static double bodyFactor(String? bodyType) {
+    return switch (normalizeBody(bodyType)) {
+      'Zayıf' => factors.bodyThin,
+      'Kilolu' => factors.bodyHeavy,
+      _ => factors.bodyIdeal,
+    };
+  }
+
+  static double activityFactor(String? activityLevel) {
+    return switch (normalizeActivity(activityLevel)) {
+      'Düşük' => factors.activityLow,
+      'Yüksek' => factors.activityHigh,
+      _ => factors.activityMid,
+    };
+  }
+
+  static double neuteredFactor(String? neutered) {
+    final v = (neutered ?? '').toLowerCase();
+    if (v == 'hayır' ||
+        v == 'hayir' ||
+        v.contains('değil') ||
+        v.contains('degil')) {
+      return factors.neuteredNo;
+    }
+    if (v == 'evet' || v.contains('kısır') || v.contains('kisir')) {
+      return factors.neuteredYes;
+    }
+    return factors.neuteredNo;
+  }
+
+  static double extraFoodFactor(String? extraFood) {
+    final v = (extraFood ?? '').toLowerCase();
+    if (v.contains('her ikisi')) return factors.extraBoth;
+    if (v.contains('yaş') || v.contains('yas')) return factors.extraWet;
+    if (v.contains('ödül') || v.contains('odul')) return factors.extraTreat;
+    return factors.extraNone;
+  }
+
+  static int finalizeGrams({
+    required int baseGrams,
+    String? bodyType,
+    String? activityLevel,
+    String? neutered,
+    String? extraFood,
+  }) {
+    if (baseGrams <= 0) return 0;
+    final raw = baseGrams *
+        neuteredFactor(neutered) *
+        bodyFactor(bodyType) *
+        activityFactor(activityLevel) *
+        extraFoodFactor(extraFood);
+    final lo = baseGrams * factors.clampLow;
+    final hi = baseGrams * factors.clampHigh;
+    return raw.clamp(lo, hi).round();
+  }
+
+  static List<CatFeedingRow> get liveRows {
+    if (gramsOverride.isEmpty) return rows;
+    return [
+      for (final row in rows)
+        CatFeedingRow(
+          catKg: row.catKg,
+          baseGrams: gramsOverride[row.catKgLabel] ?? row.baseGrams,
+        ),
+    ];
+  }
+
   static CatFeedingRow lookup(double catKg) {
-    final clamped = catKg.clamp(rows.first.catKg, rows.last.catKg);
-    CatFeedingRow best = rows.first;
+    final table = liveRows;
+    if (catKg > 10) {
+      final plus = gramsOverride['10+ kg'];
+      if (plus != null && plus > 0) {
+        return CatFeedingRow(catKg: 10.5, baseGrams: plus);
+      }
+      return table.last;
+    }
+    final clamped = catKg.clamp(table.first.catKg, table.last.catKg);
+    CatFeedingRow best = table.first;
     var bestDelta = (best.catKg - clamped).abs();
-    for (final row in rows.skip(1)) {
+    for (final row in table.skip(1)) {
       final delta = (row.catKg - clamped).abs();
       if (delta < bestDelta) {
         best = row;
@@ -210,25 +211,46 @@ abstract final class CatFeedingGuide {
     return best;
   }
 
-  /// Dost Ekle kilo etiketinden ("2-3 kg", "4,5 kg") satır üretir.
   static CatFeedingRow? fromWeightLabel(String? label) {
+    final text = label ?? '';
+    if (text.contains('+') || text.contains('>')) {
+      final plus = gramsOverride['10+ kg'];
+      if (plus != null && plus > 0) {
+        return CatFeedingRow(catKg: 10.5, baseGrams: plus);
+      }
+    }
     final kg = kgFromLabel(label);
     if (kg == null) return null;
     return lookup(kg);
+  }
+
+  static String nearestWeightLabel(String? label) {
+    final kg = kgFromLabel(label);
+    if (kg == null) return weightLabels.first;
+    if ((label ?? '').contains('+') || kg > 10) return '10+ kg';
+    return lookup(kg).catKgLabel;
   }
 
   static int? dailyGramsFor({
     String? weightLabel,
     String? bodyType,
     String? activityLevel,
+    String? neutered,
+    String? extraFood,
   }) {
     final row = fromWeightLabel(weightLabel);
     if (row == null) return null;
-    return row.gramsFor(bodyType: bodyType, activityLevel: activityLevel);
+    return row.gramsFor(
+      bodyType: bodyType,
+      activityLevel: activityLevel,
+      neutered: neutered,
+      extraFood: extraFood,
+    );
   }
 
   static double? kgFromLabel(String? label) {
     if (label == null || label.trim().isEmpty) return null;
+    if (label.contains('+') || label.contains('>')) return 10.0;
     final numbers = RegExp(r'(\d+(?:[.,]\d+)?)')
         .allMatches(label)
         .map((m) => double.tryParse(m.group(1)!.replaceAll(',', '.')))

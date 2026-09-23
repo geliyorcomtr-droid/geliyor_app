@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geliyor_app/data/turkey_locations.dart';
@@ -53,6 +55,9 @@ class _AddressesScreenState extends State<AddressesScreen> {
 
   List<AddressData> get _addresses => AddressStore.instance.addresses;
 
+  Timer? _addressHoldTimer;
+  bool _addressHoldCompleted = false;
+
   @override
   void initState() {
     super.initState();
@@ -61,6 +66,7 @@ class _AddressesScreenState extends State<AddressesScreen> {
 
   @override
   void dispose() {
+    _addressHoldTimer?.cancel();
     AddressStore.instance.removeListener(_onStoreChanged);
     _titleController.dispose();
     _contactController.dispose();
@@ -68,6 +74,39 @@ class _AddressesScreenState extends State<AddressesScreen> {
     _nationalIdController.dispose();
     _taxOfficeController.dispose();
     super.dispose();
+  }
+
+  void _onAddressPressDown(AddressData address) {
+    _addressHoldCompleted = false;
+    _addressHoldTimer?.cancel();
+    _addressHoldTimer = Timer(const Duration(milliseconds: 1500), () {
+      if (!mounted) return;
+      _addressHoldCompleted = true;
+      HapticFeedback.mediumImpact();
+      if (!address.isDefault) {
+        unawaited(_setDefault(address.id));
+      }
+    });
+  }
+
+  void _onAddressPressUp() {
+    _addressHoldTimer?.cancel();
+    _addressHoldTimer = null;
+  }
+
+  void _onAddressPressCancel() {
+    _addressHoldTimer?.cancel();
+    _addressHoldTimer = null;
+    _addressHoldCompleted = false;
+  }
+
+  void _onAddressTap(AddressData address) {
+    if (_addressHoldCompleted) return;
+    if (widget.selectForDelivery) {
+      _pickAddress(address);
+      return;
+    }
+    _openEditForm(address);
   }
 
   void _onStoreChanged() {
@@ -1203,27 +1242,21 @@ class _AddressesScreenState extends State<AddressesScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
-              child: widget.selectForDelivery
-                  ? InkWell(
-                      onTap: () => _pickAddress(address),
-                      borderRadius: BorderRadius.circular(18),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildAddressIconBox(address),
-                          const SizedBox(width: 10),
-                          Expanded(child: _buildAddressCardBody(address)),
-                        ],
-                      ),
-                    )
-                  : Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildAddressIconBox(address),
-                        const SizedBox(width: 10),
-                        Expanded(child: _buildAddressCardBody(address)),
-                      ],
-                    ),
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTapDown: (_) => _onAddressPressDown(address),
+                onTapUp: (_) => _onAddressPressUp(),
+                onTapCancel: _onAddressPressCancel,
+                onTap: () => _onAddressTap(address),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildAddressIconBox(address),
+                    const SizedBox(width: 10),
+                    Expanded(child: _buildAddressCardBody(address)),
+                  ],
+                ),
+              ),
             ),
             _buildMoreButton(address),
           ],

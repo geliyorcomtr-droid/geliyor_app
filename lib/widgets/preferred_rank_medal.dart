@@ -8,10 +8,12 @@ class PreferredRankMedal extends StatelessWidget {
   const PreferredRankMedal({
     super.key,
     required this.rank,
+    this.imagePath,
     this.errorWidget,
   });
 
   final String rank;
+  final String? imagePath;
   final Widget? errorWidget;
 
   static const Size _assetSize = Size(1024, 1024);
@@ -61,6 +63,12 @@ class PreferredRankMedal extends StatelessWidget {
               size: innerSize * 1.4,
               color: AppColors.warning,
             );
+        final medalPath = () {
+          final custom = imagePath?.trim() ?? '';
+          return custom.isNotEmpty
+              ? custom
+              : TrustBadgeRepository.preferredIconPath;
+        }();
 
         final cornerRadius = dest.width * 0.42;
         return ClipRRect(
@@ -74,7 +82,7 @@ class PreferredRankMedal extends StatelessWidget {
               Positioned.fromRect(
                 rect: dest,
                 child: buildProductImage(
-                  TrustBadgeRepository.preferredIconPath,
+                  medalPath,
                   fit: BoxFit.fill,
                   width: dest.width,
                   height: dest.height,

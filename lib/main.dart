@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geliyor_app/app_navigator.dart';
 import 'package:geliyor_app/data/brand_repository.dart';
+import 'package:geliyor_app/data/system_feeding_repository.dart';
 import 'package:geliyor_app/firebase_options.dart';
 import 'package:geliyor_app/screens/login_screen.dart';
 import 'package:geliyor_app/screens/splash_screen.dart';
 import 'package:geliyor_app/services/food_reminder_sync.dart';
+import 'package:geliyor_app/services/network_reconnect.dart';
 import 'package:geliyor_app/services/push_service.dart';
 import 'package:geliyor_app/services/user_profile_sync.dart';
 import 'package:geliyor_app/state/health_calendar_store.dart';
@@ -23,10 +25,12 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
   await PushService.instance.start();
+  NetworkReconnect.instance.start();
   UserProfileSync.start();
   FoodReminderSync.start();
   HealthCalendarStore.start();
   BrandRepository.instance.startListening();
+  SystemFeedingRepository.instance.startListening();
   LoginGate.openLogin = (context) async {
     final result = await Navigator.of(context).push<bool>(
       MaterialPageRoute(

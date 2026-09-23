@@ -1,7 +1,6 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
-import 'package:geliyor_app/admin/screens/admin_brand_feeding_dialog.dart';
 import 'package:geliyor_app/data/brand_feeding_guide.dart';
 import 'package:geliyor_app/data/brand_repository.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
@@ -383,7 +382,6 @@ class _AdminBrandsScreenState extends State<AdminBrandsScreen> {
                   DataColumn(label: Text('Marka Adı')),
                   DataColumn(label: Text('Sıra No')),
                   DataColumn(label: Text('Yayın Durumu')),
-                  DataColumn(label: Text('Tüketim (g)')),
                   DataColumn(label: Text('İşlem')),
                 ],
                 rows: [
@@ -436,35 +434,9 @@ class _AdminBrandsScreenState extends State<AdminBrandsScreen> {
                           ),
                         ),
                         DataCell(
-                          TextButton(
-                            onPressed: () =>
-                                showAdminBrandFeedingDialog(context, brand),
-                            child: Text(
-                              brand.feeding.isEmpty
-                                  ? 'Gir'
-                                  : '${brand.feeding.filledCatCount() + brand.feeding.filledCatKittenCount()} kedi / ${brand.feeding.filledDogCount() + brand.feeding.filledDogPuppyCount()} köpek',
-                              style: TextStyle(
-                                color: brand.feeding.isEmpty
-                                    ? AppColors.subText
-                                    : AppColors.primary,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                        ),
-                        DataCell(
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              IconButton(
-                                tooltip: 'Tüketim gramajı',
-                                onPressed: () =>
-                                    showAdminBrandFeedingDialog(context, brand),
-                                icon: const Icon(
-                                  Icons.scale_outlined,
-                                  size: 19,
-                                ),
-                              ),
                               IconButton(
                                 tooltip: 'Görsel Ekle / Değiştir',
                                 onPressed: _uploading

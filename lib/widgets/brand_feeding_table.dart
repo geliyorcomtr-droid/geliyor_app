@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:geliyor_app/data/brand_feeding_guide.dart';
 import 'package:geliyor_app/data/dog_feeding_guide.dart';
+import 'package:geliyor_app/data/feeding_scale.dart';
+import 'package:geliyor_app/data/feeding_variant.dart';
+import 'package:geliyor_app/data/pro_plan_mini_puppy_guide.dart';
+import 'package:geliyor_app/state/pet_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 
 class BrandFeedingTableCard extends StatefulWidget {
@@ -11,6 +15,8 @@ class BrandFeedingTableCard extends StatefulWidget {
     required this.isDog,
     this.isPuppy = false,
     this.isMiniBreed = false,
+    this.variant,
+    this.pet,
     this.highlightWeight,
     this.highlightSize,
     this.highlightMonths,
@@ -21,6 +27,8 @@ class BrandFeedingTableCard extends StatefulWidget {
   final bool isDog;
   final bool isPuppy;
   final bool isMiniBreed;
+  final FeedingVariant? variant;
+  final PetData? pet;
   final String? highlightWeight;
   final String? highlightSize;
   final int? highlightMonths;
@@ -32,9 +40,29 @@ class BrandFeedingTableCard extends StatefulWidget {
 class _BrandFeedingTableCardState extends State<BrandFeedingTableCard> {
   bool _expanded = true;
 
+  FeedingVariant get _variant =>
+      widget.variant ??
+      FeedingVariant.resolve(
+        isDog: widget.isDog,
+        isPuppy: widget.isPuppy,
+        isMiniBreed: widget.isMiniBreed,
+      );
+
+  int _displayGrams(int standard) {
+    final pet = widget.pet;
+    if (pet == null || standard <= 0) return standard;
+    return FeedingScale.apply(
+      standardGrams: standard,
+      pet: pet,
+      variant: _variant,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final rows = widget.isPuppy ? _monthRows() : (widget.isDog ? _dogRows() : _catRows());
+    final rows = _variant.isPuppy
+        ? _monthRows()
+        : (_variant.isDog ? _dogRows() : _catRows());
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
@@ -123,14 +151,7 @@ class _BrandFeedingTableCardState extends State<BrandFeedingTableCard> {
     );
   }
 
-  String _titleSuffix() {
-    if (widget.isPuppy && widget.isDog && widget.isMiniBreed) {
-      return 'mini ırk yavru tüketimi';
-    }
-    if (widget.isPuppy && widget.isDog) return 'yavru köpek tüketimi';
-    if (widget.isPuppy) return 'yavru kedi tüketimi';
-    return widget.isDog ? 'köpek tüketimi' : 'kedi tüketimi';
-  }
+  String _titleSuffix() => '${_variant.shortLabel} tüketimi';
 
   List<({String label, int grams, bool highlight})> _catRows() {
     final matchKey = widget.feeding.closestCatKey(widget.highlightWeight);
@@ -139,33 +160,43 @@ class _BrandFeedingTableCardState extends State<BrandFeedingTableCard> {
         if ((widget.feeding.catGrams[BrandFeedingGuide.catKey(kg)] ?? 0) > 0)
           (
             label: '${kg.toStringAsFixed(1).replaceAll('.', ',')} kg',
-            grams: widget.feeding.catGrams[BrandFeedingGuide.catKey(kg)]!,
+            grams: _displayGrams(
+              widget.feeding.catGrams[BrandFeedingGuide.catKey(kg)]!,
+            ),
             highlight: matchKey == BrandFeedingGuide.catKey(kg),
           ),
     ];
   }
 
   List<({String label, int grams, bool highlight})> _dogRows() {
+    final sizes = _variant.isMini
+        ? BrandFeedingGuide.dogMiniAdultSizes
+        : BrandFeedingGuide.dogAdultSizes;
     final size = DogFeedingGuide.fromSizeLabel(
-          widget.isMiniBreed ? 'Mini' : widget.highlightSize,
+          _variant.isMini ? 'Mini' : widget.highlightSize,
         )?.size;
     return [
       for (final row in DogFeedingGuide.rows)
-        if ((widget.feeding.dogGrams[row.size] ?? 0) > 0)
+        if (sizes.contains(row.size) &&
+            (widget.feeding.dogGrams[row.size] ?? 0) > 0)
           (
             label: '${row.size} · ${row.weightLabel}',
-            grams: widget.feeding.dogGrams[row.size]!,
+            grams: _displayGrams(widget.feeding.dogGrams[row.size]!),
             highlight: size == row.size,
           ),
     ];
   }
 
   List<({String label, int grams, bool highlight})> _monthRows() {
-    final source = widget.isDog
-        ? (widget.isMiniBreed
-            ? widget.feeding.dogMiniPuppyGrams
-            : widget.feeding.dogPuppyGrams)
-        : widget.feeding.catKittenGrams;
+    if (_variant == FeedingVariant.dogMiniPuppy &&
+        widget.feeding.hasMiniPuppyTable) {
+      return _miniPuppyRows();
+    }
+    final source = switch (_variant) {
+      FeedingVariant.dogMiniPuppy => widget.feeding.dogMiniPuppyGrams,
+      FeedingVariant.dogPuppy => widget.feeding.dogPuppyGrams,
+      _ => widget.feeding.catKittenGrams,
+    };
     final matchKey = widget.feeding.closestMonthKey(
       source,
       widget.highlightMonths,
@@ -175,8 +206,38 @@ class _BrandFeedingTableCardState extends State<BrandFeedingTableCard> {
         if ((source[BrandFeedingGuide.monthKey(months)] ?? 0) > 0)
           (
             label: '$months ay',
-            grams: source[BrandFeedingGuide.monthKey(months)]!,
+            grams: _displayGrams(
+              source[BrandFeedingGuide.monthKey(months)]!,
+            ),
             highlight: matchKey == BrandFeedingGuide.monthKey(months),
+          ),
+    ];
+  }
+
+  List<({String label, int grams, bool highlight})> _miniPuppyRows() {
+    final kg = BrandFeedingGuide.expectedAdultKg(
+      weightLabel: widget.highlightWeight,
+      sizeLabel: widget.highlightSize,
+    );
+    final rowKey = widget.feeding.closestMiniPuppyKgKey(kg);
+    final row = rowKey == null ? null : widget.feeding.dogMiniPuppyCells[rowKey];
+    if (row == null) return const [];
+    final band = ProPlanMiniPuppyGuide.ageBandForMonths(widget.highlightMonths);
+    return [
+      for (var i = 0; i < ProPlanMiniPuppyGuide.ageBands.length; i++)
+        if (ProPlanMiniPuppyGuide.parseCell(
+              row[ProPlanMiniPuppyGuide.ageBands[i]],
+            ) >
+            0)
+          (
+            label:
+                '${rowKey} kg · ${ProPlanMiniPuppyGuide.ageBandLabels[i]}',
+            grams: _displayGrams(
+              ProPlanMiniPuppyGuide.parseCell(
+                row[ProPlanMiniPuppyGuide.ageBands[i]],
+              ),
+            ),
+            highlight: ProPlanMiniPuppyGuide.ageBands[i] == band,
           ),
     ];
   }

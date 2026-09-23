@@ -45,7 +45,14 @@ class PetData {
     return url.isNotEmpty;
   }
 
-  /// Kısa yaş etiketi (ör. "Genç").
+  bool get canTrackFood {
+    if (name.trim().isEmpty || species.trim().isEmpty) return false;
+    final isCat = species.toLowerCase().contains('kedi');
+    if (isCat) return (weight ?? '').trim().isNotEmpty;
+    return (ageRange ?? '').trim().isNotEmpty;
+  }
+
+  /// Kısa yaş etiketi (ör. "Yetişkin").
   String get shortAge {
     final range = ageRange;
     if (range == null || range.isEmpty) return '-';

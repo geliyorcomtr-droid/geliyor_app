@@ -178,6 +178,10 @@ class ProductRepository {
       preferredRank: product.preferredRank,
       repurchaseRate: product.repurchaseRate,
       barcode: product.barcode.trim(),
+      gallery: [
+        for (final url in product.gallery)
+          if (url.trim().isNotEmpty) url.trim(),
+      ],
     );
   }
 }

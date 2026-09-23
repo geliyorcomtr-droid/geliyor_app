@@ -103,7 +103,7 @@ class TrustBadgeRepository {
       return 'Çok Satan Ürün';
     }
     if (id == proteinBadgeId || name.contains('protein')) {
-      return 'Protein İçerir';
+      return badge.name.trim().isEmpty ? 'Protein Değeri' : badge.name;
     }
     if (id == repurchaseBadgeId || name.contains('tekrar')) {
       return 'Tekrar Alım';
@@ -183,6 +183,30 @@ class TrustBadgeRepository {
         name.contains('tekrar alim');
   }
 
+  static bool isPreferredBadge(AppTrustBadge badge) {
+    final id = badge.id.toLowerCase();
+    final name = badge.name.toLowerCase();
+    return id == 'en-cok-tercih' ||
+        name.contains('en çok tercih') ||
+        name.contains('en cok tercih') ||
+        name.contains('çok satan') ||
+        name.contains('cok satan') ||
+        name.contains('tercih ürün') ||
+        name.contains('tercih urun');
+  }
+
+  static String displayImageUrl(AppTrustBadge badge) => badge.imageUrl.trim();
+
+  static String displayAssetPath(AppTrustBadge badge) {
+    final asset = badge.assetPath.trim();
+    if (asset.isNotEmpty) return asset;
+    if (isPreferredBadge(badge)) return preferredIconPath;
+    if (isRepurchaseBadge(badge)) return repurchaseIconPath;
+    if (isAffordableBadge(badge)) return affordableIconPath;
+    if (isProteinBadge(badge)) return proteinIconPath;
+    return '';
+  }
+
   final CollectionReference<Map<String, dynamic>> _collection =
       FirebaseFirestore.instance.collection(FirestoreCollections.trustBadges);
 
@@ -234,17 +258,11 @@ class TrustBadgeRepository {
       final preferredDoc = existingById[preferredId];
       if (preferredDoc != null) {
         final data = preferredDoc.data();
-        final assetPath =
-            (data[TrustBadgeFields.assetPath] as String?) ?? '';
-        final currentName = (data[TrustBadgeFields.name] as String?) ?? '';
-        final needsIcon =
-            assetPath.isEmpty ||
-            assetPath.endsWith('/akilli_oneri.png') ||
-            !assetPath.endsWith('/tercih_urun.png');
-        final needsRename = currentName != 'Çok Satan Ürün';
-        if (needsIcon || needsRename) {
+        if (_needsDefaultIcon(
+          data,
+          staleAssetSuffixes: const ['/akilli_oneri.png'],
+        )) {
           batch.set(_collection.doc(preferredId), {
-            TrustBadgeFields.name: 'Çok Satan Ürün',
             TrustBadgeFields.assetPath: preferredIconPath,
             TrustBadgeFields.updatedAt: FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
@@ -259,20 +277,12 @@ class TrustBadgeRepository {
         );
         batch.set(_collection.doc(repurchase.id), repurchase.toMap());
         hasWrites = true;
-      } else {
-        final data = repurchaseDoc.data();
-        final assetPath =
-            (data[TrustBadgeFields.assetPath] as String?) ?? '';
-        final needsIcon =
-            assetPath.isEmpty || !assetPath.endsWith('/tekrar_alim.png');
-        if (needsIcon) {
-          batch.set(_collection.doc(repurchaseBadgeId), {
-            TrustBadgeFields.name: 'Tekrar Alım',
-            TrustBadgeFields.assetPath: repurchaseIconPath,
-            TrustBadgeFields.updatedAt: FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
-          hasWrites = true;
-        }
+      } else if (_needsDefaultIcon(repurchaseDoc.data())) {
+        batch.set(_collection.doc(repurchaseBadgeId), {
+          TrustBadgeFields.assetPath: repurchaseIconPath,
+          TrustBadgeFields.updatedAt: FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+        hasWrites = true;
       }
 
       final affordableDoc = existingById[affordableBadgeId];
@@ -282,37 +292,12 @@ class TrustBadgeRepository {
         );
         batch.set(_collection.doc(affordable.id), affordable.toMap());
         hasWrites = true;
-      } else {
-        final data = affordableDoc.data();
-        final assetPath =
-            (data[TrustBadgeFields.assetPath] as String?) ?? '';
-        final needsIcon =
-            assetPath.isEmpty || !assetPath.endsWith('/uygun_fiyat.png');
-        if (needsIcon) {
-          batch.set(_collection.doc(affordableBadgeId), {
-            TrustBadgeFields.name: 'Uygun Fiyat',
-            TrustBadgeFields.assetPath: affordableIconPath,
-            TrustBadgeFields.updatedAt: FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
-          hasWrites = true;
-        }
-      }
-
-      // Puan rozeti: PNG kaldırıldı, uygulamada sarı yıldız kullanılır.
-      final ratingDoc = existingById[ratingBadgeId];
-      if (ratingDoc != null) {
-        final data = ratingDoc.data();
-        final assetPath =
-            (data[TrustBadgeFields.assetPath] as String?) ?? '';
-        final imageUrl = (data[TrustBadgeFields.imageUrl] as String?) ?? '';
-        if (assetPath.isNotEmpty || imageUrl.isNotEmpty) {
-          batch.set(_collection.doc(ratingBadgeId), {
-            TrustBadgeFields.assetPath: '',
-            TrustBadgeFields.imageUrl: '',
-            TrustBadgeFields.updatedAt: FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
-          hasWrites = true;
-        }
+      } else if (_needsDefaultIcon(affordableDoc.data())) {
+        batch.set(_collection.doc(affordableBadgeId), {
+          TrustBadgeFields.assetPath: affordableIconPath,
+          TrustBadgeFields.updatedAt: FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+        hasWrites = true;
       }
 
       if (hasWrites) await batch.commit();
@@ -320,6 +305,19 @@ class TrustBadgeRepository {
       if (error.code == 'permission-denied') return;
       rethrow;
     }
+  }
+
+  static bool _needsDefaultIcon(
+    Map<String, dynamic>? data, {
+    List<String> staleAssetSuffixes = const [],
+  }) {
+    if (data == null) return true;
+    final imageUrl = ((data[TrustBadgeFields.imageUrl] as String?) ?? '').trim();
+    if (imageUrl.isNotEmpty) return false;
+    final assetPath =
+        ((data[TrustBadgeFields.assetPath] as String?) ?? '').trim();
+    if (assetPath.isEmpty) return true;
+    return staleAssetSuffixes.any(assetPath.endsWith);
   }
 
   Future<void> save(AppTrustBadge badge) {

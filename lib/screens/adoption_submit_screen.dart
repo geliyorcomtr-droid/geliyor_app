@@ -1134,16 +1134,18 @@ class _AdoptionSubmitScreenState extends State<AdoptionSubmitScreen> {
                 ),
               ),
               const SizedBox(height: 2),
-              Text(
-                AdoptionCategories.label(id),
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  height: 1.1,
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  AdoptionCategories.label(id),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    height: 1.1,
+                  ),
                 ),
               ),
               Text(

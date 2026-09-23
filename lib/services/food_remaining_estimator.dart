@@ -1,9 +1,7 @@
-import 'package:geliyor_app/data/cat_feeding_guide.dart';
-import 'package:geliyor_app/data/dog_feeding_guide.dart';
+import 'package:geliyor_app/data/feeding_variant.dart';
 import 'package:geliyor_app/data/food_tracking_choices.dart';
-import 'package:geliyor_app/data/kitten_feeding_guide.dart';
+import 'package:geliyor_app/data/pet_consumption.dart';
 import 'package:geliyor_app/data/pet_life_stage.dart';
-import 'package:geliyor_app/data/puppy_feeding_guide.dart';
 import 'package:geliyor_app/state/food_tracking_store.dart';
 import 'package:geliyor_app/state/order_store.dart';
 import 'package:geliyor_app/state/pet_store.dart';
@@ -68,9 +66,6 @@ abstract final class FoodRemainingEstimator {
       final pets = sharingPetsFor(seed);
       final dailyGrams = sharedDailyGrams(
         pets,
-        foodId: tracking.foodId,
-        foodIsPuppy: tracking.isPuppy,
-        foodIsMini: tracking.isMiniBreed,
         profileFor: seed,
         profile: tracking.lifeProfile,
       );
@@ -91,13 +86,7 @@ abstract final class FoodRemainingEstimator {
     if (orderMatch == null) return null;
     final food = orderMatch.$1;
     final pets = sharingPetsFor(orderMatch.$2);
-    final match = foodIdFromOrder(food);
-    final dailyGrams = sharedDailyGrams(
-      pets,
-      foodId: match.id,
-      foodIsPuppy: match.isPuppy,
-      foodIsMini: match.isMiniBreed,
-    );
+    final dailyGrams = sharedDailyGrams(pets);
     if (dailyGrams <= 0) return null;
 
     final bagKg = kgFromLabel(food.weight) * food.quantity;
@@ -172,6 +161,7 @@ abstract final class FoodRemainingEstimator {
     String foodId = '',
     bool? foodIsPuppy,
     bool? foodIsMini,
+    FeedingVariant? foodVariant,
     PetData? profileFor,
     PetLifeStageProfile? profile,
   }) {
@@ -185,6 +175,7 @@ abstract final class FoodRemainingEstimator {
         foodId: foodId,
         foodIsPuppy: foodIsPuppy,
         foodIsMini: foodIsMini,
+        foodVariant: foodVariant,
         profile: useProfile,
       );
     }
@@ -310,57 +301,9 @@ abstract final class FoodRemainingEstimator {
     PetLifeStageProfile? profile,
     bool? foodIsPuppy,
     bool? foodIsMini,
+    FeedingVariant? foodVariant,
   }) {
-    final inferred = PetLifeStageProfile(
-      isPuppy: PetLifeStage.inferIsPuppy(ageRange: pet.ageRange),
-      isMiniBreed: PetLifeStage.inferIsMini(ageRange: pet.ageRange),
-      ageMonths: PetLifeStage.monthsFromLabel(pet.ageRange) ??
-          profile?.ageMonths ??
-          4,
-    );
-    final life = PetLifeStageProfile(
-      isPuppy: foodIsPuppy ?? profile?.isPuppy ?? inferred.isPuppy,
-      isMiniBreed: foodIsMini ?? profile?.isMiniBreed ?? inferred.isMiniBreed,
-      ageMonths: profile?.ageMonths ?? inferred.ageMonths,
-    );
-    final branded = FoodTrackingChoice.brandDailyGrams(
-      foodId: foodId,
-      pet: pet,
-      profile: life,
-      foodIsPuppy: life.isPuppy,
-      foodIsMini: life.isMiniBreed,
-    );
-    if (branded != null && branded > 0) return branded;
-    if (!life.isPuppy &&
-        pet.dailyFoodGrams != null &&
-        pet.dailyFoodGrams! > 0) {
-      return pet.dailyFoodGrams!;
-    }
-    final isDog = pet.species.toLowerCase().contains('köpek') ||
-        pet.species.toLowerCase().contains('kopek');
-    if (life.isPuppy) {
-      if (isDog) {
-        return PuppyFeedingGuide.dailyGramsFor(
-              life.ageMonths,
-              isMini: life.isMiniBreed,
-            ) ??
-            0;
-      }
-      return KittenFeedingGuide.dailyGramsFor(life.ageMonths) ?? 0;
-    }
-    if (isDog) {
-      return DogFeedingGuide.dailyGramsFor(
-            sizeLabel: life.isMiniBreed ? 'Mini' : pet.ageRange,
-            activityLevel: pet.activityLevel,
-          ) ??
-          0;
-    }
-    return CatFeedingGuide.dailyGramsFor(
-          weightLabel: pet.weight,
-          bodyType: pet.bodyType,
-          activityLevel: pet.activityLevel,
-        ) ??
-        0;
+    return PetConsumption.dailyGrams(pet) ?? pet.dailyFoodGrams ?? 0;
   }
 
   static DateTime _dateOnly(DateTime value) {

@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:geliyor_app/data/brand_feeding_guide.dart';
+import 'package:geliyor_app/data/feeding_variant.dart';
 import 'package:geliyor_app/data/firestore_collections.dart';
+import 'package:geliyor_app/data/pro_plan_mini_puppy_guide.dart';
 
 class AppBrand {
   const AppBrand({
@@ -28,6 +30,13 @@ class AppBrand {
     final url = imageUrl.trim();
     if (url.isNotEmpty) return url;
     return assetPath.trim();
+  }
+
+  /// Mama takibi: Pro Plan mini yavru tablosu üretici verisiyle her zaman hazır.
+  BrandFeedingGuide get trackingFeeding {
+    if (!BrandRepository.isProPlanName(name)) return feeding;
+    if (feeding.hasMiniPuppyTable) return feeding;
+    return feeding.copyWith(dogMiniPuppyCells: ProPlanMiniPuppyGuide.cells);
   }
 
   factory AppBrand.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
@@ -196,9 +205,38 @@ class BrandRepository extends ChangeNotifier {
   List<AppBrand> get cached => _cached;
 
   /// Mama takibi: yalnızca aktif ve gramajı girilmiş markalar.
+  /// Adında yavru geçen kayıtlar ayrı marka değildir; ana markanın tablosudur.
   List<AppBrand> get feedingChoices => _cached
-      .where((brand) => brand.active && !brand.feeding.isEmpty)
+      .where(
+        (brand) =>
+            brand.active &&
+            !brand.trackingFeeding.isEmpty &&
+            !isYavruLabeled(brand) &&
+            !isProductLineDuplicate(brand),
+      )
       .toList(growable: false);
+
+  /// "Pro Plan Yavru" gibi yaşam evresi adı taşıyan marka kopyaları.
+  static bool isYavruLabeled(AppBrand brand) => isYavruLabeledName(brand.name);
+
+  static bool isYavruLabeledName(String name) {
+    final title = _normalize(name).replaceAll('ı', 'i').replaceAll('İ', 'i');
+    return title.endsWith(' yavru') ||
+        title.endsWith(' kitten') ||
+        title.contains(' yavru ');
+  }
+
+  static bool isProPlanName(String name) {
+    return FeedingVariant.isProPlanName(name);
+  }
+
+  /// "Pro Plan Small & Mini Puppy" ayrı marka olarak listelenmez; Pro Plan seçeneğidir.
+  static bool isProductLineDuplicate(AppBrand brand) {
+    final title = _normalize(brand.name).replaceAll('ı', 'i').replaceAll('İ', 'i');
+    return isProPlanName(brand.name) &&
+        title.contains('mini') &&
+        (title.contains('puppy') || title.contains('yavru'));
+  }
 
   void startListening() {
     if (_listening) return;
@@ -243,7 +281,8 @@ class BrandRepository extends ChangeNotifier {
     );
   }
 
-  /// En uzun marka adı kazanır: "Pro Plan Yavru" > "Pro Plan".
+  /// En uzun marka adı kazanır. Yavru ibreli kopyalar atlanır;
+  /// yavru tablosu ana markanın varyantından seçilir.
   static String? matchId(
     List<AppBrand> brands, {
     String? brandName,
@@ -256,6 +295,8 @@ class BrandRepository extends ChangeNotifier {
     AppBrand? best;
     for (final brand in brands) {
       if (!brand.active) continue;
+      if (isYavruLabeled(brand)) continue;
+      if (isProductLineDuplicate(brand)) continue;
       final name = _normalize(brand.name);
       if (name.length < 3) continue;
       final compactName = _compact(name);
@@ -271,6 +312,7 @@ class BrandRepository extends ChangeNotifier {
     final named = _normalize(brandName ?? '');
     if (named.isEmpty) return null;
     for (final brand in brands) {
+      if (isYavruLabeled(brand)) continue;
       if (_normalize(brand.name) == named) return brand.id;
     }
     return null;
@@ -312,6 +354,34 @@ class BrandRepository extends ChangeNotifier {
         writes++;
       }
       if (writes > 0) await batch.commit();
+      await ensureProPlanMiniPuppyTable();
+    } catch (_) {}
+  }
+
+  /// Pro Plan Small & Mini Puppy üretici tablosunu mini ırk yavruya yazar.
+  Future<void> ensureProPlanMiniPuppyTable() async {
+    try {
+      final snapshot = await _collection.get();
+      for (final doc in snapshot.docs) {
+        if (!_isBrandDoc(doc)) continue;
+        final brand = AppBrand.fromDoc(doc);
+        if (isYavruLabeled(brand)) continue;
+        final name = _normalize(brand.name).replaceAll('ı', 'i');
+        if (!name.contains('pro plan') && brand.id != 'pro-plan') continue;
+        if (ProPlanMiniPuppyGuide.sameAsOfficial(
+          brand.feeding.dogMiniPuppyCells,
+        )) {
+          continue;
+        }
+        await saveFeeding(
+          brand.copyWith(
+            feeding: brand.feeding.copyWith(
+              dogMiniPuppyCells: ProPlanMiniPuppyGuide.cells,
+              dogMiniPuppyGrams: const {},
+            ),
+          ),
+        );
+      }
     } catch (_) {}
   }
 
@@ -332,6 +402,20 @@ class BrandRepository extends ChangeNotifier {
   }
 
   Future<void> delete(String id) => _collection.doc(id).delete();
+
+  /// Mama tüketim listesindeki "… Yavru" marka kopyalarını siler.
+  Future<int> deleteYavruLabeledBrands() async {
+    final snapshot = await _collection.get();
+    var count = 0;
+    for (final doc in snapshot.docs) {
+      if (!_isBrandDoc(doc)) continue;
+      final brand = AppBrand.fromDoc(doc);
+      if (!isYavruLabeled(brand)) continue;
+      await doc.reference.delete();
+      count++;
+    }
+    return count;
+  }
 
   void _setCache(List<AppBrand> brands) {
     _cached = List<AppBrand>.unmodifiable(brands);

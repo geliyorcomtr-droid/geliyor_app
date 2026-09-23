@@ -48,6 +48,7 @@ class MarketProductData {
     this.preferredRank = '',
     this.repurchaseRate = '',
     this.barcode = '',
+    this.gallery = const [],
   });
 
   final String id;
@@ -74,6 +75,23 @@ class MarketProductData {
   final String preferredRank;
   final String repurchaseRate;
   final String barcode;
+  final List<String> gallery;
+
+  /// Ana görsel + galeri; boş ve tekrarlayan adresler elenir.
+  List<String> get displayImages {
+    final paths = <String>[];
+    void add(String raw) {
+      final path = raw.trim();
+      if (path.isEmpty || paths.contains(path)) return;
+      paths.add(path);
+    }
+
+    add(imagePath);
+    for (final url in gallery) {
+      add(url);
+    }
+    return paths;
+  }
 }
 
 /// Pet Market ürün kartı — 393×852 tuvale sığacak kompakt mockup kartı.

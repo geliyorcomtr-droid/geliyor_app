@@ -3,8 +3,10 @@ import 'package:geliyor_app/data/adoption_repository.dart';
 import 'package:geliyor_app/data/banner_repository.dart';
 import 'package:geliyor_app/data/firestore_collections.dart';
 import 'package:geliyor_app/screens/adoption_detail_screen.dart';
+import 'package:geliyor_app/screens/adoption_submit_screen.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
+import 'package:geliyor_app/utils/login_gate.dart';
 import 'package:geliyor_app/utils/product_image.dart';
 import 'package:geliyor_app/widgets/app_banner_slider.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
@@ -43,7 +45,7 @@ class _AdoptionScreenState extends State<AdoptionScreen> {
 
   final _searchController = TextEditingController();
   late String _category = widget.initialCategory ?? AdoptionCategories.adopt;
-  String _species = 'Tümü';
+  String _species = '';
 
   @override
   void dispose() {
@@ -55,7 +57,7 @@ class _AdoptionScreenState extends State<AdoptionScreen> {
     final query = _searchController.text.trim().toLowerCase();
     return listings.where((item) {
       if (item.category != _category) return false;
-      if (_species != 'Tümü' && item.species != _species) return false;
+      if (_species.isNotEmpty && item.species != _species) return false;
       if (query.isEmpty) return true;
       final haystack = [
         item.name,
@@ -103,11 +105,7 @@ class _AdoptionScreenState extends State<AdoptionScreen> {
                 const SizedBox(height: 12),
                 _buildCategoryRow(all),
                 const SizedBox(height: 12),
-                _buildFilterChips(
-                  options: const ['Tümü', 'Kedi', 'Köpek', 'Diğer'],
-                  selected: _species,
-                  onSelected: (value) => setState(() => _species = value),
-                ),
+                _buildFilterRow(),
                 const SizedBox(height: 10),
                 _buildSearchRow(),
                 const SizedBox(height: 12),
@@ -212,32 +210,92 @@ class _AdoptionScreenState extends State<AdoptionScreen> {
     );
   }
 
-  Widget _buildFilterChips({
-    required List<String> options,
-    required String selected,
-    required ValueChanged<String> onSelected,
-  }) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
+  Future<void> _openAddListing() async {
+    final ok = await LoginGate.require(
+      context: context,
+      message: 'İlan eklemek için giriş yapmanız gerekir.',
+    );
+    if (!ok || !mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const AdoptionSubmitScreen()),
+    );
+  }
+
+  Widget _buildFilterRow() {
+    const options = ['Tümü', 'Kedi', 'Köpek', 'Diğer'];
+    return SizedBox(
+      height: 36,
       child: Row(
         children: [
-          for (final option in options) ...[
-            FilterChip(
-              label: Text(option),
-              selected: selected == option,
-              onSelected: (_) => onSelected(option),
-              selectedColor: AppColors.warning.withValues(alpha: 0.16),
-              checkmarkColor: AppColors.warning,
-              visualDensity: VisualDensity.compact,
-              side: BorderSide(color: AppColors.warning.withValues(alpha: 0.28)),
-              labelStyle: TextStyle(
-                color: selected == option ? AppColors.warning : AppColors.text,
-                fontWeight: FontWeight.w800,
-                fontSize: 12,
-              ),
+          Expanded(
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: options.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                final option = options[index];
+                final selected = option == 'Tümü'
+                    ? _species.isEmpty
+                    : _species == option;
+                return AppPressableButton(
+                  onTap: () => setState(() {
+                    _species = option == 'Tümü' ? '' : option;
+                  }),
+                  height: 36,
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  backgroundColor: selected
+                      ? AppColors.warning
+                      : AppColors.surface,
+                  pressedBackgroundColor: AppColors.warning,
+                  foregroundColor: selected
+                      ? AppColors.surface
+                      : AppColors.text,
+                  pressedForegroundColor: AppColors.surface,
+                  borderColor: selected
+                      ? AppColors.warning
+                      : AppColors.warning.withValues(alpha: 0.28),
+                  pressedBorderColor: AppColors.warning,
+                  builder: (pressed) => Text(
+                    option,
+                    style: TextStyle(
+                      color: selected || pressed
+                          ? AppColors.surface
+                          : AppColors.text,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                );
+              },
             ),
-            const SizedBox(width: 8),
-          ],
+          ),
+          const SizedBox(width: 8),
+          AppPressableButton(
+            onTap: _openAddListing,
+            height: 36,
+            padding: const EdgeInsets.fromLTRB(12, 0, 10, 0),
+            backgroundColor: AppColors.warning,
+            pressedBackgroundColor: AppColors.warning.withValues(alpha: 0.82),
+            foregroundColor: AppColors.surface,
+            pressedForegroundColor: AppColors.surface,
+            borderColor: AppColors.warning,
+            pressedBorderColor: AppColors.warning,
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.add_rounded, size: 16, color: AppColors.surface),
+                SizedBox(width: 4),
+                Text(
+                  'İlan Ekle',
+                  style: TextStyle(
+                    color: AppColors.surface,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -291,16 +349,18 @@ class _CategoryCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 2),
-              Text(
-                AdoptionCategories.label(id),
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  height: 1.1,
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  AdoptionCategories.label(id),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    height: 1.1,
+                  ),
                 ),
               ),
               Text(

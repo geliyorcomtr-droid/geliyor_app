@@ -49,7 +49,9 @@ class LastOrderItem {
       weight: (data['weight'] as String?) ?? '',
       price: (data['price'] as num?)?.toDouble() ?? 0,
       oldPrice: (data['oldPrice'] as num?)?.toDouble() ?? 0,
-      imagePath: (data['imagePath'] as String?) ?? '',
+      imagePath: (data['imagePath'] as String?) ??
+          (data['imageUrl'] as String?) ??
+          '',
       quantity: (data['quantity'] as num?)?.toInt() ?? 1,
       brand: (data['brand'] as String?) ?? '',
     );

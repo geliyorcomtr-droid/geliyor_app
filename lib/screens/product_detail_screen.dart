@@ -47,6 +47,14 @@ class ProductDetailScreen extends StatelessWidget {
       ? product!.weights.first
       : _fallbackWeight;
   String get _productImagePath => product?.imagePath ?? _fallbackImagePath;
+
+  List<String> get _galleryImages {
+    final images = product?.displayImages ?? const <String>[];
+    if (images.isNotEmpty) return images;
+    final fallback = _productImagePath.trim();
+    return fallback.isEmpty ? const <String>[] : [fallback];
+  }
+
   double get _productUnitPrice => product != null && product!.prices.isNotEmpty
       ? product!.prices.first
       : _fallbackUnitPrice;
@@ -231,61 +239,17 @@ class ProductDetailScreen extends StatelessWidget {
     return 'cat';
   }
 
-  void _openFullscreenImage(BuildContext context) {
+  void _openFullscreenImage(BuildContext context, {int initialIndex = 0}) {
+    final images = _galleryImages;
+    if (images.isEmpty) return;
+    final start = initialIndex.clamp(0, images.length - 1);
     InfoGuideSheet.showCentered(
       context,
       builder: (sheetContext) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          child: Column(
-            children: [
-              SizedBox(
-                height: 32,
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: GestureDetector(
-                    onTap: () => Navigator.of(sheetContext).pop(),
-                    behavior: HitTestBehavior.opaque,
-                    child: const SizedBox(
-                      width: 32,
-                      height: 32,
-                      child: Icon(
-                        Icons.close_rounded,
-                        color: AppColors.text,
-                        size: 22,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => Navigator.of(sheetContext).pop(),
-                  behavior: HitTestBehavior.opaque,
-                  child: Center(
-                    child: buildProductImage(
-                      _productImagePath,
-                      fit: BoxFit.contain,
-                      width: double.infinity,
-                      height: double.infinity,
-                      alignment: Alignment.center,
-                      filterQuality: FilterQuality.high,
-                      useHtmlElement: false,
-                      cacheWidth: productPhotoCachePx,
-                      errorWidget: const Center(
-                        child: Icon(
-                          Icons.image_outlined,
-                          size: 72,
-                          color: AppColors.subText,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+        return _FullscreenProductGallery(
+          images: images,
+          initialIndex: start,
+          onClose: () => Navigator.of(sheetContext).pop(),
         );
       },
     );
@@ -519,28 +483,9 @@ class ProductDetailScreen extends StatelessWidget {
                   ? 'Tekrar\nAlım'
                   : _isAffordableBadge(badge)
                   ? 'Uygun\nFiyat'
-                  : _isProteinTrustBadge(badge)
-                  ? 'Protein\nİçerir'
-                  : badge.name.replaceAll(' ', '\n'),
-              iconPath: _isPreferredBadge(badge)
-                  ? TrustBadgeRepository.preferredIconPath
-                  : _isRepurchaseBadge(badge)
-                  ? TrustBadgeRepository.repurchaseIconPath
-                  : _isAffordableBadge(badge)
-                  ? TrustBadgeRepository.affordableIconPath
-                  : _isProteinTrustBadge(badge)
-                  ? TrustBadgeRepository.proteinIconPath
-                  : _isRatingBadge(badge)
-                  ? ''
-                  : badge.assetPath,
-              imageUrl:
-                  _isPreferredBadge(badge) ||
-                      _isRatingBadge(badge) ||
-                      _isProteinTrustBadge(badge) ||
-                      _isRepurchaseBadge(badge) ||
-                      _isAffordableBadge(badge)
-                  ? ''
-                  : badge.imageUrl,
+                  : _balancedSideLabel(badge.name),
+              iconPath: TrustBadgeRepository.displayAssetPath(badge),
+              imageUrl: TrustBadgeRepository.displayImageUrl(badge),
               isFavoriteAction:
                   !_isPreferredBadge(badge) &&
                   !_isRepurchaseBadge(badge) &&
@@ -592,13 +537,9 @@ class ProductDetailScreen extends StatelessWidget {
           for (final item in items)
             _SideBadge(
               id: item.id,
-              label: _showsAsStat(item)
-                  ? 'Protein\nİçerir'
-                  : item.name.replaceAll(' ', '\n'),
-              iconPath: _showsAsStat(item)
-                  ? ProductAdvantageRepository.proteinIconPath
-                  : item.assetPath,
-              imageUrl: _showsAsStat(item) ? '' : item.imageUrl,
+              label: _balancedSideLabel(item.name),
+              iconPath: ProductAdvantageRepository.displayAssetPath(item),
+              imageUrl: ProductAdvantageRepository.displayImageUrl(item),
               feature: item.name,
               advantage: item,
               isStat: _showsAsStat(item),
@@ -637,7 +578,7 @@ class ProductDetailScreen extends StatelessWidget {
     final card = Container(
       width: double.infinity,
       height: double.infinity,
-      padding: const EdgeInsets.fromLTRB(2, 4, 2, 4),
+      padding: const EdgeInsets.fromLTRB(4, 6, 4, 5),
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -696,6 +637,9 @@ class ProductDetailScreen extends StatelessWidget {
                   scale: 1.12,
                   child: PreferredRankMedal(
                     rank: badge.preferredRank ?? '2.',
+                    imagePath: (badge.imageUrl?.trim().isNotEmpty ?? false)
+                        ? badge.imageUrl
+                        : badge.iconPath,
                   ),
                 ),
               ),
@@ -703,20 +647,7 @@ class ProductDetailScreen extends StatelessWidget {
           ),
           Expanded(
             flex: 3,
-            child: Center(
-              child: Text(
-                badge.label,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: AppColors.text,
-                  fontSize: 8.5,
-                  fontWeight: FontWeight.w800,
-                  height: 1.15,
-                ),
-              ),
-            ),
+            child: _fitSideLabel(badge.label),
           ),
         ],
       );
@@ -733,18 +664,7 @@ class ProductDetailScreen extends StatelessWidget {
               child: _sideBadgeImage(badge),
             ),
           ),
-          Text(
-            badge.label,
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: AppColors.text,
-              fontSize: 8.5,
-              fontWeight: FontWeight.w800,
-              height: 1.15,
-            ),
-          ),
+          _fitSideLabel(badge.label),
         ],
       );
     }
@@ -754,6 +674,7 @@ class ProductDetailScreen extends StatelessWidget {
         value: badge.ratingValue ?? '—',
         label: badge.label,
         valueColor: _sideValueColor(badge),
+        compactTexts: true,
       );
     }
     if (badge.isStat) {
@@ -779,52 +700,125 @@ class ProductDetailScreen extends StatelessWidget {
     return AppColors.primary;
   }
 
-  /// İkon boyutu korunur; ikon, rakam ve yazı arasındaki boşluk eşitlenir.
+  /// Yıldız / değer / etiket eşit aralıklı; üstte fazla boşluk kalmaz.
   Widget _iconNumberLabelCard({
     required Widget icon,
     required String value,
     required String label,
     required Color valueColor,
+    bool compactTexts = false,
   }) {
+    final valueText = Text(
+      value,
+      textAlign: TextAlign.center,
+      maxLines: 1,
+      style: TextStyle(
+        color: valueColor,
+        fontSize: 16,
+        fontWeight: FontWeight.w900,
+        height: 1,
+        letterSpacing: -0.3,
+      ),
+    );
+    final labelText = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 1),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          maxLines: 2,
+          style: const TextStyle(
+            color: AppColors.text,
+            fontSize: 8,
+            fontWeight: FontWeight.w800,
+            height: 1.05,
+          ),
+        ),
+      ),
+    );
+
+    if (compactTexts) {
+      return Column(
+        children: [
+          SizedBox(
+            height: 36,
+            width: double.infinity,
+            child: icon,
+          ),
+          const Spacer(),
+          valueText,
+          const SizedBox(height: 1),
+          labelText,
+          const SizedBox(height: 8),
+        ],
+      );
+    }
+
     return Column(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         SizedBox(
           height: 36,
           width: double.infinity,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 2),
-            child: icon,
-          ),
+          child: icon,
         ),
-        FittedBox(
+        valueText,
+        labelText,
+      ],
+    );
+  }
+
+  /// Uzun adları en fazla 2 dengeli satıra böler; her kelimeyi ayrı satıra düşürmez.
+  String _balancedSideLabel(String name) {
+    final raw = name.trim();
+    if (raw.isEmpty) return raw;
+    final existing = raw
+        .split(RegExp(r'[\n\r]+'))
+        .map((line) => line.trim())
+        .where((line) => line.isNotEmpty)
+        .toList();
+    if (existing.length >= 2) return existing.take(2).join('\n');
+
+    final words = existing.single.split(RegExp(r'\s+'));
+    if (words.length <= 1) return existing.single;
+    if (words.length == 2) return '${words[0]}\n${words[1]}';
+
+    var bestMid = 1;
+    var bestMax = 1 << 30;
+    for (var mid = 1; mid < words.length; mid++) {
+      final first = words.take(mid).join(' ');
+      final second = words.skip(mid).join(' ');
+      final longest =
+          first.length >= second.length ? first.length : second.length;
+      if (longest < bestMax) {
+        bestMax = longest;
+        bestMid = mid;
+      }
+    }
+    return '${words.take(bestMid).join(' ')}\n${words.skip(bestMid).join(' ')}';
+  }
+
+  Widget _fitSideLabel(String label) {
+    return Align(
+      alignment: Alignment.center,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 1),
+        child: FittedBox(
           fit: BoxFit.scaleDown,
           child: Text(
-            value,
+            label,
             textAlign: TextAlign.center,
-            maxLines: 1,
-            style: TextStyle(
-              color: valueColor,
-              fontSize: 16,
-              fontWeight: FontWeight.w900,
-              height: 1,
-              letterSpacing: -0.3,
+            maxLines: 2,
+            style: const TextStyle(
+              color: AppColors.text,
+              fontSize: 8,
+              fontWeight: FontWeight.w800,
+              height: 1.05,
             ),
           ),
         ),
-        Text(
-          label,
-          textAlign: TextAlign.center,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: AppColors.text,
-            fontSize: 8.5,
-            fontWeight: FontWeight.w800,
-            height: 1.15,
-          ),
-        ),
-      ],
+      ),
     );
   }
 
@@ -835,13 +829,15 @@ class ProductDetailScreen extends StatelessWidget {
   }) {
     return [
       Expanded(
+        flex: 5,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 2),
+          padding: const EdgeInsets.fromLTRB(3, 1, 3, 0),
           child: icon,
         ),
       ),
       if (value != null)
         Expanded(
+          flex: 4,
           child: Center(
             child: FittedBox(
               fit: BoxFit.scaleDown,
@@ -861,33 +857,24 @@ class ProductDetailScreen extends StatelessWidget {
           ),
         ),
       Expanded(
-        child: Center(
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: AppColors.text,
-              fontSize: 8.5,
-              fontWeight: FontWeight.w800,
-              height: 1.15,
-            ),
-          ),
-        ),
+        flex: 4,
+        child: _fitSideLabel(label),
       ),
     ];
   }
 
   Widget _sideBadgeImage(_SideBadge badge) {
     final isRating = badge.isRating || badge.id == 'degerlendirme';
-    // Puan: sarı yıldız.
-    if (isRating) {
-      return Transform.translate(
-        offset: const Offset(0, -3),
-        child: const Icon(
+    final uploadedUrl = badge.imageUrl?.trim() ?? '';
+    final assetPath = badge.iconPath.trim();
+    final hasCustomIcon =
+        uploadedUrl.isNotEmpty ||
+        (assetPath.isNotEmpty && !assetPath.endsWith('/favori.png'));
+    if (isRating && !hasCustomIcon) {
+      return const FittedBox(
+        fit: BoxFit.contain,
+        child: Icon(
           Icons.star_rounded,
-          size: 46,
           color: AppColors.warning,
         ),
       );
@@ -910,8 +897,6 @@ class ProductDetailScreen extends StatelessWidget {
         _ => AppColors.primary,
       },
     );
-    final uploadedUrl = badge.imageUrl?.trim() ?? '';
-    final assetPath = badge.iconPath.trim();
     const decodePx = 96;
 
     final wrongDefaultFavorite = assetPath.endsWith('/favori.png');
@@ -924,7 +909,6 @@ class ProductDetailScreen extends StatelessWidget {
         height: double.infinity,
         filterQuality: FilterQuality.medium,
         cacheWidth: decodePx,
-        cacheHeight: decodePx,
         errorWidget: assetPath.isEmpty || wrongDefaultFavorite
             ? fallback
             : buildProductImage(
@@ -934,7 +918,6 @@ class ProductDetailScreen extends StatelessWidget {
                 height: double.infinity,
                 filterQuality: FilterQuality.medium,
                 cacheWidth: decodePx,
-                cacheHeight: decodePx,
                 errorWidget: fallback,
               ),
       );
@@ -947,7 +930,6 @@ class ProductDetailScreen extends StatelessWidget {
         height: double.infinity,
         filterQuality: FilterQuality.medium,
         cacheWidth: decodePx,
-        cacheHeight: decodePx,
         errorWidget: fallback,
       );
     }
@@ -1076,90 +1058,10 @@ class ProductDetailScreen extends StatelessWidget {
   }
 
   Widget _buildGallery(BuildContext context) {
-    return SizedBox.expand(
-      child: ClipRect(
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Positioned.fill(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(6, 4, 6, 10),
-                child: GestureDetector(
-                  onTap: () => _openFullscreenImage(context),
-                  behavior: HitTestBehavior.opaque,
-                  child: buildProductImage(
-                    _productImagePath,
-                    fit: BoxFit.contain,
-                    width: double.infinity,
-                    height: double.infinity,
-                    alignment: Alignment.center,
-                    filterQuality: FilterQuality.medium,
-                    useHtmlElement: false,
-                    cacheWidth: productPhotoCachePx,
-                    errorWidget: const Center(
-                      child: Icon(
-                        Icons.image_outlined,
-                        size: 72,
-                        color: AppColors.subText,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        Positioned(
-          top: 0,
-          right: 0,
-          child: Container(
-            width: 46,
-            padding: const EdgeInsets.symmetric(vertical: 7),
-            decoration: BoxDecoration(
-              color: AppColors.warning,
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: const Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '%15',
-                  style: TextStyle(
-                    color: AppColors.surface,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                    height: 1.1,
-                  ),
-                ),
-                Text(
-                  'İNDİRİM',
-                  style: TextStyle(
-                    color: AppColors.surface,
-                    fontSize: 8,
-                    fontWeight: FontWeight.w800,
-                    height: 1.2,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 8,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _buildDot(true),
-              const SizedBox(width: 6),
-              _buildDot(false),
-              const SizedBox(width: 6),
-              _buildDot(false),
-            ],
-          ),
-        ),
-          ],
-        ),
-      ),
+    return _ProductHeroGallery(
+      images: _galleryImages,
+      onOpenFullscreen: (index) =>
+          _openFullscreenImage(context, initialIndex: index),
     );
   }
 
@@ -1435,11 +1337,9 @@ class ProductDetailScreen extends StatelessWidget {
       size: 22,
       color: AppColors.primary,
     );
-    final imageUrl = item.imageUrl.trim();
-    final assetPath = _showsAsStat(item)
-        ? ProductAdvantageRepository.proteinIconPath
-        : item.assetPath;
-    if (imageUrl.isNotEmpty && !_showsAsStat(item)) {
+    final imageUrl = ProductAdvantageRepository.displayImageUrl(item);
+    final assetPath = ProductAdvantageRepository.displayAssetPath(item);
+    if (imageUrl.isNotEmpty) {
       return buildProductImage(
         imageUrl,
         fit: BoxFit.contain,
@@ -1796,17 +1696,6 @@ class ProductDetailScreen extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildDot(bool isActive) {
-    return Container(
-      width: 7,
-      height: 7,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: isActive ? AppColors.subText : _accent,
       ),
     );
   }
@@ -2270,6 +2159,250 @@ class _DashedDivider extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _ProductHeroGallery extends StatefulWidget {
+  const _ProductHeroGallery({
+    required this.images,
+    required this.onOpenFullscreen,
+  });
+
+  final List<String> images;
+  final ValueChanged<int> onOpenFullscreen;
+
+  @override
+  State<_ProductHeroGallery> createState() => _ProductHeroGalleryState();
+}
+
+class _ProductHeroGalleryState extends State<_ProductHeroGallery> {
+  int _index = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final images = widget.images;
+    return SizedBox.expand(
+      child: ClipRect(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Positioned.fill(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(6, 4, 6, 10),
+                child: images.isEmpty
+                    ? const Center(
+                        child: Icon(
+                          Icons.image_outlined,
+                          size: 72,
+                          color: AppColors.subText,
+                        ),
+                      )
+                    : PageView.builder(
+                        itemCount: images.length,
+                        onPageChanged: (index) {
+                          setState(() => _index = index);
+                        },
+                        itemBuilder: (context, index) {
+                          return GestureDetector(
+                            onTap: () => widget.onOpenFullscreen(index),
+                            behavior: HitTestBehavior.opaque,
+                            child: buildProductImage(
+                              images[index],
+                              fit: BoxFit.contain,
+                              width: double.infinity,
+                              height: double.infinity,
+                              alignment: Alignment.center,
+                              filterQuality: FilterQuality.medium,
+                              useHtmlElement: false,
+                              cacheWidth: productPhotoCachePx,
+                              errorWidget: const Center(
+                                child: Icon(
+                                  Icons.image_outlined,
+                                  size: 72,
+                                  color: AppColors.subText,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ),
+            Positioned(
+              top: 0,
+              right: 0,
+              child: Container(
+                width: 46,
+                padding: const EdgeInsets.symmetric(vertical: 7),
+                decoration: BoxDecoration(
+                  color: AppColors.warning,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: const Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '%15',
+                      style: TextStyle(
+                        color: AppColors.surface,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                        height: 1.1,
+                      ),
+                    ),
+                    Text(
+                      'İNDİRİM',
+                      style: TextStyle(
+                        color: AppColors.surface,
+                        fontSize: 8,
+                        fontWeight: FontWeight.w800,
+                        height: 1.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (images.length > 1)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 8,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    for (int i = 0; i < images.length; i++) ...[
+                      if (i > 0) const SizedBox(width: 6),
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: i == _index
+                              ? ProductDetailScreen._accent
+                              : AppColors.subText,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FullscreenProductGallery extends StatefulWidget {
+  const _FullscreenProductGallery({
+    required this.images,
+    required this.initialIndex,
+    required this.onClose,
+  });
+
+  final List<String> images;
+  final int initialIndex;
+  final VoidCallback onClose;
+
+  @override
+  State<_FullscreenProductGallery> createState() =>
+      _FullscreenProductGalleryState();
+}
+
+class _FullscreenProductGalleryState extends State<_FullscreenProductGallery> {
+  late final PageController _controller;
+  late int _index;
+
+  @override
+  void initState() {
+    super.initState();
+    _index = widget.initialIndex;
+    _controller = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      child: Column(
+        children: [
+          SizedBox(
+            height: 32,
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: GestureDetector(
+                onTap: widget.onClose,
+                behavior: HitTestBehavior.opaque,
+                child: const SizedBox(
+                  width: 32,
+                  height: 32,
+                  child: Icon(
+                    Icons.close_rounded,
+                    color: AppColors.text,
+                    size: 22,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: PageView.builder(
+              controller: _controller,
+              itemCount: widget.images.length,
+              onPageChanged: (index) => setState(() => _index = index),
+              itemBuilder: (context, index) {
+                return buildProductImage(
+                  widget.images[index],
+                  fit: BoxFit.contain,
+                  width: double.infinity,
+                  height: double.infinity,
+                  alignment: Alignment.center,
+                  filterQuality: FilterQuality.high,
+                  useHtmlElement: false,
+                  cacheWidth: productPhotoCachePx,
+                  errorWidget: const Center(
+                    child: Icon(
+                      Icons.image_outlined,
+                      size: 72,
+                      color: AppColors.subText,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          if (widget.images.length > 1) ...[
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                for (int i = 0; i < widget.images.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 6),
+                  Container(
+                    width: 7,
+                    height: 7,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: i == _index
+                          ? ProductDetailScreen._accent
+                          : AppColors.subText,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

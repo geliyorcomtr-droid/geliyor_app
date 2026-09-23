@@ -1,29 +1,28 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:geliyor_app/data/banner_repository.dart';
-import 'package:geliyor_app/data/brand_repository.dart';
 import 'package:geliyor_app/data/cat_feeding_guide.dart';
-import 'package:geliyor_app/data/dog_feeding_guide.dart';
 import 'package:geliyor_app/data/food_tracking_choices.dart';
+import 'package:geliyor_app/data/feeding_variant.dart';
 import 'package:geliyor_app/data/kitten_feeding_guide.dart';
 import 'package:geliyor_app/data/pet_life_stage.dart';
-import 'package:geliyor_app/data/puppy_feeding_guide.dart';
+import 'package:geliyor_app/screens/add_pet_screen.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/services/food_remaining_estimator.dart';
 import 'package:geliyor_app/state/food_tracking_store.dart';
 import 'package:geliyor_app/state/pet_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
-import 'package:geliyor_app/theme/app_icons.dart';
 import 'package:geliyor_app/utils/login_gate.dart';
-import 'package:geliyor_app/utils/product_image.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
 import 'package:geliyor_app/widgets/app_banner_slider.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
 import 'package:geliyor_app/widgets/app_pressable_button.dart';
-import 'package:geliyor_app/widgets/brand_feeding_table.dart';
+import 'package:geliyor_app/widgets/adult_dog_feeding_table.dart';
 import 'package:geliyor_app/widgets/cat_feeding_table.dart';
-import 'package:geliyor_app/widgets/dog_feeding_table.dart';
+import 'package:geliyor_app/widgets/mini_adult_dog_feeding_table.dart';
+import 'package:geliyor_app/widgets/mini_puppy_feeding_table.dart';
 import 'package:geliyor_app/widgets/month_feeding_table.dart';
+import 'package:geliyor_app/widgets/standard_puppy_feeding_table.dart';
 
 class FoodTrackingScreen extends StatefulWidget {
   const FoodTrackingScreen({super.key});
@@ -35,12 +34,11 @@ class FoodTrackingScreen extends StatefulWidget {
 class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
   int _weightKg = 10;
   DateTime _purchaseDate = DateTime.now();
-  String _foodId = FoodTrackingChoice.standardId;
-  String _foodLabel = FoodTrackingChoice.standardLabel;
   String? _selectedPetName;
   bool _isPuppy = false;
   bool _isMiniBreed = false;
   int _ageMonths = 4;
+  FeedingVariant? _foodVariant;
 
   static const int _minKg = 1;
   static const int _maxKg = 19;
@@ -75,22 +73,26 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
       _isPuppy = tracking.isPuppy;
       _isMiniBreed = tracking.isMiniBreed;
       _ageMonths = tracking.ageMonths;
+      _foodVariant = tracking.feedingVariant;
+      _purchaseDate = tracking.purchaseDate;
+      _weightKg = tracking.bagKg.round().clamp(_minKg, _maxKg);
     } else {
       _applyPetProfile(_guidePet);
     }
-    if (!tracking.isActive) return;
-    _foodLabel = tracking.foodName.isEmpty
-        ? FoodTrackingChoice.standardLabel
-        : tracking.foodName;
-    _foodId = tracking.foodId.isNotEmpty
-        ? tracking.foodId
-        : FoodTrackingChoice.idFromName(tracking.foodName);
-    _purchaseDate = tracking.purchaseDate;
-    final kg = tracking.bagKg.round().clamp(_minKg, _maxKg);
-    _weightKg = kg;
   }
 
   Future<void> _startTracking() async {
+    if (_guidePet == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Hesaplama için önce Yeni Dost Ekle’den dost bilgilerini girin.',
+          ),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
     final bagKg = _bagKg;
     if (bagKg <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -107,8 +109,8 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
     );
     if (!ok || !mounted) return;
     FoodTrackingStore.instance.start(
-      foodName: _foodLabel,
-      foodId: _foodId,
+      foodName: 'Mama takibi',
+      foodId: FoodTrackingChoice.standardId,
       bagKg: bagKg,
       purchaseDate: _purchaseDate,
       petName: _guidePet?.name,
@@ -116,15 +118,18 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
       isPuppy: _isPuppy,
       isMiniBreed: _isMiniBreed,
       ageMonths: _ageMonths,
+      variant: _foodVariant,
     );
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Mama takibi başlatıldı. Manuel kg esas alındı.'),
+        content: Text('Mama takibi başlatıldı. Alınan kg ve tarih esas alındı.'),
         backgroundColor: _accent,
       ),
     );
     Navigator.of(context).maybePop();
   }
+
+  bool get _trackingReady => PetStore.instance.pets.isNotEmpty;
 
   PetData? get _guidePet {
     final pets = PetStore.instance.pets;
@@ -143,11 +148,10 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
         ageMonths: _ageMonths,
       );
 
-  void _applyPetProfile(PetData? pet, {bool keepFoodPuppy = false}) {
-    if (!keepFoodPuppy || FoodTrackingChoice.isStandard(_foodId)) {
-      _isPuppy = PetLifeStage.inferIsPuppy(ageRange: pet?.ageRange);
-    }
+  void _applyPetProfile(PetData? pet) {
+    _isPuppy = PetLifeStage.inferIsPuppy(ageRange: pet?.ageRange);
     _isMiniBreed = _isDog && PetLifeStage.inferIsMini(ageRange: pet?.ageRange);
+    _foodVariant = null;
     _ageMonths = PetLifeStage.monthsFromLabel(pet?.ageRange) ?? 4;
   }
 
@@ -163,75 +167,75 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
     return CatFeedingGuide.fromWeightLabel(pet.weight);
   }
 
-  DogFeedingRow? get _dogFeedingRow {
-    if (!_isDog || _isPuppy) return null;
-    return DogFeedingGuide.fromSizeLabel(
-      _isMiniBreed ? 'Mini' : _guidePet?.ageRange,
-    );
-  }
-
-  AppBrand? get _selectedBrand {
-    if (FoodTrackingChoice.isStandard(_foodId)) return null;
-    return BrandRepository.instance.byId(_foodId);
-  }
-
   List<Widget> _buildFeedingTables() {
-    final brand = _selectedBrand;
-    final feeding = brand?.feeding;
-    if (brand != null && feeding != null) {
-      final hasBrandTable = _isPuppy
-          ? (_isDog
-              ? (_isMiniBreed ? feeding.hasDogMiniPuppy : feeding.hasDogPuppy)
-              : feeding.hasCatKitten)
-          : (_isDog ? feeding.hasDog : feeding.hasCat);
-      if (hasBrandTable) {
-        return [
-          BrandFeedingTableCard(
-            brandName: brand.name,
-            feeding: feeding,
-            isDog: _isDog,
-            isPuppy: _isPuppy,
-            isMiniBreed: _isMiniBreed,
-            highlightWeight: _guidePet?.weight,
-            highlightSize: _guidePet?.ageRange,
-            highlightMonths: _ageMonths,
-          ),
-        ];
-      }
-    }
     if (_isPuppy) {
       if (_isDog) {
+        if (_isMiniBreed) {
+          return [
+            MiniPuppyFeedingTableCard(
+              highlightedLabel: _guidePet?.weight,
+              ageLabel: _guidePet?.ageRange,
+              months: _ageMonths,
+              activityLevel: _guidePet?.activityLevel,
+              bodyType: _guidePet?.bodyType,
+              extraFood: _guidePet?.extraFood,
+              accent: _accent,
+            ),
+          ];
+        }
         return [
-          MonthFeedingTableCard(
-            title: _isMiniBreed
-                ? 'Mini ırk yavru köpek tüketimi (ay)'
-                : 'Yavru köpek tüketimi (ay)',
+          StandardPuppyFeedingTableCard(
+            highlightedLabel: _guidePet?.weight,
+            ageLabel: _guidePet?.ageRange,
+            months: _ageMonths,
+            activityLevel: _guidePet?.activityLevel,
+            bodyType: _guidePet?.bodyType,
+            neutered: _guidePet?.neutered,
+            extraFood: _guidePet?.extraFood,
             accent: _accent,
-            highlightedMonths: _ageMonths,
-            rows: [
-              for (final row in PuppyFeedingGuide.rows)
-                (months: row.months, grams: row.gramsFor(isMini: _isMiniBreed)),
-            ],
           ),
         ];
       }
       return [
         MonthFeedingTableCard(
-          title: 'Yavru kedi tüketimi (ay)',
+          title: 'Yavru kedi tüketimi (kilo × ay)',
           accent: _accent,
           highlightedMonths: _ageMonths,
           rows: [
-            for (final row in KittenFeedingGuide.rows)
-              (months: row.months, grams: row.dailyGrams),
+            for (final row in KittenFeedingGuide.monthRows)
+              (
+                months: row,
+                grams: KittenFeedingGuide.dailyGramsFor(
+                      weightLabel: _guidePet?.weight,
+                      months: row,
+                    ) ??
+                    0,
+              ),
           ],
         ),
       ];
     }
     if (_isDog) {
+      if (_isMiniBreed) {
+        return [
+          MiniAdultDogFeedingTableCard(
+            highlightedLabel: _guidePet?.weight,
+            activityLevel: _guidePet?.activityLevel,
+            bodyType: _guidePet?.bodyType,
+            neutered: _guidePet?.neutered,
+            extraFood: _guidePet?.extraFood,
+            accent: _accent,
+          ),
+        ];
+      }
       return [
-        DogFeedingTableCard(
-          highlighted: _dogFeedingRow,
+        AdultDogFeedingTableCard(
+          highlightedLabel: _guidePet?.weight,
           activityLevel: _guidePet?.activityLevel,
+          bodyType: _guidePet?.bodyType,
+          neutered: _guidePet?.neutered,
+          extraFood: _guidePet?.extraFood,
+          accent: _accent,
         ),
       ];
     }
@@ -251,9 +255,6 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
     if (pet == null) return 0;
     return FoodRemainingEstimator.sharedDailyGrams(
       FoodRemainingEstimator.sharingPetsFor(pet),
-      foodId: _foodId,
-      foodIsPuppy: _isPuppy,
-      foodIsMini: _isMiniBreed,
       profileFor: pet,
       profile: _lifeProfile,
     );
@@ -263,7 +264,7 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
     if (_bagKg <= 0) return 0;
     final daily = _profileDailyGrams;
     if (daily > 0) return ((_bagKg * 1000) / daily).round();
-    return (_bagKg * 2.4).round().clamp(7, 120);
+    return 0;
   }
 
   DateTime get _estimatedEnd =>
@@ -327,10 +328,7 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
         backgroundColor: AppColors.background,
         header: _buildHeader(),
         content: ListenableBuilder(
-          listenable: Listenable.merge([
-            PetStore.instance,
-            BrandRepository.instance,
-          ]),
+          listenable: PetStore.instance,
           builder: (context, _) {
             return SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
@@ -350,18 +348,17 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
                   _buildBanner(),
                   const SizedBox(height: 14),
                   _buildPetSection(),
-                  const SizedBox(height: 14),
-                  _buildFoodSection(),
-                  const SizedBox(height: 14),
-                  _buildWeightSection(),
-                  const SizedBox(height: 14),
-                  _buildDateSection(),
-                  const SizedBox(height: 14),
-                  _buildEstimateCard(),
-                  const SizedBox(height: 12),
-                  ..._buildFeedingTables(),
-                  const SizedBox(height: 12),
-                  AppPressableButton(
+                  if (_trackingReady) ...[
+                    const SizedBox(height: 14),
+                    _buildWeightSection(),
+                    const SizedBox(height: 14),
+                    _buildDateSection(),
+                    const SizedBox(height: 14),
+                    _buildEstimateCard(),
+                    const SizedBox(height: 12),
+                    ..._buildFeedingTables(),
+                    const SizedBox(height: 12),
+                    AppPressableButton(
                     onTap: () {
                       _startTracking();
                     },
@@ -397,6 +394,7 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
                       ),
                     ),
                   ),
+                  ],
                 ],
               ),
             );
@@ -473,25 +471,72 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
   Widget _buildPetSection() {
     final pets = PetStore.instance.pets;
     if (pets.isEmpty) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: _soft,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: _lineSoft),
-        ),
-        child: const Text(
-          'Önce Dost Ekle sayfasından dostunuzu kaydedin.',
-          style: TextStyle(
-            color: AppColors.subText,
-            fontSize: 11.5,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+      return _needPetCard(
+        text:
+            'Hesaplama için önce Yeni Dost Ekle sayfasından dost bilgilerini girin. Sistem kilo, yaş ve aktiviteyi kullanır.',
+        buttonLabel: 'Yeni Dost Ekle',
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const AddPetScreen()),
+          );
+        },
       );
     }
 
+    return _buildPetChips(pets);
+  }
+
+  Widget _needPetCard({
+    required String text,
+    required String buttonLabel,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: _soft,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _lineSoft),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            text,
+            style: const TextStyle(
+              color: AppColors.subText,
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 10),
+          AppPressableButton(
+            onTap: onTap,
+            width: double.infinity,
+            height: 40,
+            backgroundColor: _buttonFill,
+            pressedBackgroundColor: _accent,
+            foregroundColor: AppColors.surface,
+            pressedForegroundColor: AppColors.surface,
+            borderColor: _buttonFill,
+            pressedBorderColor: _accent,
+            builder: (_) => Text(
+              buttonLabel,
+              style: const TextStyle(
+                color: AppColors.surface,
+                fontWeight: FontWeight.w900,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPetChips(List<PetData> pets) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -522,7 +567,7 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
               GestureDetector(
                 onTap: () => setState(() {
                   _selectedPetName = pet.name;
-                  _applyPetProfile(pet, keepFoodPuppy: true);
+                  _applyPetProfile(pet);
                 }),
                 child: Container(
                   height: 34,
@@ -567,238 +612,11 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
     );
   }
 
-  Future<void> _pickFood() async {
-    if (!mounted) return;
-    final selected = await showModalBottomSheet<FoodTrackingMatch>(
-      context: context,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      builder: (ctx) {
-        return StreamBuilder<List<AppBrand>>(
-          stream: BrandRepository.instance.watchAll(activeOnly: true),
-          builder: (context, snapshot) {
-            final brands = (snapshot.data ?? BrandRepository.instance.cached)
-                .where((brand) => !brand.feeding.isEmpty)
-                .toList(growable: false);
-            final picks = [
-              for (final brand in brands) ...FoodTrackingChoice.picksFor(brand),
-            ];
-            return SafeArea(
-              child: ListView(
-                shrinkWrap: true,
-                padding: const EdgeInsets.fromLTRB(8, 12, 8, 16),
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(12, 4, 12, 8),
-                    child: Text(
-                      'Mama seçin',
-                      style: TextStyle(
-                        color: AppColors.text,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                  _foodOptionTile(
-                    ctx,
-                    id: FoodTrackingChoice.standardId,
-                    label: FoodTrackingChoice.standardLabel,
-                    subtitle: 'Sistemdeki kedi / köpek tüketim tablosu',
-                  ),
-                  const Divider(height: 16),
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(12, 0, 12, 8),
-                    child: Text(
-                      'Markalar',
-                      style: TextStyle(
-                        color: AppColors.subText,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  if (picks.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.fromLTRB(12, 8, 12, 12),
-                      child: Text(
-                        'Admin panelinden marka ekleyip tüketim gramajı girildiğinde burada görünür.',
-                        style: TextStyle(
-                          color: AppColors.subText,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          height: 1.35,
-                        ),
-                      ),
-                    )
-                  else
-                    for (final pick in picks)
-                      _foodOptionTile(
-                        ctx,
-                        id: pick.id,
-                        label: pick.label,
-                        subtitle: pick.isPuppy
-                            ? 'Yavru tüketimi (ay)'
-                            : 'Yetişkin tüketimi (kilo / beden)',
-                        imagePath: BrandRepository.instance
-                                .byId(pick.id)
-                                ?.displayImage ??
-                            '',
-                        isPuppy: pick.isPuppy,
-                        isMiniBreed: pick.isMiniBreed,
-                      ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-    if (selected == null || !mounted) return;
-    setState(() {
-      _foodId = selected.id;
-      _foodLabel = selected.label;
-      if (!FoodTrackingChoice.isStandard(selected.id)) {
-        _isPuppy = selected.isPuppy;
-        _applyPetProfile(_guidePet, keepFoodPuppy: true);
-      } else {
-        _applyPetProfile(_guidePet);
-      }
-    });
-  }
-
-  Widget _foodOptionTile(
-    BuildContext ctx, {
-    required String id,
-    required String label,
-    required String subtitle,
-    String imagePath = '',
-    bool isPuppy = false,
-    bool isMiniBreed = false,
-  }) {
-    final selected = FoodTrackingChoice.isStandard(id)
-        ? FoodTrackingChoice.isStandard(_foodId)
-        : _foodId == id && _isPuppy == isPuppy;
-    return ListTile(
-      onTap: () => Navigator.pop(
-        ctx,
-        FoodTrackingMatch(
-          id: id,
-          label: label,
-          isPuppy: isPuppy,
-          isMiniBreed: isMiniBreed,
-        ),
-      ),
-      leading: _foodBrandMark(imagePath: imagePath, size: 36),
-      title: Text(
-        label,
-        style: TextStyle(
-          fontWeight: FontWeight.w800,
-          color: selected ? _accent : AppColors.text,
-        ),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
-      ),
-      trailing: selected
-          ? const Icon(Icons.check_rounded, color: _accent)
-          : null,
-    );
-  }
-
-  Widget _foodBrandMark({String imagePath = '', double size = 26}) {
-    if (imagePath.trim().isEmpty) {
-      return _BowlSpoonIcon(size: size);
-    }
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: SizedBox(
-        width: size,
-        height: size,
-        child: buildProductImage(
-          imagePath,
-          fit: BoxFit.contain,
-          width: size,
-          height: size,
-          cacheWidth: uiIconAssetPx,
-          errorWidget: _BowlSpoonIcon(size: size),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFoodSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _sectionTitle(1, 'Kullandığınız mama hangisi?'),
-        const SizedBox(height: 8),
-        GestureDetector(
-          onTap: _pickFood,
-          behavior: HitTestBehavior.opaque,
-          child: Container(
-            height: 44,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: _lineSoft),
-            ),
-            child: Row(
-              children: [
-                _foodBrandMark(
-                  imagePath: _selectedBrand?.displayImage ?? '',
-                  size: 26,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    _foodLabel,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.text,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                const Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  color: _accent,
-                  size: 22,
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          FoodTrackingChoice.isStandard(_foodId)
-              ? 'Tüketim, dostun kayıtlı özelliklerine göre standart tablodan hesaplanır.'
-              : (_selectedBrand?.feeding.isEmpty ?? true)
-                  ? 'Bu marka için henüz gramaj girilmedi; standart tablo kullanılır.'
-                  : _isPuppy
-                      ? 'Yavru mama seçildi; tüketim dostun ayına göre hesaplanır.'
-                      : 'Yetişkin mama seçildi; tüketim dostun kilosuna / bedenine göre hesaplanır.',
-          style: const TextStyle(
-            color: AppColors.subText,
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            height: 1.3,
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildWeightSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionTitle(2, 'Ne kadar mama aldınız?'),
+        _sectionTitle(1, 'Ne kadar mama aldınız?'),
         const SizedBox(height: 8),
         _buildWeightDropdown(
           value: '$_weightKg kg',
@@ -999,7 +817,7 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionTitle(3, 'Ne zaman aldınız?'),
+        _sectionTitle(2, 'Ne zaman aldınız?'),
         const SizedBox(height: 8),
         GestureDetector(
           onTap: _pickDate,
@@ -1044,7 +862,6 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
 
   Widget _buildEstimateCard() {
     final row = _feedingRow;
-    final dogRow = _dogFeedingRow;
     final pet = _guidePet;
     final remaining = (_remainingRatio * 100).round();
     final daily = _profileDailyGrams;
@@ -1060,9 +877,8 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
               ? '$shareLabel bu paketi paylaşıyor. Günlük toplam $daily g, '
                     '30 günde $monthlyKg kg. '
                     '${_bagKg.toStringAsFixed(0)} kg mama yaklaşık $_estimatedDays gün yeter.'
-              : _isDog && dogRow != null
-              ? '${pet.name} (${dogRow.size}, ${DogFeedingGuide.normalizeActivity(pet.activityLevel)} aktivite) '
-                    'için tablo aralığı ${dogRow.rangeFor(pet.activityLevel)}, tahmini günlük $daily g ve 30 günde $monthlyKg kg. '
+              : _isDog
+              ? '${pet.name} (${pet.weight ?? '-'}) için tahmini günlük $daily g ve 30 günde $monthlyKg kg. '
                     '${_bagKg.toStringAsFixed(0)} kg mama yaklaşık $_estimatedDays gün yeter.'
               : row != null
               ? '${pet.name} (${pet.weight}, ${CatFeedingGuide.profileLabel(bodyType: pet.bodyType, activityLevel: pet.activityLevel)}) '
@@ -1171,69 +987,4 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
       ),
     );
   }
-}
-
-class _BowlSpoonIcon extends StatelessWidget {
-  const _BowlSpoonIcon({this.size = 26});
-
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: size * 1.38,
-      height: size,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Image.asset(
-            AppIcons.mamaKabi,
-            width: size,
-            height: size,
-            fit: BoxFit.contain,
-            filterQuality: FilterQuality.medium,
-          ),
-          CustomPaint(
-            size: Size(size * 0.34, size * 0.88),
-            painter: const _SpoonPainter(AppColors.violet),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SpoonPainter extends CustomPainter {
-  const _SpoonPainter(this.color);
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    canvas.save();
-    canvas.translate(size.width * 0.15, size.height * 0.02);
-    canvas.rotate(-0.38);
-    final fill = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill
-      ..strokeCap = StrokeCap.round;
-    final w = size.width;
-    final h = size.height;
-    canvas.drawOval(Rect.fromLTWH(0, 0, w * 0.95, h * 0.40), fill);
-    canvas.drawRRect(
-      RRect.fromLTRBR(
-        w * 0.32,
-        h * 0.28,
-        w * 0.62,
-        h * 0.98,
-        Radius.circular(w),
-      ),
-      fill,
-    );
-    canvas.restore();
-  }
-
-  @override
-  bool shouldRepaint(covariant _SpoonPainter oldDelegate) =>
-      oldDelegate.color != color;
 }

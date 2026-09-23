@@ -128,9 +128,7 @@ class AdminProduct {
       repurchaseRate: _rateFrom(d[ProductFields.repurchaseRate]),
       rating: (d[ProductFields.rating] as num?)?.toDouble() ?? 0,
       reviewCount: (d[ProductFields.reviewCount] as num?)?.toInt() ?? 0,
-      gallery:
-          (d[ProductFields.gallery] as List?)?.whereType<String>().toList() ??
-          const [],
+      gallery: _stringList(d[ProductFields.gallery]),
       seoTitle: (d[ProductFields.seoTitle] as String?) ?? '',
       metaDescription: (d[ProductFields.metaDescription] as String?) ?? '',
       createdAt: created is Timestamp ? created.toDate() : null,

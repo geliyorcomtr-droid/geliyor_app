@@ -52,21 +52,11 @@ class _AdminTrustBadgesScreenState extends State<AdminTrustBadgesScreen> {
     );
     var active = existing?.active ?? true;
     var dialogUploading = false;
-    final isExistingRating =
-        existing != null && TrustBadgeRepository.isRatingBadge(existing);
 
     final save = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) {
-          final isRating =
-              isExistingRating ||
-              TrustBadgeRepository.isRatingBadge(
-                AppTrustBadge(
-                  id: existing?.id ?? _badgeId(name.text),
-                  name: name.text,
-                ),
-              );
           return AlertDialog(
             title: Text(
               existing == null
@@ -103,43 +93,35 @@ class _AdminTrustBadgesScreenState extends State<AdminTrustBadgesScreen> {
                       border: OutlineInputBorder(),
                     ),
                   ),
-                  if (!isRating) ...[
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: imageUrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Görsel URL',
-                        border: OutlineInputBorder(),
-                      ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: imageUrl,
+                    onChanged: (_) => setDialogState(() {}),
+                    decoration: const InputDecoration(
+                      labelText: 'İkon görseli URL',
+                      border: OutlineInputBorder(),
                     ),
-                    const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                      onPressed: dialogUploading
-                          ? null
-                          : () async {
-                              setDialogState(() => dialogUploading = true);
-                              final url = await _pickAndUploadImage();
-                              if (url != null) {
-                                imageUrl.text = url;
-                                setDialogState(() {});
-                              }
-                              setDialogState(() => dialogUploading = false);
-                            },
-                      icon: const Icon(Icons.upload_rounded),
-                      label: Text(
-                        dialogUploading ? 'Yükleniyor...' : 'Görsel Ekle',
-                      ),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: dialogUploading
+                        ? null
+                        : () async {
+                            setDialogState(() => dialogUploading = true);
+                            final url = await _pickAndUploadImage();
+                            if (url != null) {
+                              imageUrl.text = url;
+                              setDialogState(() {});
+                            }
+                            setDialogState(() => dialogUploading = false);
+                          },
+                    icon: const Icon(Icons.upload_rounded),
+                    label: Text(
+                      dialogUploading
+                          ? 'Yükleniyor...'
+                          : 'İkon Ekle / Değiştir',
                     ),
-                  ] else ...[
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Puan rozeti sarı yıldız ikonu kullanır; özel görsel yok.',
-                      style: TextStyle(
-                        color: AppColors.subText,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
+                  ),
                   const SizedBox(height: 12),
                   Material(
                     color: AppColors.background,
@@ -197,15 +179,14 @@ class _AdminTrustBadgesScreenState extends State<AdminTrustBadgesScreen> {
     if (save != true || badgeName.isEmpty) return;
 
     final id = existing?.id ?? _badgeId(badgeName);
-    final asRating = TrustBadgeRepository.isRatingBadge(
-      AppTrustBadge(id: id, name: badgeName),
-    );
     await TrustBadgeRepository.instance.save(
       AppTrustBadge(
         id: id,
         name: badgeName,
-        imageUrl: asRating ? '' : uploadedImage,
-        assetPath: asRating ? '' : (existing?.assetPath ?? ''),
+        imageUrl: uploadedImage,
+        assetPath: uploadedImage.isNotEmpty
+            ? ''
+            : (existing?.assetPath ?? ''),
         order: badgeOrder,
         active: active,
       ),
@@ -223,10 +204,11 @@ class _AdminTrustBadgesScreenState extends State<AdminTrustBadgesScreen> {
   }
 
   Future<void> _changeImage(AppTrustBadge badge) async {
-    if (TrustBadgeRepository.isRatingBadge(badge)) return;
     final url = await _pickAndUploadImage();
     if (url == null) return;
-    await TrustBadgeRepository.instance.save(badge.copyWith(imageUrl: url));
+    await TrustBadgeRepository.instance.save(
+      badge.copyWith(imageUrl: url, assetPath: ''),
+    );
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('${badge.name} görseli güncellendi.')),
@@ -323,8 +305,7 @@ class _AdminTrustBadgesScreenState extends State<AdminTrustBadgesScreen> {
             const SizedBox(height: 6),
             const Text(
               'Ürün detayında görselin solunda gösterilen rozetleri yönetin. '
-              'Puan / Değerlendirme rozeti her zaman sarı yıldız ikonu kullanır; '
-              'özel görsel yüklenmez.',
+              'İkonu tablodaki resme tıklayarak veya düzenle penceresinden değiştirebilirsiniz.',
               style: TextStyle(
                 color: AppColors.subText,
                 fontWeight: FontWeight.w600,
@@ -437,10 +418,7 @@ class _AdminTrustBadgesScreenState extends State<AdminTrustBadgesScreen> {
                       cells: [
                         DataCell(
                           InkWell(
-                            onTap: _uploading ||
-                                    TrustBadgeRepository.isRatingBadge(badge)
-                                ? null
-                                : () => _changeImage(badge),
+                            onTap: _uploading ? null : () => _changeImage(badge),
                             borderRadius: BorderRadius.circular(16),
                             child: SizedBox(
                               width: 68,
@@ -487,21 +465,13 @@ class _AdminTrustBadgesScreenState extends State<AdminTrustBadgesScreen> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               IconButton(
-                                tooltip: TrustBadgeRepository.isRatingBadge(badge)
-                                    ? 'Sarı yıldız (değiştirilemez)'
-                                    : 'Görsel Ekle / Değiştir',
-                                onPressed: _uploading ||
-                                        TrustBadgeRepository.isRatingBadge(badge)
+                                tooltip: 'Görsel Ekle / Değiştir',
+                                onPressed: _uploading
                                     ? null
                                     : () => _changeImage(badge),
-                                icon: Icon(
-                                  TrustBadgeRepository.isRatingBadge(badge)
-                                      ? Icons.star_rounded
-                                      : Icons.image_outlined,
+                                icon: const Icon(
+                                  Icons.image_outlined,
                                   size: 19,
-                                  color: TrustBadgeRepository.isRatingBadge(badge)
-                                      ? AppColors.warning
-                                      : null,
                                 ),
                               ),
                               IconButton(
@@ -539,68 +509,47 @@ class _AdminTrustBadgesScreenState extends State<AdminTrustBadgesScreen> {
     String? id,
     double? size,
   }) {
-    final isRating = TrustBadgeRepository.isRatingBadge(
-      AppTrustBadge(id: id ?? '', name: name),
+    final badge = AppTrustBadge(
+      id: id ?? '',
+      name: name,
+      imageUrl: imageUrl,
+      assetPath: assetPath,
     );
-    if (isRating) {
-      return Container(
-        width: size,
-        height: size,
-        padding: const EdgeInsets.all(5),
-        decoration: BoxDecoration(
-          color: AppColors.background,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: const Icon(
-          Icons.star_rounded,
-          color: AppColors.warning,
-          size: 28,
-        ),
-      );
-    }
-
-    final lower = name.toLowerCase();
-    final fallback = Center(
-      child: Container(
-        color: AppColors.subText,
-        alignment: Alignment.center,
-        child: const Text(
-          'RESİM\nYOK',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: AppColors.surface,
-            fontSize: 11,
-            fontWeight: FontWeight.w900,
-            height: 1.1,
-          ),
-        ),
-      ),
-    );
-    final isProtein = lower.contains('protein');
-    final isPreferred = lower.contains('tercih');
-    final isRepurchase = lower.contains('tekrar');
-    final isAffordable = lower.contains('uygun');
-    final resolvedAsset = isProtein
-        ? TrustBadgeRepository.proteinIconPath
-        : isPreferred
-        ? TrustBadgeRepository.preferredIconPath
-        : isRepurchase
-        ? TrustBadgeRepository.repurchaseIconPath
-        : isAffordable
-        ? TrustBadgeRepository.affordableIconPath
-        : assetPath;
-    final image = imageUrl.isNotEmpty
+    final url = TrustBadgeRepository.displayImageUrl(badge);
+    final asset = TrustBadgeRepository.displayAssetPath(badge);
+    final isRating = TrustBadgeRepository.isRatingBadge(badge);
+    final fallback = isRating
+        ? const Icon(
+            Icons.star_rounded,
+            color: AppColors.warning,
+            size: 28,
+          )
+        : Center(
+            child: Container(
+              color: AppColors.subText,
+              alignment: Alignment.center,
+              child: const Text(
+                'RESİM\nYOK',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: AppColors.surface,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                  height: 1.1,
+                ),
+              ),
+            ),
+          );
+    final image = url.isNotEmpty
         ? buildProductImage(
-            imageUrl,
+            url,
             fit: BoxFit.contain,
             filterQuality: FilterQuality.high,
             errorWidget: fallback,
           )
-        : resolvedAsset.isNotEmpty
+        : asset.isNotEmpty
         ? buildProductImage(
-            resolvedAsset,
+            asset,
             fit: BoxFit.contain,
             errorWidget: fallback,
           )

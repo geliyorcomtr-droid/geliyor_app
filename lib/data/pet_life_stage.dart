@@ -15,6 +15,34 @@ abstract final class PetLifeStage {
 
   static const monthOptions = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
+  static const petCatKitten = 'Yavru';
+  static const petCatAdult = 'Yetişkin';
+  static const petDogAdult = 'Köpek';
+  static const petDogPuppy = 'Köpek Yavru';
+  static const petDogMini = 'Mini Irk Yetişkin';
+  static const petDogMiniPuppy = 'Mini Irk Yavru';
+
+  static const catAgeOptions = [petCatKitten, petCatAdult];
+  static const dogTypeOptions = [
+    petDogAdult,
+    petDogPuppy,
+    petDogMini,
+    petDogMiniPuppy,
+  ];
+
+  static String dogTypeOf(String? raw) {
+    final puppy = inferIsPuppy(ageRange: raw);
+    final mini = inferIsMini(ageRange: raw);
+    if (mini) return puppy ? petDogMiniPuppy : petDogMini;
+    return puppy ? petDogPuppy : petDogAdult;
+  }
+
+  static String catAgeOf(String? raw) {
+    final group = ageGroupOf(raw);
+    if (group == petCatKitten) return petCatKitten;
+    return petCatAdult;
+  }
+
   static String normalizeTitle(String raw) {
     return raw
         .trim()
