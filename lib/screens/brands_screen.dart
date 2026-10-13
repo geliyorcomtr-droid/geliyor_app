@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:geliyor_app/data/brand_repository.dart';
 import 'package:geliyor_app/screens/pet_market_products_screen.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:geliyor_app/utils/product_image.dart';
+import 'package:geliyor_app/widgets/brand_tile_image.dart';
 import 'package:geliyor_app/widgets/filter_subpage_layout.dart';
 
 class BrandsScreen extends StatelessWidget {
@@ -13,7 +15,7 @@ class BrandsScreen extends StatelessWidget {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => PetMarketProductsScreen(
-          initialMainCategory: 'cat',
+          initialMainCategory: '',
           initialBrand: brand.name,
         ),
       ),
@@ -43,7 +45,15 @@ class BrandsScreen extends StatelessWidget {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final brands = snapshot.data!;
+          final brands = [
+            for (final brand in snapshot.data!)
+              if (brand.hasImage) brand,
+          ];
+          ImageWarmup.precache(
+            context,
+            brands.map((brand) => brand.displayImage),
+            cacheWidth: brandLogoCachePx,
+          );
           if (brands.isEmpty) {
             return const Center(
               child: Text(
@@ -90,47 +100,14 @@ class BrandsScreen extends StatelessWidget {
           padding: const EdgeInsets.all(10),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(16),
-            child: _brandImage(brand),
+            child: Transform.scale(
+              scale: 1.08,
+              child: BrandTileImage(brand: brand, fallbackColor: AppColors.success),
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _brandImage(AppBrand brand) {
-    final fallback = Center(
-      child: Text(
-        brand.name,
-        textAlign: TextAlign.center,
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(
-          color: AppColors.success,
-          fontSize: 11,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-    );
-    if (brand.imageUrl.isNotEmpty) {
-      return Transform.scale(
-        scale: 1.08,
-        child: Image.network(
-          brand.imageUrl,
-          fit: BoxFit.cover,
-          errorBuilder: (_, _, _) => fallback,
-        ),
-      );
-    }
-    if (brand.assetPath.isNotEmpty) {
-      return Transform.scale(
-        scale: 1.08,
-        child: Image.asset(
-          brand.assetPath,
-          fit: BoxFit.cover,
-          errorBuilder: (_, _, _) => fallback,
-        ),
-      );
-    }
-    return fallback;
-  }
 }

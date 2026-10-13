@@ -70,14 +70,11 @@ class PreferredRankMedal extends StatelessWidget {
               : TrustBadgeRepository.preferredIconPath;
         }();
 
-        final cornerRadius = dest.width * 0.42;
-        return ClipRRect(
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(cornerRadius),
-            topRight: Radius.circular(cornerRadius),
-          ),
+        return SizedBox(
+          width: maxW,
+          height: maxH,
           child: Stack(
-            clipBehavior: Clip.hardEdge,
+            clipBehavior: Clip.none,
             children: [
               Positioned.fromRect(
                 rect: dest,

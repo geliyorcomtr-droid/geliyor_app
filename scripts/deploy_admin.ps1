@@ -27,12 +27,6 @@ self.addEventListener('activate', function (event) {
       await Promise.all(keys.map(function (k) { return caches.delete(k); }));
     } catch (e) {}
     try { await self.registration.unregister(); } catch (e) {}
-    try {
-      var clients = await self.clients.matchAll({ type: 'window' });
-      await Promise.all(clients.map(function (client) {
-        if (client.url && client.navigate) return client.navigate(client.url);
-      }));
-    } catch (e) {}
   })());
 });
 '@

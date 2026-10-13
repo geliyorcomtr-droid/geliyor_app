@@ -14,7 +14,6 @@ class AppIcons {
   static const String favori = '$_base/favori.png';
   static const String hindi = '$_base/hindi.png';
   static const String hypoallergenic = '$_base/hypoallergenic.png';
-  static const String idrar = '$_base/idrar.png';
   static const String ilac = '$_base/ilac.png';
   static const String ilacTedavi = '$_base/ilac_tedavi.png';
   static const String inek = '$_base/inek.png';

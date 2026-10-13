@@ -108,7 +108,8 @@ class MeetPetScreen extends StatelessWidget {
             final activeIndex = PetStore.instance.activePetIndex;
             return LayoutBuilder(
               builder: (context, constraints) {
-                const bannerH = 132.0;
+                const framePad = 3.0;
+                const bannerH = 132.0 + framePad * 2;
                 const addH = 36.0;
                 const sectionH = 22.0;
                 const gap = 8.0;
@@ -132,11 +133,24 @@ class MeetPetScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const AppBannerSlot(
-                        placement: BannerPlacement.meetPet,
-                        fallbackAssets: [
-                          'assets/images/dostunu_taniyalim_banner.png',
-                        ],
+                      Container(
+                        padding: const EdgeInsets.all(framePad),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(
+                            color: AppColors.primary.withValues(alpha: 0.25),
+                          ),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(21),
+                          child: const AppBannerSlot(
+                            placement: BannerPlacement.meetPet,
+                            fallbackAssets: [
+                              'assets/images/dostunu_taniyalim_banner.png',
+                            ],
+                          ),
+                        ),
                       ),
                       const SizedBox(height: gap),
                       AppPressableButton(

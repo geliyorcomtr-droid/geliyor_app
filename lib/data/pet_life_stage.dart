@@ -6,9 +6,9 @@ abstract final class PetLifeStage {
   static const adult = 'adult';
   static const puppy = 'puppy';
 
-  static const catAdult = 'Mama';
+  static const catAdult = 'Yetişkin';
   static const catKitten = 'Yavru';
-  static const dogAdult = 'Mama';
+  static const dogAdult = 'Yetişkin';
   static const dogPuppy = 'Yavru';
   static const dogMiniAdult = 'Mini Irk';
   static const dogMiniPuppy = 'Mini Irk Yavru';
@@ -102,19 +102,26 @@ abstract final class PetLifeStage {
 
   static bool isAdultFoodTitle(String raw) {
     final title = normalizeTitle(raw);
-    return title == 'mama' || title.isEmpty;
+    return title == 'yetiskin' || title == 'mama' || title.isEmpty;
   }
 
   static bool isLifeStageTitle(String raw) {
-    final title = normalizeTitle(raw);
-    return title == 'mama' ||
+    final title = canonicalLifeStageTitle(raw);
+    return title == 'yetiskin' ||
         title == 'yavru' ||
         title == 'mini irk' ||
         title == 'mini irk yavru';
   }
 
+  /// Eski "Mama" alt kategorisi yetişkin mamayla aynıdır.
+  static String canonicalLifeStageTitle(String raw) {
+    final title = normalizeTitle(raw);
+    if (title == 'mama') return 'yetiskin';
+    return title;
+  }
+
   static bool isSameLifeStageCategory(String a, String b) {
-    return normalizeTitle(a) == normalizeTitle(b);
+    return canonicalLifeStageTitle(a) == canonicalLifeStageTitle(b);
   }
 
   /// Mini Irk Yavru, formda Mini Irk + Yavru ile yönetilir.
@@ -137,7 +144,7 @@ abstract final class PetLifeStage {
     return catAdult;
   }
 
-  /// Yavru seçilmemiş ürün yetişkin kedi/köpek (Mama) olarak kaydedilir.
+  /// Yavru seçilmemiş ürün yetişkin kedi/köpek olarak kaydedilir.
   static String savedCategory({
     required String mainCategory,
     required String selected,
@@ -175,7 +182,7 @@ abstract final class PetLifeStage {
       return true;
     }
     final months = monthsFromLabel(ageRange);
-    if (months != null && months <= 12) return true;
+    if (months != null && months <= 18) return true;
     return false;
   }
 
@@ -197,7 +204,7 @@ abstract final class PetLifeStage {
     if (monthMatch != null) {
       final months = int.tryParse(monthMatch.group(1)!);
       if (months == null) return null;
-      return months.clamp(1, 12);
+      return months.clamp(1, 18);
     }
     return null;
   }

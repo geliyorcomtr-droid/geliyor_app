@@ -14,7 +14,9 @@ import 'package:geliyor_app/state/auth_store.dart';
 import 'package:geliyor_app/state/pet_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
+import 'package:geliyor_app/utils/compress_upload_image.dart';
 import 'package:geliyor_app/utils/login_gate.dart';
+import 'package:geliyor_app/utils/storage_metadata.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
@@ -405,10 +407,18 @@ class _AddPetScreenState extends State<AddPetScreen> {
   Future<String?> _uploadPhoto(Uint8List bytes) async {
     final uid = AuthStore.instance.uid ?? '';
     if (uid.isEmpty) return null;
-    final ref = FirebaseStorage.instance.ref(
-      'pet_photos/$uid/${DateTime.now().millisecondsSinceEpoch}.jpg',
+    final prepared = prepareUploadImage(
+      bytes,
+      'pet.jpg',
+      style: UploadImageStyle.photo,
     );
-    await ref.putData(bytes, SettableMetadata(contentType: 'image/jpeg'));
+    final ref = FirebaseStorage.instance.ref(
+      'pet_photos/$uid/${DateTime.now().millisecondsSinceEpoch}_${prepared.fileName}',
+    );
+    await ref.putData(
+      prepared.bytes,
+      storageImageMetadata(prepared.contentType),
+    );
     return ref.getDownloadURL();
   }
 

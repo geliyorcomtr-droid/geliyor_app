@@ -91,10 +91,10 @@ class FoodReminderSync {
     if (notifyAt.isAfter(end)) {
       notifyAt = end;
     }
-    if (notifyAt.isBefore(today)) {
-      notifyAt = today;
-    }
     final reminderDate = _ymd(notifyAt);
+    final cycleKey =
+        '${_ymd(end)}|${estimate.fromManual ? 'manual' : 'order'}|'
+        '${estimate.bagKg}|${estimate.foodTitle}';
 
     var autoNotifyAt = end.subtract(
       Duration(days: settings.autoOrderDaysBefore.clamp(1, 30)),
@@ -102,14 +102,18 @@ class FoodReminderSync {
     if (autoNotifyAt.isAfter(end)) autoNotifyAt = end;
     if (autoNotifyAt.isBefore(today)) autoNotifyAt = today;
     final autoOrderDate = _ymd(autoNotifyAt);
-    final autoOrderEnabled =
-        settings.canSendOrderNotifications && estimate.remainingDays >= 0;
+    final autoOrderEnabled = settings.subscriptionEnabled &&
+        settings.canSendOrderNotifications &&
+        estimate.remainingDays >= 0;
 
     final existing = await ref.get();
     final prev = existing.data()?[_map] as Map<String, dynamic>?;
     final prevDate = prev?[FoodReminderFields.reminderDate] as String?;
     final prevSent = prev?[FoodReminderFields.sentFor] as String?;
-    final sentFor = prevDate == reminderDate ? (prevSent ?? '') : '';
+    final prevCycle = prev?[FoodReminderFields.cycleKey] as String?;
+    final sentFor = prevCycle == cycleKey && prevDate == reminderDate
+        ? (prevSent ?? '')
+        : '';
     final prevAutoDate = prev?[FoodReminderFields.autoOrderDate] as String?;
     final prevAutoSent = prev?[FoodReminderFields.autoOrderSentFor] as String?;
     final autoOrderSentFor =
@@ -126,6 +130,7 @@ class FoodReminderSync {
         FoodReminderFields.petName: estimate.shareLabel,
         FoodReminderFields.foodTitle: estimate.foodTitle,
         FoodReminderFields.sentFor: sentFor,
+        FoodReminderFields.cycleKey: cycleKey,
         FoodReminderFields.autoOrderEnabled: autoOrderEnabled,
         FoodReminderFields.autoOrderDate: autoOrderDate,
         FoodReminderFields.autoOrderSentFor: autoOrderSentFor,

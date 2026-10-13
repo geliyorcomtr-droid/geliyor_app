@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:geliyor_app/data/firestore_collections.dart';
+import 'package:geliyor_app/data/knowledge_advantage_icons.dart';
 import 'package:geliyor_app/data/knowledge_catalog.dart';
 
 class AppKnowledgeTopic {
@@ -10,8 +11,9 @@ class AppKnowledgeTopic {
     this.subtitle = '',
     this.iconUrl = '',
     this.assetPath = '',
-    this.colorValue = 0xFFF59E0B,
+    this.colorValue = 0xFF1E90FF,
     this.questionTopicId = 'sindirim',
+    this.advantageId = '',
     this.order = 0,
     this.active = true,
   });
@@ -23,6 +25,7 @@ class AppKnowledgeTopic {
   final String assetPath;
   final int colorValue;
   final String questionTopicId;
+  final String advantageId;
   final int order;
   final bool active;
 
@@ -46,10 +49,11 @@ class AppKnowledgeTopic {
       assetPath: (data[KnowledgeTopicFields.assetPath] as String?) ?? '',
       colorValue:
           (data[KnowledgeTopicFields.colorValue] as num?)?.toInt() ??
-          0xFFF59E0B,
+          0xFF1E90FF,
       questionTopicId:
           (data[KnowledgeTopicFields.questionTopicId] as String?) ??
           'sindirim',
+      advantageId: (data[KnowledgeTopicFields.advantageId] as String?) ?? '',
       order: (data[KnowledgeTopicFields.order] as num?)?.toInt() ?? 0,
       active: data[KnowledgeTopicFields.active] as bool? ?? true,
     );
@@ -63,6 +67,7 @@ class AppKnowledgeTopic {
       assetPath: item.assetPath,
       colorValue: item.colorValue,
       questionTopicId: item.questionTopicId,
+      advantageId: KnowledgeAdvantageIcons.defaultForTopicId(item.id),
       order: item.order,
     );
   }
@@ -79,6 +84,7 @@ class AppKnowledgeTopic {
     KnowledgeTopicFields.assetPath: assetPath.trim(),
     KnowledgeTopicFields.colorValue: colorValue,
     KnowledgeTopicFields.questionTopicId: questionTopicId.trim(),
+    KnowledgeTopicFields.advantageId: advantageId.trim(),
     KnowledgeTopicFields.order: order,
     KnowledgeTopicFields.active: active,
     KnowledgeTopicFields.updatedAt: FieldValue.serverTimestamp(),
@@ -91,6 +97,7 @@ class AppKnowledgeTopic {
     String? assetPath,
     int? colorValue,
     String? questionTopicId,
+    String? advantageId,
     int? order,
     bool? active,
   }) {
@@ -102,6 +109,7 @@ class AppKnowledgeTopic {
       assetPath: assetPath ?? this.assetPath,
       colorValue: colorValue ?? this.colorValue,
       questionTopicId: questionTopicId ?? this.questionTopicId,
+      advantageId: advantageId ?? this.advantageId,
       order: order ?? this.order,
       active: active ?? this.active,
     );
@@ -234,6 +242,26 @@ class KnowledgeContentRepository {
         }
         await batch.commit();
       }
+    } catch (_) {}
+
+    try {
+      final snap = await _topics.get();
+      final batch = FirebaseFirestore.instance.batch();
+      var hasWrites = false;
+      for (final doc in snap.docs) {
+        final stored =
+            ((doc.data()[KnowledgeTopicFields.advantageId] as String?) ?? '')
+                .trim();
+        if (stored.isNotEmpty) continue;
+        final inferred = KnowledgeAdvantageIcons.defaultForTopicId(doc.id);
+        if (inferred.isEmpty) continue;
+        batch.set(doc.reference, {
+          KnowledgeTopicFields.advantageId: inferred,
+          KnowledgeTopicFields.updatedAt: FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+        hasWrites = true;
+      }
+      if (hasWrites) await batch.commit();
     } catch (_) {}
 
     try {

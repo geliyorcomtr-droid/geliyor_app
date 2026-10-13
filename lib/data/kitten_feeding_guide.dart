@@ -1,5 +1,7 @@
+import 'package:geliyor_app/data/feeding_factors.dart';
+
 /// Yavru kedi kuru mama tüketimi (g/gün).
-/// Excel: kilo satırı × yaş sütunu. Boş hücre o kombinasyon için referans yok.
+/// Excel: kilo satırı × yaş sütunu. Formül: baz × kısır × vücut × aktivite × ek besin.
 class KittenAgeColumn {
   const KittenAgeColumn({required this.label, required this.months});
 
@@ -11,6 +13,7 @@ class KittenAgeColumn {
 
 abstract final class KittenFeedingGuide {
   static Map<String, int> gramsOverride = const {};
+  static FeedingFactors factors = FeedingFactors.defaults;
 
   static const List<double> kgRows = [
     0.5,
@@ -144,10 +147,81 @@ abstract final class KittenFeedingGuide {
     return null;
   }
 
-  static int? dailyGramsFor({String? weightLabel, int? months}) {
+  static int? dailyGramsFor({
+    String? weightLabel,
+    int? months,
+    String? bodyType,
+    String? activityLevel,
+    String? neutered,
+    String? extraFood,
+  }) {
     final kg = kgFromLabel(weightLabel);
     if (kg == null || months == null || months <= 0) return null;
-    return gramsAt(kg: kg, months: months);
+    final base = gramsAt(kg: kg, months: months);
+    if (base == null) return null;
+    return finalizeGrams(
+      baseGrams: base,
+      bodyType: bodyType,
+      activityLevel: activityLevel,
+      neutered: neutered,
+      extraFood: extraFood,
+    );
+  }
+
+  static int finalizeGrams({
+    required int baseGrams,
+    String? bodyType,
+    String? activityLevel,
+    String? neutered,
+    String? extraFood,
+  }) {
+    if (baseGrams <= 0) return 0;
+    final raw = baseGrams *
+        neuteredFactor(neutered) *
+        bodyFactor(bodyType) *
+        activityFactor(activityLevel) *
+        extraFoodFactor(extraFood);
+    final lo = baseGrams * factors.clampLow;
+    final hi = baseGrams * factors.clampHigh;
+    return raw.clamp(lo, hi).round();
+  }
+
+  static double bodyFactor(String? bodyType) {
+    final v = (bodyType ?? '').toLowerCase();
+    if (v.contains('zayıf') || v.contains('zayif')) return factors.bodyThin;
+    if (v.contains('kilolu') || v.contains('obez')) return factors.bodyHeavy;
+    return factors.bodyIdeal;
+  }
+
+  static double activityFactor(String? activityLevel) {
+    final v = (activityLevel ?? '').toLowerCase();
+    if (v.contains('yüksek') || v.contains('yuksek') || v.contains('aktif')) {
+      return factors.activityHigh;
+    }
+    if (v.contains('düşük') || v.contains('dusuk')) return factors.activityLow;
+    return factors.activityMid;
+  }
+
+  static double neuteredFactor(String? neutered) {
+    final v = (neutered ?? '').toLowerCase();
+    if (v == 'hayır' ||
+        v == 'hayir' ||
+        v.contains('değil') ||
+        v.contains('degil')) {
+      return factors.neuteredNo;
+    }
+    if (v == 'evet' || v.contains('kısır') || v.contains('kisir')) {
+      return factors.neuteredYes;
+    }
+    return factors.neuteredNo;
+  }
+
+  static double extraFoodFactor(String? extraFood) {
+    final v = (extraFood ?? '').toLowerCase();
+    if (v.contains('her ikisi')) return factors.extraBoth;
+    if (v.contains('yaş') || v.contains('yas')) return factors.extraWet;
+    if (v.contains('ödül') || v.contains('odul')) return factors.extraTreat;
+    return factors.extraNone;
   }
 
   static String nearestWeightLabel(String? label) {

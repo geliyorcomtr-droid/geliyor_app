@@ -4,7 +4,10 @@ import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
+import 'package:geliyor_app/data/banner_repository.dart';
 import 'package:geliyor_app/data/firestore_collections.dart';
+import 'package:geliyor_app/data/hangi_mama_repository.dart';
+import 'package:geliyor_app/data/product_advantage_repository.dart';
 import 'package:geliyor_app/data/product_repository.dart';
 import 'package:geliyor_app/state/auth_store.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
@@ -12,7 +15,10 @@ import 'package:geliyor_app/widgets/app_notification_button.dart';
 import 'package:geliyor_app/screens/product_detail_screen.dart';
 import 'package:geliyor_app/state/cart_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:geliyor_app/utils/compress_upload_image.dart';
 import 'package:geliyor_app/utils/login_gate.dart';
+import 'package:geliyor_app/utils/product_image.dart';
+import 'package:geliyor_app/utils/storage_metadata.dart';
 import 'package:geliyor_app/utils/market_product_helpers.dart';
 import 'package:geliyor_app/utils/product_tag_filter.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
@@ -36,6 +42,7 @@ class HangiMamaScreen extends StatefulWidget {
 class _HangiMamaScreenState extends State<HangiMamaScreen> {
   _PetType _petType = _PetType.cat;
   final Set<String> _selectedNeedIds = {'sindirim'};
+  final _needSearch = TextEditingController();
 
   bool _supplyOpen = false;
   final _requestNameController = TextEditingController();
@@ -45,77 +52,20 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
   bool _savingRequest = false;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _supplySub;
 
-  static const _needs = <_MamaNeed>[
-    _MamaNeed(
-      id: 'sindirim',
-      title: 'Sindirim\nProblemleri',
-      iconPath: 'assets/images/app_ikonlar/sindirim.png',
-    ),
-    _MamaNeed(
-      id: 'bobrek',
-      title: 'Böbrek\nDesteği',
-      iconPath: 'assets/images/app_ikonlar/bobrek.png',
-    ),
-    _MamaNeed(
-      id: 'tuy',
-      title: 'Tüy & Deri\nSağlığı',
-      iconPath: 'assets/images/app_ikonlar/tuy_deri.png',
-    ),
-    _MamaNeed(
-      id: 'kilo',
-      title: 'Kilo\nKontrolü',
-      iconPath: 'assets/images/app_ikonlar/kilo_kontrol.png',
-    ),
-    _MamaNeed(
-      id: 'bagisiklik',
-      title: 'Bağışıklık\nDesteği',
-      iconPath: 'assets/images/app_ikonlar/bagisiklik.png',
-    ),
-    _MamaNeed(
-      id: 'mide',
-      title: 'Mide\nSağlığı',
-      iconPath: 'assets/images/app_ikonlar/dogal_icerik.png',
-    ),
-    _MamaNeed(
-      id: 'kalp',
-      title: 'Kalp\nDesteği',
-      iconPath: 'assets/images/app_ikonlar/kalp.png',
-    ),
-    _MamaNeed(
-      id: 'dis',
-      title: 'Diş\nSağlığı',
-      iconPath: 'assets/images/app_ikonlar/dis.png',
-    ),
-    _MamaNeed(
-      id: 'kisir',
-      title: 'Kısırlaştırılmış\nDostlar',
-      iconPath: 'assets/images/app_ikonlar/kisir_kedi.png',
-    ),
-    _MamaNeed(
-      id: 'tahilsiz',
-      title: 'Tahılsız\nMama',
-      iconPath: 'assets/images/app_ikonlar/tahilsiz.png',
-    ),
-    _MamaNeed(
-      id: 'idrar',
-      title: 'İdrar Yolu\nSağlığı',
-      iconPath: 'assets/images/app_ikonlar/idrar.png',
-    ),
-    _MamaNeed(
-      id: 'eklem',
-      title: 'Eklem\nDesteği',
-      iconPath: 'assets/images/app_ikonlar/eklem.png',
-    ),
-  ];
-
   bool get _isCat => _petType == _PetType.cat;
 
-  String get _listTitle {
+  String _listTitleFor(List<AppProductAdvantage> catalog) {
     if (_selectedNeedIds.isEmpty) {
       return 'Önerilen Mamalar';
     }
-    final first = _needs.firstWhere((n) => n.id == _selectedNeedIds.first);
-    final base = first.title.replaceAll('\n', ' ');
+    AppProductAdvantage? first;
+    for (final item in catalog) {
+      if (_selectedNeedIds.contains(item.id)) {
+        first = item;
+        if (item.id == _selectedNeedIds.first) break;
+      }
+    }
+    final base = (first?.name ?? 'Seçilen ihtiyaç').replaceAll('\n', ' ');
     if (_selectedNeedIds.length == 1) {
       return '$base için Önerilen Mamalar';
     }
@@ -194,12 +144,17 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
       final bytes = _requestImageBytes;
       final uid = AuthStore.instance.uid ?? '';
       if (bytes != null && uid.isNotEmpty) {
+        final prepared = prepareUploadImage(
+          bytes,
+          'supply.jpg',
+          style: UploadImageStyle.photo,
+        );
         final ref = FirebaseStorage.instance.ref(
-          'supply_requests/$uid/${DateTime.now().millisecondsSinceEpoch}.jpg',
+          'supply_requests/$uid/${DateTime.now().millisecondsSinceEpoch}_${prepared.fileName}',
         );
         await ref.putData(
-          bytes,
-          SettableMetadata(contentType: 'image/jpeg'),
+          prepared.bytes,
+          storageImageMetadata(prepared.contentType),
         );
         imageUrl = await ref.getDownloadURL();
       }
@@ -404,6 +359,7 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
     _supplySub?.cancel();
     _requestNameController.dispose();
     _requestNoteController.dispose();
+    _needSearch.dispose();
     super.dispose();
   }
 
@@ -465,23 +421,55 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  _buildBanner(),
+                  const SizedBox(height: 10),
                   _buildPetTypeSelector(),
                   const SizedBox(height: 10),
                   _buildRecommendCard(),
                   const SizedBox(height: 14),
-                  _buildNeedsHeader(),
-                  const SizedBox(height: 8),
-                  _buildNeedsGrid(),
-                  const SizedBox(height: 14),
-                  _buildProductsHeader(),
-                  const SizedBox(height: 8),
-                  StreamBuilder<List<MarketProductData>>(
-                    stream: ProductRepository.instance.watchMarketProducts(),
-                    builder: (context, snapshot) {
-                      final catalog =
-                          snapshot.data ?? const <MarketProductData>[];
-                      return _buildProductsGrid(
-                        _productsForSelection(catalog),
+                  StreamBuilder<List<AppProductAdvantage>>(
+                    stream: ProductAdvantageRepository.instance.watchAll(
+                      activeOnly: true,
+                    ),
+                    builder: (context, advantageSnap) {
+                      return StreamBuilder<List<String>>(
+                        stream: HangiMamaRepository.instance.watchAdvantageIds(),
+                        builder: (context, idsSnap) {
+                          final catalog =
+                              advantageSnap.data ??
+                              const <AppProductAdvantage>[];
+                          final pinnedIds =
+                              idsSnap.data ??
+                              HangiMamaRepository.defaultAdvantageIds;
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildNeedsHeader(),
+                              const SizedBox(height: 8),
+                              _buildNeedSearch(),
+                              const SizedBox(height: 8),
+                              _buildNeedSearchResults(catalog, pinnedIds),
+                              _buildNeedsGrid(catalog, pinnedIds),
+                              const SizedBox(height: 14),
+                              _buildProductsHeader(_listTitleFor(catalog)),
+                              const SizedBox(height: 8),
+                              StreamBuilder<List<MarketProductData>>(
+                                stream: ProductRepository.instance
+                                    .watchMarketProducts(),
+                                initialData: ProductRepository.instance
+                                    .cachedMarketProducts(),
+                                builder: (context, snapshot) {
+                                  final products =
+                                      snapshot.data ??
+                                      const <MarketProductData>[];
+                                  return _buildProductsGrid(
+                                    _productsForSelection(products),
+                                  );
+                                },
+                              ),
+                            ],
+                          );
+                        },
                       );
                     },
                   ),
@@ -526,6 +514,76 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
           const AppNotificationButton(badgeColor: AppColors.error),
         ],
       ),
+    );
+  }
+
+  Widget _buildBanner() {
+    const fallback = 'assets/images/hangi_mama_banner.jpg';
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection(FirestoreCollections.banners)
+          .snapshots(),
+      builder: (context, snapshot) {
+        var path = fallback;
+        var hidden = false;
+        final docs = snapshot.data?.docs;
+        if (docs != null) {
+          final deleted = <String>{};
+          for (final doc in docs) {
+            if (doc.id != BannerRepository.seededDocId) continue;
+            final raw = doc.data()['deletedIds'];
+            if (raw is Iterable) {
+              deleted.addAll(raw.map((item) => item.toString()));
+            }
+          }
+          final live = [
+            for (final doc in docs)
+              if (!doc.id.startsWith('_')) AppBanner.fromDoc(doc),
+          ].where((banner) {
+            return banner.active &&
+                banner.placement == BannerPlacement.hangiMama.id &&
+                banner.displayImage.trim().isNotEmpty;
+          }).toList();
+          final picked = AppBanner.latestLive(live);
+          if (picked != null) {
+            path = picked.displayImage;
+          } else if (deleted.contains('hangi-mama')) {
+            hidden = true;
+          }
+        }
+        if (hidden) return const SizedBox.shrink();
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            const framePad = 3.0;
+            final width = constraints.maxWidth - framePad * 2;
+            final height = width * 140 / 361;
+            return Container(
+              padding: const EdgeInsets.all(framePad),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.25),
+                ),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(21),
+                child: SizedBox(
+                  width: width,
+                  height: height,
+                  child: buildProductImage(
+                    path,
+                    fit: BoxFit.fill,
+                    width: width,
+                    height: height,
+                    cacheWidth: 1024,
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -1241,6 +1299,151 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
     );
   }
 
+  Widget _buildNeedSearch() {
+    return Container(
+      height: 48,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.violet.withValues(alpha: 0.28)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.search_rounded, color: AppColors.violet, size: 22),
+          const SizedBox(width: 8),
+          Expanded(
+            child: TextField(
+              controller: _needSearch,
+              onChanged: (_) => setState(() {}),
+              style: const TextStyle(
+                color: AppColors.text,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+              ),
+              decoration: const InputDecoration(
+                hintText: 'Listede yoksa fayda ara ve seç...',
+                hintStyle: TextStyle(
+                  color: AppColors.subText,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                ),
+                border: InputBorder.none,
+                isDense: true,
+              ),
+            ),
+          ),
+          if (_needSearch.text.isNotEmpty)
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              onPressed: () {
+                _needSearch.clear();
+                setState(() {});
+              },
+              icon: const Icon(Icons.close_rounded, size: 18),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNeedSearchResults(
+    List<AppProductAdvantage> catalog,
+    List<String> pinnedIds,
+  ) {
+    final query = ProductAdvantageRepository.foldSearch(_needSearch.text);
+    if (query.isEmpty) return const SizedBox.shrink();
+    final pinned = pinnedIds.toSet();
+    final matches = [
+      for (final item in catalog)
+        if (!pinned.contains(item.id) &&
+            (ProductAdvantageRepository.foldSearch(item.name).contains(query) ||
+                ProductAdvantageRepository.foldSearch(
+                  item.id,
+                ).contains(query) ||
+                ProductAdvantageRepository.matchingIds(
+                  _needSearch.text,
+                  catalog: catalog,
+                ).contains(item.id)))
+          item,
+    ];
+    if (matches.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.only(bottom: 8),
+        child: Text(
+          'Bu aramaya uyan başka fayda yok.',
+          style: TextStyle(
+            color: AppColors.subText,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final item in matches.take(12))
+            FilterChip(
+              label: Text(item.name),
+              selected: _selectedNeedIds.contains(item.id),
+              showCheckmark: false,
+              selectedColor: AppColors.selected,
+              side: BorderSide(
+                color: _selectedNeedIds.contains(item.id)
+                    ? AppColors.violet
+                    : AppColors.border,
+              ),
+              labelStyle: TextStyle(
+                color: _selectedNeedIds.contains(item.id)
+                    ? AppColors.violet
+                    : AppColors.text,
+                fontWeight: FontWeight.w800,
+                fontSize: 11,
+              ),
+              avatar: SizedBox(
+                width: 22,
+                height: 22,
+                child: _advantageImage(item),
+              ),
+              onSelected: (_) => _toggleNeed(item.id),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _advantageImage(AppProductAdvantage item) {
+    final path = ProductAdvantageRepository.displayPath(item);
+    if (path.isEmpty) {
+      return const Icon(
+        Icons.health_and_safety_outlined,
+        color: AppColors.violet,
+        size: 22,
+      );
+    }
+    return buildProductImage(
+      path,
+      fit: BoxFit.contain,
+      errorWidget: const Icon(
+        Icons.health_and_safety_outlined,
+        color: AppColors.violet,
+        size: 22,
+      ),
+    );
+  }
+
+  String _needLabel(String name) {
+    final words = name.trim().split(RegExp(r'\s+'));
+    if (words.length <= 1) return name.trim();
+    if (words.length == 2) return '${words[0]}\n${words[1]}';
+    final mid = (words.length / 2).ceil();
+    return '${words.take(mid).join(' ')}\n${words.skip(mid).join(' ')}';
+  }
+
   Widget _buildNeedsHeader() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1251,31 +1454,58 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
               'İhtiyacını Seç',
               style: AppTextStyles.sectionHeader.copyWith(
                 color: AppColors.violet,
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+                height: 1.1,
               ),
             ),
-            const SizedBox(width: 4),
-            const Icon(Icons.eco_rounded, color: AppColors.violet, size: 16),
+            const SizedBox(width: 6),
+            const Icon(Icons.eco_rounded, color: AppColors.violet, size: 22),
           ],
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: 4),
         const Text(
           'Birden fazla özellik seçebilirsin',
           style: TextStyle(
-            color: AppColors.subText,
-            fontSize: 11,
-            fontWeight: FontWeight.w500,
+            color: AppColors.text,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildNeedsGrid() {
+  Widget _buildNeedsGrid(
+    List<AppProductAdvantage> catalog,
+    List<String> pinnedIds,
+  ) {
+    final byId = {for (final item in catalog) item.id: item};
+    final items = <AppProductAdvantage>[
+      for (final id in pinnedIds)
+        if (byId[id] != null) byId[id]!,
+      for (final id in _selectedNeedIds)
+        if (!pinnedIds.contains(id) && byId[id] != null) byId[id]!,
+    ];
+    if (items.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Text(
+          'Admin panelinden henüz ihtiyaç ikonu seçilmedi.',
+          style: TextStyle(
+            color: AppColors.subText,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+    }
+
     const columns = 6;
     const gap = 6.0;
     final rows = <Widget>[];
 
-    for (int start = 0; start < _needs.length; start += columns) {
+    for (int start = 0; start < items.length; start += columns) {
       if (rows.isNotEmpty) rows.add(const SizedBox(height: gap));
       rows.add(
         Row(
@@ -1283,8 +1513,8 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
             for (int i = 0; i < columns; i++) ...[
               if (i > 0) const SizedBox(width: gap),
               Expanded(
-                child: start + i < _needs.length
-                    ? _buildNeedCard(_needs[start + i])
+                child: start + i < items.length
+                    ? _buildNeedCard(items[start + i])
                     : const SizedBox.shrink(),
               ),
             ],
@@ -1296,10 +1526,10 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
     return Column(children: rows);
   }
 
-  Widget _buildNeedCard(_MamaNeed need) {
-    final selected = _selectedNeedIds.contains(need.id);
+  Widget _buildNeedCard(AppProductAdvantage item) {
+    final selected = _selectedNeedIds.contains(item.id);
     return GestureDetector(
-      onTap: () => _toggleNeed(need.id),
+      onTap: () => _toggleNeed(item.id),
       child: Container(
         height: 86,
         padding: const EdgeInsets.fromLTRB(3, 4, 3, 4),
@@ -1307,7 +1537,9 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: selected ? AppColors.violet : AppColors.violet.withValues(alpha: 0.28),
+            color: selected
+                ? AppColors.violet
+                : AppColors.violet.withValues(alpha: 0.28),
             width: selected ? 0.8 : 1,
           ),
         ),
@@ -1318,26 +1550,15 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(2, 2, 2, 2),
-                    child: Image.asset(
-                      need.iconPath,
-                      fit: BoxFit.contain,
-                      width: double.infinity,
-                      height: double.infinity,
-                      filterQuality: FilterQuality.high,
-                      errorBuilder: (context, error, stackTrace) => const Icon(
-                        Icons.health_and_safety_outlined,
-                        color: AppColors.violet,
-                        size: 28,
-                      ),
-                    ),
+                    child: _advantageImage(item),
                   ),
                 ),
                 Text(
-                  need.title,
+                  _needLabel(item.name),
                   textAlign: TextAlign.center,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: AppColors.violet,
                     fontSize: 7.5,
                     fontWeight: FontWeight.w800,
@@ -1370,9 +1591,9 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
     );
   }
 
-  Widget _buildProductsHeader() {
+  Widget _buildProductsHeader(String title) {
     return Text(
-      _listTitle,
+      title,
       maxLines: 2,
       overflow: TextOverflow.ellipsis,
       style: AppTextStyles.sectionHeader.copyWith(color: AppColors.violet),
@@ -1381,18 +1602,9 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
 
   Widget _buildProductsGrid(List<_MamaProduct> products) {
     if (products.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 16),
-        child: Center(
-          child: Text(
-            'Bu ihtiyaca uygun ürün bulunamadı.',
-            style: TextStyle(
-              color: AppColors.subText,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
+      return marketProductsPlaceholder(
+        isEmpty: true,
+        emptyMessage: 'Bu ihtiyaca uygun ürün bulunamadı.',
       );
     }
 
@@ -1464,18 +1676,6 @@ class _HangiMamaScreenState extends State<HangiMamaScreen> {
       },
     );
   }
-}
-
-class _MamaNeed {
-  const _MamaNeed({
-    required this.id,
-    required this.title,
-    required this.iconPath,
-  });
-
-  final String id;
-  final String title;
-  final String iconPath;
 }
 
 class _MamaProduct {

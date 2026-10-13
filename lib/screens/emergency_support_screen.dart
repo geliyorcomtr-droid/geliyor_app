@@ -1,10 +1,12 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 import 'package:geliyor_app/data/banner_repository.dart';
+import 'package:geliyor_app/data/firestore_collections.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
+import 'package:geliyor_app/utils/product_image.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
-import 'package:geliyor_app/widgets/app_banner_slider.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
 
@@ -22,8 +24,8 @@ class _EmergencySupportScreenState extends State<EmergencySupportScreen> {
     _EmergencyCase(
       title: 'Zehirlenme',
       iconPath: 'assets/images/app_ikonlar/zehirlenme.png',
-      color: Color(0xFFE60000),
-      soft: Color(0xFFFFF7F7),
+      color: AppColors.primary,
+      soft: AppColors.selected,
       detailTitle: 'Zehirlenme Şüphesi',
       detailSubtitle: 'Yaygın toksik maddelere ve belirtilere dikkat edin.',
       symptoms: ['Ağız salyası', 'Kusma', 'Titreme', 'Halsizlik'],
@@ -41,8 +43,8 @@ class _EmergencySupportScreenState extends State<EmergencySupportScreen> {
     _EmergencyCase(
       title: 'Kusma',
       iconPath: 'assets/images/son_ikonlar/kusma.png',
-      color: Color(0xFFFF6600),
-      soft: Color(0xFFFFF9F4),
+      color: AppColors.primary,
+      soft: AppColors.selected,
       detailTitle: 'Kusma Durumu',
       detailSubtitle: 'Sıklık, içerik ve genel durumu takip edin.',
       symptoms: [
@@ -66,7 +68,7 @@ class _EmergencySupportScreenState extends State<EmergencySupportScreen> {
       title: 'Nefes',
       iconPath: 'assets/images/son_ikonlar/nefes.png',
       color: AppColors.primary,
-      soft: Color(0xFFF7FBFF),
+      soft: AppColors.selected,
       detailTitle: 'Nefes Darlığı',
       detailSubtitle: 'Nefes almada zorlanma acil müdahale gerektirir.',
       symptoms: ['Hızlı nefes', 'Açık ağız', 'Mavi diş eti', 'Huzursuzluk'],
@@ -84,8 +86,8 @@ class _EmergencySupportScreenState extends State<EmergencySupportScreen> {
     _EmergencyCase(
       title: 'Yaralanma',
       iconPath: 'assets/images/app_ikonlar/yaralanma.png',
-      color: Color(0xFF00A859),
-      soft: Color(0xFFF6FBF8),
+      color: AppColors.primary,
+      soft: AppColors.selected,
       detailTitle: 'Yaralanma',
       detailSubtitle: 'Kanama ve kırık şüphesinde hızlı ve sakin hareket edin.',
       symptoms: ['Kanama', 'Topallama', 'Şişlik', 'Ağrı belirtisi'],
@@ -103,8 +105,8 @@ class _EmergencySupportScreenState extends State<EmergencySupportScreen> {
     _EmergencyCase(
       title: 'Yabancı Cisim',
       iconPath: 'assets/images/son_ikonlar/yabanci_cisim.png',
-      color: Color(0xFF9B4DCA),
-      soft: Color(0xFFFBF7FF),
+      color: AppColors.primary,
+      soft: AppColors.selected,
       detailTitle: 'Yabancı Cisim Yutma',
       detailSubtitle: 'Oyuncak, kemik veya ip yutma şüphesinde dikkatli olun.',
       symptoms: ['Kusma', 'İştahsızlık', 'Karın ağrısı', 'Kabızlık'],
@@ -122,8 +124,8 @@ class _EmergencySupportScreenState extends State<EmergencySupportScreen> {
     _EmergencyCase(
       title: 'Parazit',
       iconPath: 'assets/images/app_ikonlar/parazit.png',
-      color: Color(0xFFFF6600),
-      soft: Color(0xFFFFF9F4),
+      color: AppColors.primary,
+      soft: AppColors.selected,
       detailTitle: 'Parazit Acili',
       detailSubtitle:
           'Yoğun parazit yükü ve hastalık belirtilerini ciddiye alın.',
@@ -156,17 +158,6 @@ class _EmergencySupportScreenState extends State<EmergencySupportScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Acil bir durumda doğru bilgi, hızlı müdahale hayat kurtarır.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: AppColors.subText,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  height: 1.3,
-                ),
-              ),
-              const SizedBox(height: 10),
               _buildBanner(),
               const SizedBox(height: 12),
               const Text(
@@ -183,6 +174,8 @@ class _EmergencySupportScreenState extends State<EmergencySupportScreen> {
               _buildDetailCard(),
               const SizedBox(height: 10),
               _buildTipBox(),
+              const SizedBox(height: 12),
+              _buildNoticeBanner(),
             ],
           ),
         ),
@@ -213,9 +206,94 @@ class _EmergencySupportScreenState extends State<EmergencySupportScreen> {
   }
 
   Widget _buildBanner() {
-    return const AppBannerSlot(
+    return _framedBanner(
       placement: BannerPlacement.emergency,
-      fallbackAssets: ['assets/images/acil_destek_banner.png'],
+      seededId: 'emergency',
+      fallback: 'assets/images/acil_destek_banner.png',
+      imageHeight: 140,
+    );
+  }
+
+  Widget _buildNoticeBanner() {
+    return _framedBanner(
+      placement: BannerPlacement.emergencyNotice,
+      seededId: 'emergency-notice',
+      fallback: 'assets/images/acil_destek_uyari_banner.jpg',
+      imageHeight: 120,
+    );
+  }
+
+  Widget _framedBanner({
+    required BannerPlacement placement,
+    required String seededId,
+    required String fallback,
+    required double imageHeight,
+  }) {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection(FirestoreCollections.banners)
+          .snapshots(),
+      builder: (context, snapshot) {
+        var path = fallback;
+        var hidden = false;
+        final docs = snapshot.data?.docs;
+        if (docs != null) {
+          final deleted = <String>{};
+          for (final doc in docs) {
+            if (doc.id != BannerRepository.seededDocId) continue;
+            final raw = doc.data()['deletedIds'];
+            if (raw is Iterable) {
+              deleted.addAll(raw.map((item) => item.toString()));
+            }
+          }
+          final live = [
+            for (final doc in docs)
+              if (!doc.id.startsWith('_')) AppBanner.fromDoc(doc),
+          ].where((banner) {
+            return banner.active &&
+                banner.placement == placement.id &&
+                banner.imageUrl.trim().isNotEmpty;
+          }).toList();
+          final picked = AppBanner.latestLive(live);
+          if (picked != null) {
+            path = picked.imageUrl;
+          } else if (deleted.contains(seededId)) {
+            hidden = true;
+          }
+        }
+        if (hidden) return const SizedBox.shrink();
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            const framePad = 3.0;
+            final width = constraints.maxWidth - framePad * 2;
+            final height = width * imageHeight / 361;
+            return Container(
+              padding: const EdgeInsets.all(framePad),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.25),
+                ),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(21),
+                child: SizedBox(
+                  width: width,
+                  height: height,
+                  child: buildProductImage(
+                    path,
+                    fit: BoxFit.fill,
+                    width: width,
+                    height: height,
+                    cacheWidth: 1024,
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -347,16 +425,14 @@ class _EmergencySupportScreenState extends State<EmergencySupportScreen> {
                     vertical: 5,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.surface,
+                    color: AppColors.statNumber.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(999),
-                    border: Border.all(
-                      color: item.color.withValues(alpha: 0.28),
-                    ),
+                    border: Border.all(color: AppColors.statNumber),
                   ),
                   child: Text(
                     s,
-                    style: TextStyle(
-                      color: item.color,
+                    style: const TextStyle(
+                      color: AppColors.statNumber,
                       fontSize: 10,
                       fontWeight: FontWeight.w800,
                     ),
@@ -392,7 +468,7 @@ class _EmergencySupportScreenState extends State<EmergencySupportScreen> {
                     ),
                     const SizedBox(height: 4),
                   ],
-                  _numberedRow(i + 1, item.doList[i], AppColors.success),
+                  _numberedRow(i + 1, item.doList[i], AppColors.statNumber),
                 ],
               ],
             ),
@@ -427,7 +503,7 @@ class _EmergencySupportScreenState extends State<EmergencySupportScreen> {
                     ),
                     const SizedBox(height: 4),
                   ],
-                  _bulletRow(item.dontList[i], AppColors.error),
+                  _bulletRow(item.dontList[i], AppColors.statNumber),
                 ],
               ],
             ),

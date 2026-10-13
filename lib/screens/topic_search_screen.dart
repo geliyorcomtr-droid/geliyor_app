@@ -1,6 +1,9 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:geliyor_app/data/knowledge_advantage_icons.dart';
 import 'package:geliyor_app/data/knowledge_catalog.dart';
+import 'package:geliyor_app/data/product_advantage_repository.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
+import 'package:geliyor_app/utils/product_image.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
@@ -76,35 +79,46 @@ class _TopicSearchScreenState extends State<TopicSearchScreen> {
               ),
               const SizedBox(height: 8),
               Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: AppColors.warning.withValues(alpha: 0.28)),
+                child: StreamBuilder<List<AppProductAdvantage>>(
+                  stream: ProductAdvantageRepository.instance.watchAll(
+                    activeOnly: true,
                   ),
-                  child: items.isEmpty
-                      ? const Center(
-                          child: Text(
-                            'Sonuç bulunamadı',
-                            style: TextStyle(
-                              color: AppColors.subText,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        )
-                      : ListView.separated(
-                          physics: const BouncingScrollPhysics(),
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          itemCount: items.length,
-                          separatorBuilder: (_, _) => Divider(
-                            height: 1,
-                            color: AppColors.warning.withValues(alpha: 0.28),
-                          ),
-                          itemBuilder: (context, index) {
-                            return _buildTopicRow(items[index]);
-                          },
+                  builder: (context, advantageSnap) {
+                    final catalog =
+                        advantageSnap.data ?? const <AppProductAdvantage>[];
+                    return Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: AppColors.warning.withValues(alpha: 0.28),
                         ),
+                      ),
+                      child: items.isEmpty
+                          ? const Center(
+                              child: Text(
+                                'Sonuç bulunamadı',
+                                style: TextStyle(
+                                  color: AppColors.subText,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            )
+                          : ListView.separated(
+                              physics: const BouncingScrollPhysics(),
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              itemCount: items.length,
+                              separatorBuilder: (_, _) => Divider(
+                                height: 1,
+                                color: AppColors.warning.withValues(alpha: 0.28),
+                              ),
+                              itemBuilder: (context, index) {
+                                return _buildTopicRow(items[index], catalog);
+                              },
+                            ),
+                    );
+                  },
                 ),
               ),
               const SizedBox(height: 10),
@@ -190,7 +204,10 @@ class _TopicSearchScreenState extends State<TopicSearchScreen> {
     );
   }
 
-  Widget _buildTopicRow(TopicSearchItem topic) {
+  Widget _buildTopicRow(
+    TopicSearchItem topic,
+    List<AppProductAdvantage> catalog,
+  ) {
     final selected = topic.id == widget.selectedTopicId;
     return InkWell(
       onTap: () => Navigator.of(context).pop(topic.id),
@@ -198,7 +215,7 @@ class _TopicSearchScreenState extends State<TopicSearchScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
         child: Row(
           children: [
-            _buildIcon(topic),
+            _buildIcon(topic, catalog),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -232,17 +249,23 @@ class _TopicSearchScreenState extends State<TopicSearchScreen> {
     );
   }
 
-  Widget _buildIcon(TopicSearchItem topic) {
-    if (topic.iconPath != null) {
+  Widget _buildIcon(
+    TopicSearchItem topic,
+    List<AppProductAdvantage> catalog,
+  ) {
+    final path = KnowledgeAdvantageIcons.forQuestionTopic(
+      topic.id,
+      catalog: catalog,
+      fallback: topic.iconPath ?? '',
+    );
+    if (path.isNotEmpty) {
       return SizedBox(
         width: 32,
         height: 32,
-        child: Image.asset(
-          topic.iconPath!,
+        child: buildProductImage(
+          path,
           fit: BoxFit.contain,
-          errorBuilder: (context, error, stackTrace) {
-            return Icon(topic.icon, color: AppColors.warning, size: 24);
-          },
+          errorWidget: Icon(topic.icon, color: AppColors.warning, size: 24),
         ),
       );
     }

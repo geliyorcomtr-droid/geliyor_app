@@ -74,7 +74,7 @@ class LogoutSuccessScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 _InfoCard(
-                  backgroundColor: const Color(0xFFE8F9EE),
+                  backgroundColor: AppColors.selected,
                   iconBackground: AppColors.success.withValues(alpha: 0.15),
                   icon: Icons.lock_outline_rounded,
                   iconColor: AppColors.success,
@@ -84,7 +84,7 @@ class LogoutSuccessScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 _InfoCard(
-                  backgroundColor: const Color(0xFFF0E8FF),
+                  backgroundColor: AppColors.selected,
                   iconBackground: AppColors.primary.withValues(alpha: 0.12),
                   icon: Icons.notifications_none_rounded,
                   iconColor: AppColors.primary,
@@ -93,7 +93,7 @@ class LogoutSuccessScreen extends StatelessWidget {
                       'Patili dostlarınızla ilgili tüm bilgilere dilediğiniz zaman geri dönebilirsiniz.',
                   trailing: Icon(
                     Icons.favorite_rounded,
-                    color: const Color(0xFFA855F7),
+                    color: AppColors.primary,
                     size: 18,
                   ),
                 ),

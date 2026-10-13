@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:geliyor_app/data/coupon_repository.dart';
 import 'package:geliyor_app/data/firestore_collections.dart';
 import 'package:geliyor_app/data/user_doc_persist.dart';
+import 'package:geliyor_app/state/order_store.dart';
 import 'package:geliyor_app/utils/courier_fee.dart';
 
 class CouponStore extends ChangeNotifier {
@@ -19,9 +20,16 @@ class CouponStore extends ChangeNotifier {
   AppCoupon? get selected => _selected;
   List<String> get earnedIds => List.unmodifiable(_earnedIds);
 
+  bool get _hasPriorOrder =>
+      OrderStore.instance.lastOrderId.trim().isNotEmpty;
+
+  bool _isWelcome(AppCoupon coupon) =>
+      coupon.id == CouponRepository.welcomeCouponId;
+
   List<AppCoupon> get usableCoupons {
     final list = _catalog.where((coupon) {
       if (!coupon.active) return false;
+      if (_isWelcome(coupon) && _hasPriorOrder) return false;
       if (coupon.publicCoupon) return true;
       return _earnedIds.contains(coupon.id);
     }).toList();
@@ -105,6 +113,9 @@ class CouponStore extends ChangeNotifier {
     if (match == null || !match.active) {
       return 'Kupon bulunamadı.';
     }
+    if (_isWelcome(match) && _hasPriorOrder) {
+      return 'Hoş geldin kuponu yalnızca ilk siparişte geçerlidir.';
+    }
     if (!match.publicCoupon && !_earnedIds.contains(match.id)) {
       return 'Bu kupon hesabınıza tanımlı değil.';
     }
@@ -116,6 +127,9 @@ class CouponStore extends ChangeNotifier {
   }
 
   String? applyCoupon(AppCoupon coupon, double subtotal) {
+    if (_isWelcome(coupon) && _hasPriorOrder) {
+      return 'Hoş geldin kuponu yalnızca ilk siparişte geçerlidir.';
+    }
     if (!coupon.publicCoupon && !_earnedIds.contains(coupon.id)) {
       return 'Bu kupon hesabınıza tanımlı değil.';
     }
@@ -123,6 +137,40 @@ class CouponStore extends ChangeNotifier {
     if (error != null) return error;
     _selected = coupon;
     notifyListeners();
+    return null;
+  }
+
+  /// İlk siparişte Hoşgeldin 50 kuponunu uygular. Sonraki siparişlerde kaldırır.
+  void syncWelcome(double subtotal) {
+    final welcome = _welcomeCoupon();
+    if (_hasPriorOrder) {
+      if (_selected != null && _isWelcome(_selected!)) {
+        _selected = null;
+        notifyListeners();
+      }
+      return;
+    }
+    if (welcome == null || !welcome.active) return;
+    if (_selected != null && !_isWelcome(_selected!)) return;
+    if (welcome.eligibilityError(subtotal) != null) {
+      if (_selected != null && _isWelcome(_selected!)) {
+        _selected = null;
+        notifyListeners();
+      }
+      return;
+    }
+    if (_selected?.id == welcome.id) return;
+    _selected = welcome;
+    notifyListeners();
+  }
+
+  AppCoupon? _welcomeCoupon() {
+    for (final coupon in _catalog) {
+      if (_isWelcome(coupon)) return coupon;
+    }
+    for (final coupon in defaultCoupons) {
+      if (_isWelcome(coupon)) return coupon;
+    }
     return null;
   }
 

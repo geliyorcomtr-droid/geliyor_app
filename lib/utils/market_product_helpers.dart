@@ -1,8 +1,48 @@
 import 'package:flutter/material.dart';
 import 'package:geliyor_app/data/pet_market_catalog.dart';
+import 'package:geliyor_app/data/product_repository.dart';
+import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/utils/product_price.dart';
 import 'package:geliyor_app/utils/product_skt.dart';
 import 'package:geliyor_app/widgets/market_product_card.dart';
+
+bool marketCatalogWaiting() => !ProductRepository.instance.catalogReady;
+
+Widget marketProductsPlaceholder({
+  required bool isEmpty,
+  String emptyMessage = 'Bu kategoride ürün bulunamadı.',
+}) {
+  if (!isEmpty) return const SizedBox.shrink();
+  if (marketCatalogWaiting()) {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 24),
+      child: Center(
+        child: SizedBox(
+          width: 22,
+          height: 22,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: AppColors.primary,
+          ),
+        ),
+      ),
+    );
+  }
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 24),
+    child: Center(
+      child: Text(
+        emptyMessage,
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          color: AppColors.subText,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    ),
+  );
+}
 
 Widget marketProductListCard({
   required MarketProductData product,

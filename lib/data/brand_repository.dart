@@ -6,6 +6,7 @@ import 'package:geliyor_app/data/brand_feeding_guide.dart';
 import 'package:geliyor_app/data/feeding_variant.dart';
 import 'package:geliyor_app/data/firestore_collections.dart';
 import 'package:geliyor_app/data/pro_plan_mini_puppy_guide.dart';
+import 'package:geliyor_app/utils/local_image_cache.dart';
 
 class AppBrand {
   const AppBrand({
@@ -31,6 +32,8 @@ class AppBrand {
     if (url.isNotEmpty) return url;
     return assetPath.trim();
   }
+
+  bool get hasImage => displayImage.isNotEmpty;
 
   /// Mama takibi: Pro Plan mini yavru tablosu üretici verisiyle her zaman hazır.
   BrandFeedingGuide get trackingFeeding {
@@ -341,14 +344,23 @@ class BrandRepository extends ChangeNotifier {
     return activeOnly ? brands.where((brand) => brand.active).toList() : brands;
   }
 
-  /// Eksik katalog markalarını geri yazar; mevcut kayıtları silmez / ezmez.
+  /// Eksik katalog markalarını yazar; silinenleri geri getirmez.
   Future<void> ensureDefaults() async {
     try {
       final snapshot = await _collection.get();
       final existingIds = snapshot.docs.map((doc) => doc.id).toSet();
+      Map<String, dynamic>? meta;
+      for (final doc in snapshot.docs) {
+        if (doc.id == _brandsMetaDocId) {
+          meta = doc.data();
+          break;
+        }
+      }
+      final removedIds = _deletedIdsFrom(meta);
       final batch = FirebaseFirestore.instance.batch();
       var writes = 0;
       for (final brand in defaultBrands) {
+        if (removedIds.contains(brand.id)) continue;
         if (existingIds.contains(brand.id)) continue;
         batch.set(_collection.doc(brand.id), brand.toMap());
         writes++;
@@ -390,9 +402,17 @@ class BrandRepository extends ChangeNotifier {
   }
 
   Future<void> save(AppBrand brand) {
-    return _collection
-        .doc(brand.id)
-        .set(brand.toMap(), SetOptions(merge: true));
+    final batch = FirebaseFirestore.instance.batch();
+    batch.set(
+      _collection.doc(brand.id),
+      brand.toMap(),
+      SetOptions(merge: true),
+    );
+    batch.set(_metaDoc, {
+      BrandFields.deletedIds: FieldValue.arrayRemove([brand.id]),
+      BrandFields.updatedAt: FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+    return batch.commit();
   }
 
   Future<void> saveFeeding(AppBrand brand) {
@@ -401,25 +421,60 @@ class BrandRepository extends ChangeNotifier {
         .set(brand.toFeedingMap(), SetOptions(merge: true));
   }
 
-  Future<void> delete(String id) => _collection.doc(id).delete();
+  Future<void> delete(String id) async {
+    final trimmed = id.trim();
+    if (trimmed.isEmpty || trimmed == _brandsMetaDocId) return;
+    final batch = FirebaseFirestore.instance.batch();
+    batch.delete(_collection.doc(trimmed));
+    batch.set(_metaDoc, {
+      BrandFields.deletedIds: FieldValue.arrayUnion([trimmed]),
+      BrandFields.updatedAt: FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+    await batch.commit();
+  }
 
   /// Mama tüketim listesindeki "… Yavru" marka kopyalarını siler.
   Future<int> deleteYavruLabeledBrands() async {
     final snapshot = await _collection.get();
-    var count = 0;
+    final batch = FirebaseFirestore.instance.batch();
+    final removed = <String>[];
     for (final doc in snapshot.docs) {
       if (!_isBrandDoc(doc)) continue;
       final brand = AppBrand.fromDoc(doc);
       if (!isYavruLabeled(brand)) continue;
-      await doc.reference.delete();
-      count++;
+      batch.delete(doc.reference);
+      removed.add(doc.id);
     }
-    return count;
+    if (removed.isEmpty) return 0;
+    batch.set(_metaDoc, {
+      BrandFields.deletedIds: FieldValue.arrayUnion(removed),
+      BrandFields.updatedAt: FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+    await batch.commit();
+    return removed.length;
+  }
+
+  DocumentReference<Map<String, dynamic>> get _metaDoc =>
+      _collection.doc(_brandsMetaDocId);
+
+  static Set<String> _deletedIdsFrom(Map<String, dynamic>? data) {
+    final raw = data?[BrandFields.deletedIds];
+    if (raw is! Iterable) return {};
+    return {
+      for (final value in raw)
+        if ('$value'.trim().isNotEmpty) '$value'.trim(),
+    };
   }
 
   void _setCache(List<AppBrand> brands) {
     _cached = List<AppBrand>.unmodifiable(brands);
     notifyListeners();
+    unawaited(
+      LocalImageCache.instance.prefetch([
+        for (final brand in brands)
+          if (brand.imageUrl.trim().isNotEmpty) brand.imageUrl.trim(),
+      ]),
+    );
   }
 
   static String _compact(String value) {

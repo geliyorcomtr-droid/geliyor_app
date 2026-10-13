@@ -97,7 +97,7 @@ class FoodTrackingStore extends ChangeNotifier {
       _isMiniBreed = data[FoodTrackingFields.isMiniBreed] == true;
       _ageMonths =
           ((data[FoodTrackingFields.ageMonths] as num?)?.toInt() ?? 4)
-              .clamp(1, 12);
+              .clamp(1, 18);
       _feedingVariant = FeedingVariant.tryParse(
         data[FoodTrackingFields.feedingVariant] as String?,
       );
@@ -132,7 +132,7 @@ class FoodTrackingStore extends ChangeNotifier {
     _petSpecies = petSpecies;
     _lifeStage = isPuppy ? PetLifeStage.puppy : PetLifeStage.adult;
     _isMiniBreed = isMiniBreed;
-    _ageMonths = ageMonths.clamp(1, 12);
+    _ageMonths = ageMonths.clamp(1, 18);
     _feedingVariant = variant ??
         FeedingVariant.resolve(
           isDog: (_petSpecies ?? '').toLowerCase().contains('köpek') ||

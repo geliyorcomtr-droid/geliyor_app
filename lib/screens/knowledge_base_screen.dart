@@ -2,8 +2,10 @@
 
 import 'package:flutter/material.dart';
 import 'package:geliyor_app/data/banner_repository.dart';
+import 'package:geliyor_app/data/knowledge_advantage_icons.dart';
 import 'package:geliyor_app/data/knowledge_article_repository.dart';
 import 'package:geliyor_app/data/knowledge_content_repository.dart';
+import 'package:geliyor_app/data/product_advantage_repository.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/screens/all_topics_screen.dart';
 import 'package:geliyor_app/utils/product_image.dart';
@@ -41,7 +43,6 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
     _KbCategory(
       id: 'idrar',
       title: 'İdrar Yolu\nSağlığı',
-      iconPath: 'assets/images/app_ikonlar/idrar.png',
       color: AppColors.warning,
     ),
     _KbCategory(
@@ -118,6 +119,7 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
     super.initState();
     unawaited(KnowledgeArticleRepository.instance.ensureDefaults());
     unawaited(KnowledgeContentRepository.instance.ensureDefaults());
+    unawaited(ProductAdvantageRepository.instance.ensureDefaults());
   }
 
   @override
@@ -230,28 +232,57 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
   }
 
   Widget _buildHeroBanner() {
-    return const AppBannerSlot(
-      placement: BannerPlacement.knowledge,
-      fallbackAssets: ['assets/images/bilgi_bankasi_banner.png'],
-    );
-  }
-
-  Widget _buildCategoryRow() {
-    return SizedBox(
-      height: 78,
-      child: Row(
-        children: [
-          for (int i = 0; i < _categories.length; i++) ...[
-            if (i > 0) const SizedBox(width: 5),
-            Expanded(child: _buildCategoryItem(_categories[i])),
-          ],
-        ],
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(21),
+        child: const AppBannerSlot(
+          placement: BannerPlacement.knowledge,
+          fallbackAssets: ['assets/images/bilgi_bankasi_banner.png'],
+        ),
       ),
     );
   }
 
-  Widget _buildCategoryItem(_KbCategory cat) {
+  Widget _buildCategoryRow() {
+    return StreamBuilder<List<AppProductAdvantage>>(
+      stream: ProductAdvantageRepository.instance.watchAll(activeOnly: true),
+      builder: (context, snapshot) {
+        final catalog = snapshot.data ?? const <AppProductAdvantage>[];
+        return SizedBox(
+          height: 78,
+          child: Row(
+            children: [
+              for (int i = 0; i < _categories.length; i++) ...[
+                if (i > 0) const SizedBox(width: 5),
+                Expanded(
+                  child: _buildCategoryItem(_categories[i], catalog),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCategoryItem(
+    _KbCategory cat,
+    List<AppProductAdvantage> catalog,
+  ) {
     final selected = _selectedCategoryId == cat.id;
+    final iconPath = cat.id == 'tumu'
+        ? ''
+        : KnowledgeAdvantageIcons.forQuestionTopic(
+            cat.id,
+            catalog: catalog,
+            fallback: cat.iconPath ?? '',
+          );
 
     return GestureDetector(
       onTap: () => _onCategoryTap(cat.id),
@@ -264,11 +295,13 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
               color: AppColors.surface,
               shape: BoxShape.circle,
               border: Border.all(
-                color: selected ? cat.color : AppColors.warning.withValues(alpha: 0.28),
+                color: selected
+                    ? cat.color
+                    : AppColors.warning.withValues(alpha: 0.28),
                 width: selected ? 2 : 1.2,
               ),
             ),
-            child: cat.iconPath == null
+            child: iconPath.isEmpty
                 ? Icon(
                     Icons.more_horiz_rounded,
                     color: selected ? cat.color : AppColors.subText,
@@ -276,17 +309,15 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
                   )
                 : Padding(
                     padding: const EdgeInsets.all(5),
-                    child: Image.asset(
-                      cat.iconPath!,
+                    child: buildProductImage(
+                      iconPath,
                       fit: BoxFit.contain,
                       filterQuality: FilterQuality.high,
-                      errorBuilder: (context, error, stackTrace) {
-                        return const Icon(
-                          Icons.health_and_safety_outlined,
-                          color: AppColors.warning,
-                          size: 20,
-                        );
-                      },
+                      errorWidget: const Icon(
+                        Icons.health_and_safety_outlined,
+                        color: AppColors.warning,
+                        size: 20,
+                      ),
                     ),
                   ),
           ),

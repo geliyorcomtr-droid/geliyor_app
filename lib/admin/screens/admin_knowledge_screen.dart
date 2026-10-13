@@ -4,33 +4,21 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:geliyor_app/admin/admin_ui.dart';
 import 'package:geliyor_app/data/firestore_collections.dart';
+import 'package:geliyor_app/data/knowledge_advantage_icons.dart';
 import 'package:geliyor_app/data/knowledge_article_repository.dart';
 import 'package:geliyor_app/data/knowledge_catalog.dart';
 import 'package:geliyor_app/data/knowledge_content_repository.dart';
+import 'package:geliyor_app/data/product_advantage_category.dart';
+import 'package:geliyor_app/data/product_advantage_repository.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/utils/compress_upload_image.dart';
+import 'package:geliyor_app/utils/storage_metadata.dart';
 import 'package:geliyor_app/utils/product_image.dart';
 
 const _colorChoices = <(int, String)>[
   (0xFF1E90FF, 'Mavi'),
-  (0xFFEC4899, 'Pembe'),
-  (0xFFDB2777, 'Fuşya'),
-  (0xFF9B4DCA, 'Mor'),
-  (0xFF22C55E, 'Yeşil'),
-  (0xFF0EA5E9, 'Açık mavi'),
-  (0xFFFF6600, 'Turuncu'),
-  (0xFFEF4444, 'Kırmızı'),
-  (0xFF16A34A, 'Koyu yeşil'),
-  (0xFFF59E0B, 'Amber'),
-  (0xFF84CC16, 'Lime'),
-  (0xFF14B8A6, 'Turkuaz'),
-  (0xFF2563EB, 'İndigo'),
-  (0xFF00A859, 'Zümrüt'),
-  (0xFF8B5CF6, 'Violet'),
-  (0xFFE60000, 'Acil kırmızı'),
-  (0xFFDC2626, 'Koyu kırmızı'),
-  (0xFFB91C1C, 'Bordo'),
-  (0xFF65A30D, 'Zeytin'),
+  (0xFF60A5FA, 'Açık mavi'),
+  (0xFF3B82F6, 'Orta mavi'),
 ];
 
 class AdminKnowledgeScreen extends StatefulWidget {
@@ -62,6 +50,7 @@ class _AdminKnowledgeScreenState extends State<AdminKnowledgeScreen> {
       await Future.wait([
         KnowledgeContentRepository.instance.ensureDefaults(),
         KnowledgeArticleRepository.instance.ensureDefaults(),
+        ProductAdvantageRepository.instance.ensureDefaults(),
       ]);
     } catch (error) {
       if (!mounted) return;
@@ -94,7 +83,7 @@ class _AdminKnowledgeScreenState extends State<AdminKnowledgeScreen> {
       );
       await reference.putData(
         prepared.bytes,
-        SettableMetadata(contentType: prepared.contentType),
+        storageImageMetadata(prepared.contentType),
       );
       return reference.getDownloadURL();
     } catch (error) {
@@ -160,7 +149,10 @@ class _AdminKnowledgeScreenState extends State<AdminKnowledgeScreen> {
       questionTopicId = KnowledgeQuestionTopic.sindirim.id;
     }
     var colorValue = existing?.colorValue ?? 0xFF1E90FF;
-    var iconUrl = existing?.iconUrl ?? '';
+    var advantageId =
+        (existing?.advantageId.trim().isNotEmpty ?? false)
+        ? existing!.advantageId
+        : KnowledgeAdvantageIcons.defaultForTopicId(existing?.id ?? '');
     var active = existing?.active ?? true;
 
     final saved = await showDialog<bool>(
@@ -225,21 +217,74 @@ class _AdminKnowledgeScreenState extends State<AdminKnowledgeScreen> {
                     },
                   ),
                   const SizedBox(height: 10),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: OutlinedButton.icon(
-                      onPressed: _uploading
-                          ? null
-                          : () async {
-                              final url = await _upload('knowledge_topics');
-                              if (url == null) return;
-                              setDialog(() => iconUrl = url);
-                            },
-                      icon: const Icon(Icons.upload_rounded, size: 18),
-                      label: Text(
-                        iconUrl.isEmpty ? 'İkon yükle' : 'İkonu değiştir',
-                      ),
+                  StreamBuilder<List<AppProductAdvantage>>(
+                    stream: ProductAdvantageRepository.instance.watchAll(
+                      activeOnly: true,
                     ),
+                    builder: (context, snapshot) {
+                      final catalog =
+                          snapshot.data ?? const <AppProductAdvantage>[];
+                      final ids = {for (final item in catalog) item.id};
+                      final selected = ids.contains(advantageId)
+                          ? advantageId
+                          : null;
+                      final preview = KnowledgeAdvantageIcons.forTopic(
+                        topicId: existing?.id ?? '',
+                        advantageId: selected ?? '',
+                        fallback: existing?.displayIcon ?? '',
+                        catalog: catalog,
+                      );
+                      if (catalog.isEmpty) {
+                        return const Text(
+                          'Önce Ürünler → Öne Çıkan Özellikler ekranından ikon ekleyin.',
+                        );
+                      }
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          DropdownButtonFormField<String>(
+                            value: selected,
+                            isExpanded: true,
+                            hint: const Text('Özellik seçin'),
+                            decoration: const InputDecoration(
+                              labelText: 'İkon (Öne Çıkan Özellikler)',
+                              helperText:
+                                  'Görsel öne çıkan özelliklerdeki ikondan gelir.',
+                            ),
+                            items: [
+                              for (final item in catalog)
+                                DropdownMenuItem(
+                                  value: item.id,
+                                  child: Text(
+                                    '${ProductAdvantageCategory.fromId(item.resolvedCategoryId, catalog: ProductAdvantageRepository.instance.cachedCategories).label} · ${item.name}',
+                                  ),
+                                ),
+                            ],
+                            onChanged: (value) {
+                              if (value == null) return;
+                              setDialog(() => advantageId = value);
+                            },
+                          ),
+                          if (preview.isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: SizedBox(
+                                width: 56,
+                                height: 56,
+                                child: buildProductImage(
+                                  preview,
+                                  fit: BoxFit.contain,
+                                  errorWidget: const Icon(
+                                    Icons.health_and_safety_outlined,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      );
+                    },
                   ),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
@@ -278,10 +323,11 @@ class _AdminKnowledgeScreenState extends State<AdminKnowledgeScreen> {
                 .id,
         title: title.text.trim(),
         subtitle: subtitle.text.trim(),
-        iconUrl: iconUrl.trim(),
+        iconUrl: '',
         assetPath: existing?.assetPath ?? '',
         colorValue: colorValue,
         questionTopicId: questionTopicId,
+        advantageId: advantageId.trim(),
         order: existing?.order ?? nextOrder,
         active: active,
       ),

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:geliyor_app/data/trust_badge_repository.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/utils/compress_upload_image.dart';
+import 'package:geliyor_app/utils/storage_metadata.dart';
 import 'package:geliyor_app/utils/product_image.dart';
 
 class AdminTrustBadgesScreen extends StatefulWidget {
@@ -47,6 +48,9 @@ class _AdminTrustBadgesScreenState extends State<AdminTrustBadgesScreen> {
   Future<void> _editBadge(AppTrustBadge? existing, int nextOrder) async {
     final name = TextEditingController(text: existing?.name ?? '');
     final imageUrl = TextEditingController(text: existing?.imageUrl ?? '');
+    final detailImageUrl = TextEditingController(
+      text: existing?.detailImageUrl ?? '',
+    );
     final order = TextEditingController(
       text: '${existing?.order ?? nextOrder}',
     );
@@ -64,65 +68,89 @@ class _AdminTrustBadgesScreenState extends State<AdminTrustBadgesScreen> {
                   : 'Güven Rozetini Düzenle',
             ),
             content: SizedBox(
-              width: 520,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _badgeImage(
-                    imageUrl: imageUrl.text,
-                    assetPath: existing?.assetPath ?? '',
-                    name: name.text,
-                    id: existing?.id,
-                    size: 110,
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: name,
-                    onChanged: (_) => setDialogState(() {}),
-                    decoration: const InputDecoration(
-                      labelText: 'Rozet adı',
-                      border: OutlineInputBorder(),
+              width: 560,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: _imageSlot(
+                            title: 'İkon',
+                            imageUrl: imageUrl.text,
+                            assetPath:
+                                (existing?.assetPath.trim().isNotEmpty ?? false)
+                                ? existing!.assetPath
+                                : TrustBadgeRepository.defaultAssetPathFor(
+                                    AppTrustBadge(
+                                      id: existing?.id ?? '',
+                                      name: name.text,
+                                    ),
+                                  ),
+                            name: name.text,
+                            id: existing?.id,
+                            uploading: dialogUploading,
+                            onUpload: () async {
+                              setDialogState(() => dialogUploading = true);
+                              final url = await _pickAndUploadImage();
+                              if (url != null) imageUrl.text = url;
+                              setDialogState(() => dialogUploading = false);
+                            },
+                            onDelete: imageUrl.text.trim().isEmpty
+                                ? null
+                                : () =>
+                                      setDialogState(() => imageUrl.clear()),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _imageSlot(
+                            title: 'Açılan görsel',
+                            imageUrl: detailImageUrl.text,
+                            assetPath: '',
+                            name: name.text,
+                            id: existing?.id,
+                            emptyHint: 'Yükle',
+                            uploading: dialogUploading,
+                            onUpload: () async {
+                              setDialogState(() => dialogUploading = true);
+                              final url = await _pickAndUploadImage(
+                                style: UploadImageStyle.photo,
+                                folder: 'trust_badges/detail',
+                              );
+                              if (url != null) detailImageUrl.text = url;
+                              setDialogState(() => dialogUploading = false);
+                            },
+                            onDelete: detailImageUrl.text.trim().isEmpty
+                                ? null
+                                : () => setDialogState(
+                                    () => detailImageUrl.clear(),
+                                  ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: order,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Sıra No',
-                      border: OutlineInputBorder(),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: name,
+                      onChanged: (_) => setDialogState(() {}),
+                      decoration: const InputDecoration(
+                        labelText: 'Rozet adı',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: imageUrl,
-                    onChanged: (_) => setDialogState(() {}),
-                    decoration: const InputDecoration(
-                      labelText: 'İkon görseli URL',
-                      border: OutlineInputBorder(),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: order,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Sıra No',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    onPressed: dialogUploading
-                        ? null
-                        : () async {
-                            setDialogState(() => dialogUploading = true);
-                            final url = await _pickAndUploadImage();
-                            if (url != null) {
-                              imageUrl.text = url;
-                              setDialogState(() {});
-                            }
-                            setDialogState(() => dialogUploading = false);
-                          },
-                    icon: const Icon(Icons.upload_rounded),
-                    label: Text(
-                      dialogUploading
-                          ? 'Yükleniyor...'
-                          : 'İkon Ekle / Değiştir',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
+                    const SizedBox(height: 12),
                   Material(
                     color: AppColors.background,
                     borderRadius: BorderRadius.circular(18),
@@ -155,6 +183,7 @@ class _AdminTrustBadgesScreenState extends State<AdminTrustBadgesScreen> {
                 ],
               ),
             ),
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext, false),
@@ -172,9 +201,11 @@ class _AdminTrustBadgesScreenState extends State<AdminTrustBadgesScreen> {
 
     final badgeName = name.text.trim();
     final uploadedImage = imageUrl.text.trim();
+    final uploadedDetail = detailImageUrl.text.trim();
     final badgeOrder = int.tryParse(order.text.trim()) ?? nextOrder;
     name.dispose();
     imageUrl.dispose();
+    detailImageUrl.dispose();
     order.dispose();
     if (save != true || badgeName.isEmpty) return;
 
@@ -184,9 +215,12 @@ class _AdminTrustBadgesScreenState extends State<AdminTrustBadgesScreen> {
         id: id,
         name: badgeName,
         imageUrl: uploadedImage,
+        detailImageUrl: uploadedDetail,
         assetPath: uploadedImage.isNotEmpty
             ? ''
-            : (existing?.assetPath ?? ''),
+            : TrustBadgeRepository.defaultAssetPathFor(
+                AppTrustBadge(id: id, name: badgeName),
+              ),
         order: badgeOrder,
         active: active,
       ),
@@ -215,6 +249,84 @@ class _AdminTrustBadgesScreenState extends State<AdminTrustBadgesScreen> {
     );
   }
 
+  Future<void> _removeImage(AppTrustBadge badge) async {
+    if (badge.imageUrl.trim().isEmpty) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Görseli sil'),
+        content: Text('"${badge.name}" için yüklenen görsel silinsin mi?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Sil'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await TrustBadgeRepository.instance.save(
+      badge.copyWith(
+        imageUrl: '',
+        assetPath: TrustBadgeRepository.defaultAssetPathFor(badge),
+      ),
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${badge.name} görseli silindi.')),
+    );
+  }
+
+  Future<void> _changeDetailImage(AppTrustBadge badge) async {
+    final url = await _pickAndUploadImage(
+      style: UploadImageStyle.photo,
+      folder: 'trust_badges/detail',
+    );
+    if (url == null) return;
+    await TrustBadgeRepository.instance.save(
+      badge.copyWith(detailImageUrl: url),
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${badge.name} açılan görseli güncellendi.')),
+    );
+  }
+
+  Future<void> _removeDetailImage(AppTrustBadge badge) async {
+    if (badge.detailImageUrl.trim().isEmpty) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Açılan görseli sil'),
+        content: Text(
+          '"${badge.name}" için tıklanınca açılan görsel silinsin mi?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Sil'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await TrustBadgeRepository.instance.save(
+      badge.copyWith(detailImageUrl: ''),
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${badge.name} açılan görseli silindi.')),
+    );
+  }
+
   Future<void> _deleteBadge(AppTrustBadge badge) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -238,7 +350,10 @@ class _AdminTrustBadgesScreenState extends State<AdminTrustBadgesScreen> {
     await TrustBadgeRepository.instance.delete(badge.id);
   }
 
-  Future<String?> _pickAndUploadImage() async {
+  Future<String?> _pickAndUploadImage({
+    UploadImageStyle style = UploadImageStyle.icon,
+    String folder = 'trust_badges',
+  }) async {
     final file = await FilePicker.pickFile(type: FileType.image);
     if (file == null) return null;
     setState(() => _uploading = true);
@@ -247,14 +362,14 @@ class _AdminTrustBadgesScreenState extends State<AdminTrustBadgesScreen> {
       final prepared = prepareUploadImage(
         bytes,
         file.name,
-        style: UploadImageStyle.icon,
+        style: style,
       );
       final reference = FirebaseStorage.instance.ref(
-        'trust_badges/${DateTime.now().microsecondsSinceEpoch}_${prepared.fileName}',
+        '$folder/${DateTime.now().microsecondsSinceEpoch}_${prepared.fileName}',
       );
       await reference.putData(
         prepared.bytes,
-        SettableMetadata(contentType: prepared.contentType),
+        storageImageMetadata(prepared.contentType),
       );
       return reference.getDownloadURL();
     } catch (error) {
@@ -305,7 +420,7 @@ class _AdminTrustBadgesScreenState extends State<AdminTrustBadgesScreen> {
             const SizedBox(height: 6),
             const Text(
               'Ürün detayında görselin solunda gösterilen rozetleri yönetin. '
-              'İkonu tablodaki resme tıklayarak veya düzenle penceresinden değiştirebilirsiniz.',
+              'İkon ile tıklanınca açılan görsel birbirinden bağımsızdır; ikonun yanındaki alana açılan görseli yükleyin.',
               style: TextStyle(
                 color: AppColors.subText,
                 fontWeight: FontWeight.w600,
@@ -401,12 +516,12 @@ class _AdminTrustBadgesScreenState extends State<AdminTrustBadgesScreen> {
                   AppColors.selected,
                 ),
                 headingRowHeight: 46,
-                dataRowMinHeight: 70,
-                dataRowMaxHeight: 70,
+                dataRowMinHeight: 86,
+                dataRowMaxHeight: 86,
                 columnSpacing: 34,
                 horizontalMargin: 14,
                 columns: const [
-                  DataColumn(label: Text('Resim')),
+                  DataColumn(label: Text('İkon / Açılan görsel')),
                   DataColumn(label: Text('Rozet Adı')),
                   DataColumn(label: Text('Sıra No')),
                   DataColumn(label: Text('Yayın Durumu')),
@@ -417,19 +532,44 @@ class _AdminTrustBadgesScreenState extends State<AdminTrustBadgesScreen> {
                     DataRow(
                       cells: [
                         DataCell(
-                          InkWell(
-                            onTap: _uploading ? null : () => _changeImage(badge),
-                            borderRadius: BorderRadius.circular(16),
-                            child: SizedBox(
-                              width: 68,
-                              height: 52,
-                              child: _badgeImage(
-                                imageUrl: badge.imageUrl,
-                                assetPath: badge.assetPath,
-                                name: badge.name,
-                                id: badge.id,
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              InkWell(
+                                onTap: _uploading
+                                    ? null
+                                    : () => _changeImage(badge),
+                                borderRadius: BorderRadius.circular(16),
+                                child: SizedBox(
+                                  width: 68,
+                                  height: 52,
+                                  child: _badgeImage(
+                                    imageUrl: badge.imageUrl,
+                                    assetPath: badge.assetPath,
+                                    name: badge.name,
+                                    id: badge.id,
+                                  ),
+                                ),
                               ),
-                            ),
+                              const SizedBox(width: 8),
+                              InkWell(
+                                onTap: _uploading
+                                    ? null
+                                    : () => _changeDetailImage(badge),
+                                borderRadius: BorderRadius.circular(16),
+                                child: SizedBox(
+                                  width: 68,
+                                  height: 52,
+                                  child: _badgeImage(
+                                    imageUrl: badge.detailImageUrl,
+                                    assetPath: '',
+                                    name: badge.name,
+                                    id: badge.id,
+                                    emptyHint: 'Açılan',
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         DataCell(
@@ -465,12 +605,48 @@ class _AdminTrustBadgesScreenState extends State<AdminTrustBadgesScreen> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               IconButton(
-                                tooltip: 'Görsel Ekle / Değiştir',
+                                tooltip: badge.imageUrl.trim().isEmpty
+                                    ? 'İkon Yükle'
+                                    : 'İkonu Değiştir',
                                 onPressed: _uploading
                                     ? null
                                     : () => _changeImage(badge),
                                 icon: const Icon(
                                   Icons.image_outlined,
+                                  size: 19,
+                                ),
+                              ),
+                              IconButton(
+                                tooltip: 'İkonu Sil',
+                                onPressed: _uploading ||
+                                        badge.imageUrl.trim().isEmpty
+                                    ? null
+                                    : () => _removeImage(badge),
+                                icon: const Icon(
+                                  Icons.hide_image_outlined,
+                                  size: 19,
+                                ),
+                              ),
+                              IconButton(
+                                tooltip: badge.detailImageUrl.trim().isEmpty
+                                    ? 'Açılan Görsel Yükle'
+                                    : 'Açılan Görseli Değiştir',
+                                onPressed: _uploading
+                                    ? null
+                                    : () => _changeDetailImage(badge),
+                                icon: const Icon(
+                                  Icons.photo_outlined,
+                                  size: 19,
+                                ),
+                              ),
+                              IconButton(
+                                tooltip: 'Açılan Görseli Sil',
+                                onPressed: _uploading ||
+                                        badge.detailImageUrl.trim().isEmpty
+                                    ? null
+                                    : () => _removeDetailImage(badge),
+                                icon: const Icon(
+                                  Icons.hide_image_outlined,
                                   size: 19,
                                 ),
                               ),
@@ -502,12 +678,66 @@ class _AdminTrustBadgesScreenState extends State<AdminTrustBadgesScreen> {
     );
   }
 
+  Widget _imageSlot({
+    required String title,
+    required String imageUrl,
+    required String assetPath,
+    required String name,
+    required bool uploading,
+    required Future<void> Function() onUpload,
+    required VoidCallback? onDelete,
+    String? id,
+    String emptyHint = '',
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 13,
+            color: AppColors.text,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Center(
+          child: _badgeImage(
+            imageUrl: imageUrl,
+            assetPath: assetPath,
+            name: name,
+            id: id,
+            size: 110,
+            emptyHint: emptyHint,
+          ),
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: uploading ? null : onUpload,
+          icon: const Icon(Icons.upload_rounded, size: 18),
+          label: Text(
+            uploading
+                ? 'Yükleniyor...'
+                : (imageUrl.trim().isEmpty ? 'Yükle' : 'Değiştir'),
+          ),
+        ),
+        const SizedBox(height: 6),
+        OutlinedButton.icon(
+          onPressed: uploading ? null : onDelete,
+          icon: const Icon(Icons.delete_outline_rounded, size: 18),
+          label: const Text('Sil'),
+        ),
+      ],
+    );
+  }
+
   Widget _badgeImage({
     required String imageUrl,
     required String assetPath,
     required String name,
     String? id,
     double? size,
+    String emptyHint = '',
   }) {
     final badge = AppTrustBadge(
       id: id ?? '',
@@ -515,10 +745,36 @@ class _AdminTrustBadgesScreenState extends State<AdminTrustBadgesScreen> {
       imageUrl: imageUrl,
       assetPath: assetPath,
     );
-    final url = TrustBadgeRepository.displayImageUrl(badge);
-    final asset = TrustBadgeRepository.displayAssetPath(badge);
+    final url = emptyHint.isNotEmpty
+        ? imageUrl.trim()
+        : TrustBadgeRepository.displayImageUrl(badge);
+    final asset = emptyHint.isNotEmpty
+        ? ''
+        : TrustBadgeRepository.displayAssetPath(badge);
     final isRating = TrustBadgeRepository.isRatingBadge(badge);
-    final fallback = isRating
+    final fallback = emptyHint.isNotEmpty
+        ? Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.add_photo_alternate_outlined,
+                  color: AppColors.primary,
+                  size: 22,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  emptyHint,
+                  style: const TextStyle(
+                    color: AppColors.subText,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          )
+        : isRating
         ? const Icon(
             Icons.star_rounded,
             color: AppColors.warning,

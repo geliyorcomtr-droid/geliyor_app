@@ -241,6 +241,15 @@ class UserProfileSync {
     );
   }
 
+  /// Siparişler dururken takip “sipariş yok” demesin diye son siparişi yeniler.
+  static Future<void> refreshLastOrder() async {
+    final uid = AuthStore.instance.uid;
+    if (uid == null || uid.isEmpty) return;
+    final snap = await UserDocPersist.fetchUserDoc(uid);
+    if (AuthStore.instance.uid != uid) return;
+    await _applyLastOrder(uid, snap?.data());
+  }
+
   static Future<void> _applyLastOrder(
     String uid,
     Map<String, dynamic>? data,
@@ -266,14 +275,21 @@ class UserProfileSync {
       final snap = await FirebaseFirestore.instance
           .collection(FirestoreCollections.orders)
           .where(OrderFields.userId, isEqualTo: uid)
-          .orderBy(OrderFields.createdAt, descending: true)
-          .limit(1)
           .get();
       if (snap.docs.isEmpty) {
         OrderStore.instance.clearLocal();
         return;
       }
-      final order = snap.docs.first.data();
+      final docs = snap.docs.toList()
+        ..sort((a, b) {
+          final aTime = a.data()[OrderFields.createdAt];
+          final bTime = b.data()[OrderFields.createdAt];
+          final aMs = aTime is Timestamp ? aTime.millisecondsSinceEpoch : 0;
+          final bMs = bTime is Timestamp ? bTime.millisecondsSinceEpoch : 0;
+          return bMs.compareTo(aMs);
+        });
+      final latest = docs.first;
+      final order = latest.data();
       final created = order[OrderFields.createdAt];
       final items = UserDocPersist.asMapList(order[OrderFields.items])
           .map(
@@ -284,7 +300,9 @@ class UserProfileSync {
               weight: (item['weight'] as String?) ?? '',
               price: (item['unitPrice'] as num?)?.toDouble() ?? 0,
               oldPrice: 0,
-              imagePath: (item['imageUrl'] as String?) ?? '',
+              imagePath: (item['imageUrl'] as String?) ??
+                  (item['imagePath'] as String?) ??
+                  '',
               quantity: (item['quantity'] as num?)?.toInt() ?? 1,
               brand: (item['brand'] as String?) ?? '',
             ),
@@ -292,12 +310,10 @@ class UserProfileSync {
           .where((item) => item.title.isNotEmpty)
           .toList();
       OrderStore.instance.applyRemote(
-        orderId: snap.docs.first.id,
+        orderId: latest.id,
         orderedAt: created is Timestamp ? created.toDate() : DateTime.now(),
         items: items,
       );
-    } catch (_) {
-      OrderStore.instance.clearLocal();
-    }
+    } catch (_) {}
   }
 }

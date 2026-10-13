@@ -1,5 +1,8 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 import 'package:geliyor_app/data/banner_repository.dart';
+import 'package:geliyor_app/data/firestore_collections.dart';
+import 'package:geliyor_app/data/health_product_groups.dart';
 import 'package:geliyor_app/data/product_advantage_repository.dart';
 import 'package:geliyor_app/data/product_repository.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
@@ -7,8 +10,9 @@ import 'package:geliyor_app/screens/cart_screen.dart';
 import 'package:geliyor_app/screens/product_detail_screen.dart';
 import 'package:geliyor_app/state/cart_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:geliyor_app/utils/market_product_helpers.dart';
+import 'package:geliyor_app/utils/product_image.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
-import 'package:geliyor_app/widgets/app_banner_slider.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
 import 'package:geliyor_app/widgets/app_pressable_button.dart';
@@ -34,21 +38,18 @@ class _MedicineTreatmentScreenState extends State<MedicineTreatmentScreen> {
       id: _MedCategory.vitamins,
       title: 'Vitaminler',
       subtitle: 'Bağışıklık ve enerji desteği',
-      imagePath: 'assets/images/ilac_icon_vitamin.png',
       accent: AppColors.primary,
     ),
     _CategoryData(
       id: _MedCategory.supplements,
       title: 'Takviye Gıdalar',
       subtitle: 'Ek besin ve destek ürünleri',
-      imagePath: 'assets/images/ilac_icon_takviye.png',
       accent: AppColors.success,
     ),
     _CategoryData(
       id: _MedCategory.malts,
       title: 'Maltlar',
       subtitle: 'Tüy yumağı ve sindirim',
-      imagePath: 'assets/images/ilac_icon_malt.png',
       accent: AppColors.primary,
     ),
   ];
@@ -64,14 +65,14 @@ class _MedicineTreatmentScreenState extends State<MedicineTreatmentScreen> {
     }
   }
 
-  List<String> get _categoryKeywords {
+  HealthProductGroup get _selectedGroup {
     switch (_selected) {
       case _MedCategory.vitamins:
-        return const ['vitamin', 'multivitamin'];
+        return HealthProductGroup.vitamin;
       case _MedCategory.supplements:
-        return const ['takviye', 'supplement', 'probiyotik', 'probiotic'];
+        return HealthProductGroup.supplement;
       case _MedCategory.malts:
-        return const ['malt'];
+        return HealthProductGroup.malt;
     }
   }
 
@@ -84,29 +85,22 @@ class _MedicineTreatmentScreenState extends State<MedicineTreatmentScreen> {
   List<MarketProductData> _productsForSelection(
     List<MarketProductData> catalog,
   ) {
-    final section = ProductAdvantageRepository.foldSearch(_sectionTitle);
-    final keywords = _categoryKeywords;
+    final group = _selectedGroup;
     final query = _searchQuery;
 
     return [
       for (final item in catalog)
-        if (_matchesCategory(item, section: section, keywords: keywords) &&
-            _matchesSearch(item, query))
+        if (_matchesCategory(item, group) && _matchesSearch(item, query))
           item,
     ];
   }
 
-  bool _matchesCategory(
-    MarketProductData item, {
-    required String section,
-    required List<String> keywords,
-  }) {
-    final hay = ProductAdvantageRepository.foldSearch(
-      '${item.title} ${item.subtitle} ${item.brand} ${item.dietTag} '
-      '${item.productAdvantageIds.join(' ')}',
+  bool _matchesCategory(MarketProductData item, HealthProductGroup group) {
+    if (item.petTag != 'Kedi') return false;
+    return group.matches(
+      advantageIds: item.productAdvantageIds,
+      categoryTitles: [item.dietTag, ...item.categoryTitles],
     );
-    if (section.isNotEmpty && hay.contains(section)) return true;
-    return keywords.any((key) => hay.contains(key));
   }
 
   bool _matchesSearch(MarketProductData item, String query) {
@@ -121,6 +115,7 @@ class _MedicineTreatmentScreenState extends State<MedicineTreatmentScreen> {
   Widget build(BuildContext context) {
     return StreamBuilder<List<MarketProductData>>(
       stream: ProductRepository.instance.watchMarketProducts(),
+      initialData: ProductRepository.instance.cachedMarketProducts(),
       builder: (context, snapshot) {
         final products = _productsForSelection(snapshot.data ?? const []);
         return Scaffold(
@@ -142,17 +137,6 @@ class _MedicineTreatmentScreenState extends State<MedicineTreatmentScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Misket’in sağlığını desteklemek için ihtiyacınız olan ürünler ve bilgiler burada.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: AppColors.subText,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                            height: 1.3,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
                         _buildBanner(),
                         const SizedBox(height: 10),
                         _buildSearchBar(),
@@ -172,20 +156,8 @@ class _MedicineTreatmentScreenState extends State<MedicineTreatmentScreen> {
                     10,
                   ),
                   sliver: products.isEmpty
-                      ? const SliverToBoxAdapter(
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(vertical: 24),
-                            child: Center(
-                              child: Text(
-                                'Bu kategoride ürün bulunamadı.',
-                                style: TextStyle(
-                                  color: AppColors.subText,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ),
+                      ? SliverToBoxAdapter(
+                          child: marketProductsPlaceholder(isEmpty: true),
                         )
                       : SliverGrid(
                           gridDelegate:
@@ -313,9 +285,72 @@ class _MedicineTreatmentScreenState extends State<MedicineTreatmentScreen> {
   }
 
   Widget _buildBanner() {
-    return const AppBannerSlot(
-      placement: BannerPlacement.medicine,
-      fallbackAssets: ['assets/images/ilac_tedavi_banner.png'],
+    const fallback = 'assets/images/ilac_tedavi_banner.jpg';
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection(FirestoreCollections.banners)
+          .snapshots(),
+      builder: (context, snapshot) {
+        var path = fallback;
+        var hidden = false;
+        final docs = snapshot.data?.docs;
+        if (docs != null) {
+          final deleted = <String>{};
+          for (final doc in docs) {
+            if (doc.id != BannerRepository.seededDocId) continue;
+            final raw = doc.data()['deletedIds'];
+            if (raw is Iterable) {
+              deleted.addAll(raw.map((item) => item.toString()));
+            }
+          }
+          final live = [
+            for (final doc in docs)
+              if (!doc.id.startsWith('_')) AppBanner.fromDoc(doc),
+          ].where((banner) {
+            return banner.active &&
+                banner.placement == BannerPlacement.medicine.id &&
+                banner.imageUrl.trim().isNotEmpty;
+          }).toList();
+          final picked = AppBanner.latestLive(live);
+          if (picked != null) {
+            path = picked.imageUrl;
+          } else if (deleted.contains('medicine')) {
+            hidden = true;
+          }
+        }
+        if (hidden) return const SizedBox.shrink();
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            const framePad = 3.0;
+            final width = constraints.maxWidth - framePad * 2;
+            final height = width * 140 / 361;
+            return Container(
+              padding: const EdgeInsets.all(framePad),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.25),
+                ),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(21),
+                child: SizedBox(
+                  width: width,
+                  height: height,
+                  child: buildProductImage(
+                    path,
+                    fit: BoxFit.fill,
+                    width: width,
+                    height: height,
+                    cacheWidth: 1024,
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -375,21 +410,41 @@ class _MedicineTreatmentScreenState extends State<MedicineTreatmentScreen> {
     );
   }
 
+  HealthProductGroup _groupFor(_MedCategory id) {
+    switch (id) {
+      case _MedCategory.vitamins:
+        return HealthProductGroup.vitamin;
+      case _MedCategory.supplements:
+        return HealthProductGroup.supplement;
+      case _MedCategory.malts:
+        return HealthProductGroup.malt;
+    }
+  }
+
   Widget _buildCategoryCards() {
-    return SizedBox(
-      height: 108,
-      child: Row(
-        children: [
-          for (int i = 0; i < _categories.length; i++) ...[
-            if (i > 0) const SizedBox(width: 8),
-            Expanded(child: _buildCategoryCard(_categories[i])),
-          ],
-        ],
-      ),
+    return StreamBuilder<List<AppProductAdvantage>>(
+      stream: ProductAdvantageRepository.instance.watchAll(activeOnly: true),
+      builder: (context, snapshot) {
+        final catalog = snapshot.data ?? const <AppProductAdvantage>[];
+        return SizedBox(
+          height: 108,
+          child: Row(
+            children: [
+              for (int i = 0; i < _categories.length; i++) ...[
+                if (i > 0) const SizedBox(width: 8),
+                Expanded(child: _buildCategoryCard(_categories[i], catalog)),
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildCategoryCard(_CategoryData cat) {
+  Widget _buildCategoryCard(
+    _CategoryData cat,
+    List<AppProductAdvantage> catalog,
+  ) {
     final selected = _selected == cat.id;
     return GestureDetector(
       onTap: () => setState(() => _selected = cat.id),
@@ -416,17 +471,18 @@ class _MedicineTreatmentScreenState extends State<MedicineTreatmentScreen> {
               children: [
                 Expanded(
                   child: Center(
-                    child: Image.asset(
-                      cat.imagePath,
+                    child: buildProductImage(
+                      ProductAdvantageRepository.iconForHealthGroup(
+                        _groupFor(cat.id),
+                        catalog: catalog,
+                      ),
                       fit: BoxFit.contain,
                       filterQuality: FilterQuality.high,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Icon(
-                          Icons.medical_services_outlined,
-                          color: cat.accent,
-                          size: 32,
-                        );
-                      },
+                      errorWidget: Icon(
+                        Icons.medical_services_outlined,
+                        color: cat.accent,
+                        size: 32,
+                      ),
                     ),
                   ),
                 ),
@@ -713,13 +769,11 @@ class _CategoryData {
     required this.id,
     required this.title,
     required this.subtitle,
-    required this.imagePath,
     required this.accent,
   });
 
   final _MedCategory id;
   final String title;
   final String subtitle;
-  final String imagePath;
   final Color accent;
 }

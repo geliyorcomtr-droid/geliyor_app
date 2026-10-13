@@ -4,8 +4,11 @@ import 'package:geliyor_app/screens/order_confirm_screen.dart';
 import 'package:geliyor_app/screens/product_detail_screen.dart';
 import 'package:geliyor_app/state/cart_store.dart';
 import 'package:geliyor_app/state/coupon_store.dart';
+import 'package:geliyor_app/state/notification_settings_store.dart';
+import 'package:geliyor_app/state/order_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/utils/courier_fee.dart';
+import 'package:geliyor_app/utils/subscription_discount.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
@@ -53,15 +56,25 @@ class _CartScreenState extends State<CartScreen> {
       listenable: Listenable.merge([
         CartStore.instance,
         CouponStore.instance,
+        NotificationSettingsStore.instance,
+        OrderStore.instance,
       ]),
       builder: (context, _) {
         final cart = CartStore.instance;
         final cartItems = cart.items;
         final totalQuantity = cart.totalQuantity;
         final cartTotal = cart.cartTotal;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          CouponStore.instance.syncWelcome(cartTotal);
+        });
         final cartDiscount = cart.cartDiscount;
         final courierFee = cart.courierFee;
-        final payableTotal = CouponStore.instance.payableTotal(cartTotal);
+        final subscriptionDiscount = SubscriptionDiscount.amountFor(cartTotal);
+        final payableTotal = SubscriptionDiscount.payable(
+          subtotal: cartTotal,
+          couponDiscount: CouponStore.instance.discountFor(cartTotal),
+          courierFee: courierFee,
+        );
 
         return Scaffold(
           backgroundColor: AppColors.background,
@@ -101,7 +114,13 @@ class _CartScreenState extends State<CartScreen> {
                     if (i != cartItems.length - 1) const SizedBox(height: 8),
                   ],
                   const SizedBox(height: 10),
-                  _buildSummaryCard(cartTotal, cartDiscount, courierFee, payableTotal),
+                  _buildSummaryCard(
+                    cartTotal,
+                    cartDiscount,
+                    courierFee,
+                    payableTotal,
+                    subscriptionDiscount,
+                  ),
                   const SizedBox(height: 10),
                   _buildCheckoutBar(cartTotal, payableTotal, totalQuantity),
                 ],
@@ -245,6 +264,7 @@ class _CartScreenState extends State<CartScreen> {
     double cartDiscount,
     double courierFee,
     double payableTotal,
+    double subscriptionDiscount,
   ) {
     final cartOldTotal = cartTotal + cartDiscount;
     final remainingForFree = CourierFee.remainingForFree(cartTotal);
@@ -273,6 +293,14 @@ class _CartScreenState extends State<CartScreen> {
             _summaryRow(
               'Kupon',
               '-${_formatPrice(CouponStore.instance.discountFor(cartTotal))} TL',
+              valueColor: AppColors.primary,
+            ),
+          ],
+          if (subscriptionDiscount > 0) ...[
+            const SizedBox(height: 10),
+            _summaryRow(
+              SubscriptionDiscount.name,
+              '-${_formatPrice(subscriptionDiscount)} TL',
               valueColor: AppColors.primary,
             ),
           ],

@@ -6,6 +6,7 @@ class AppTrustBadge {
     required this.id,
     required this.name,
     this.imageUrl = '',
+    this.detailImageUrl = '',
     this.assetPath = '',
     this.order = 0,
     this.active = true,
@@ -14,6 +15,8 @@ class AppTrustBadge {
   final String id;
   final String name;
   final String imageUrl;
+  /// İkona tıklanınca açılan görsel; ikondan bağımsızdır.
+  final String detailImageUrl;
   final String assetPath;
   final int order;
   final bool active;
@@ -24,6 +27,7 @@ class AppTrustBadge {
       id: doc.id,
       name: (data[TrustBadgeFields.name] as String?) ?? doc.id,
       imageUrl: (data[TrustBadgeFields.imageUrl] as String?) ?? '',
+      detailImageUrl: (data[TrustBadgeFields.detailImageUrl] as String?) ?? '',
       assetPath: (data[TrustBadgeFields.assetPath] as String?) ?? '',
       order: (data[TrustBadgeFields.order] as num?)?.toInt() ?? 0,
       active: data[TrustBadgeFields.active] as bool? ?? true,
@@ -33,6 +37,7 @@ class AppTrustBadge {
   Map<String, dynamic> toMap() => {
     TrustBadgeFields.name: name.trim(),
     TrustBadgeFields.imageUrl: imageUrl.trim(),
+    TrustBadgeFields.detailImageUrl: detailImageUrl.trim(),
     TrustBadgeFields.assetPath: assetPath.trim(),
     TrustBadgeFields.order: order,
     TrustBadgeFields.active: active,
@@ -42,6 +47,7 @@ class AppTrustBadge {
   AppTrustBadge copyWith({
     String? name,
     String? imageUrl,
+    String? detailImageUrl,
     String? assetPath,
     int? order,
     bool? active,
@@ -50,6 +56,7 @@ class AppTrustBadge {
       id: id,
       name: name ?? this.name,
       imageUrl: imageUrl ?? this.imageUrl,
+      detailImageUrl: detailImageUrl ?? this.detailImageUrl,
       assetPath: assetPath ?? this.assetPath,
       order: order ?? this.order,
       active: active ?? this.active,
@@ -91,27 +98,14 @@ class TrustBadgeRepository {
   static final instance = TrustBadgeRepository._();
 
   static String displayName(AppTrustBadge badge) {
+    final name = badge.name.trim();
+    if (name.isNotEmpty) return name;
     final id = badge.id.toLowerCase();
-    final name = badge.name.toLowerCase();
-    if (id == 'en-cok-tercih' ||
-        name.contains('en çok tercih') ||
-        name.contains('en cok tercih') ||
-        name.contains('çok satan') ||
-        name.contains('cok satan') ||
-        name.contains('tercih ürün') ||
-        name.contains('tercih urun')) {
-      return 'Çok Satan Ürün';
-    }
-    if (id == proteinBadgeId || name.contains('protein')) {
-      return badge.name.trim().isEmpty ? 'Protein Değeri' : badge.name;
-    }
-    if (id == repurchaseBadgeId || name.contains('tekrar')) {
-      return 'Tekrar Alım';
-    }
-    if (id == affordableBadgeId || name.contains('uygun')) {
-      return 'Uygun Fiyat';
-    }
-    return badge.name;
+    if (id == 'en-cok-tercih') return 'Çok Satan Ürün';
+    if (id == proteinBadgeId) return 'Protein Değeri';
+    if (id == repurchaseBadgeId) return 'Tekrar Alım';
+    if (id == affordableBadgeId) return 'Uygun Fiyat';
+    return badge.id;
   }
 
   static bool isSmartSuggestionBadge(AppTrustBadge badge) {
@@ -197,9 +191,19 @@ class TrustBadgeRepository {
 
   static String displayImageUrl(AppTrustBadge badge) => badge.imageUrl.trim();
 
+  static String displayDetailImageUrl(AppTrustBadge badge) =>
+      badge.detailImageUrl.trim();
+
   static String displayAssetPath(AppTrustBadge badge) {
     final asset = badge.assetPath.trim();
     if (asset.isNotEmpty) return asset;
+    return defaultAssetPathFor(badge);
+  }
+
+  static String defaultAssetPathFor(AppTrustBadge badge) {
+    for (final item in defaultTrustBadges) {
+      if (item.id == badge.id) return item.assetPath.trim();
+    }
     if (isPreferredBadge(badge)) return preferredIconPath;
     if (isRepurchaseBadge(badge)) return repurchaseIconPath;
     if (isAffordableBadge(badge)) return affordableIconPath;
@@ -210,11 +214,15 @@ class TrustBadgeRepository {
   final CollectionReference<Map<String, dynamic>> _collection =
       FirebaseFirestore.instance.collection(FirestoreCollections.trustBadges);
 
+  List<AppTrustBadge> _cached = const [];
+  List<AppTrustBadge> get cached => _cached;
+
   Stream<List<AppTrustBadge>> watchAll({bool activeOnly = false}) {
     return _collection.orderBy(TrustBadgeFields.order).snapshots().map((
       snapshot,
     ) {
       final badges = snapshot.docs.map(AppTrustBadge.fromDoc).toList();
+      _cached = List<AppTrustBadge>.unmodifiable(badges);
       return activeOnly
           ? badges.where((badge) => badge.active).toList()
           : badges;

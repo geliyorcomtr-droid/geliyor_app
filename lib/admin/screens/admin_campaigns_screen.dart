@@ -76,7 +76,7 @@ class _AdminCampaignsScreenState extends State<AdminCampaignsScreen> {
                   TextField(
                     controller: subCategory,
                     decoration: const InputDecoration(
-                      labelText: 'Alt kategori (ör. Mama)',
+                      labelText: 'Alt kategori (ör. Yetişkin)',
                     ),
                   ),
                   const SizedBox(height: 8),

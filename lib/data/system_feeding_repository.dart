@@ -23,6 +23,7 @@ class SystemFeedingTables {
     required this.miniPuppyFactors,
     required this.adultDogFactors,
     required this.puppyDogFactors,
+    required this.kittenFactors,
   });
 
   final Map<String, int> catAdult;
@@ -36,6 +37,7 @@ class SystemFeedingTables {
   final MiniPuppyFactors miniPuppyFactors;
   final MiniAdultDogFactors adultDogFactors;
   final StandardPuppyFactors puppyDogFactors;
+  final FeedingFactors kittenFactors;
 
   static SystemFeedingTables get defaults {
     return SystemFeedingTables(
@@ -53,6 +55,7 @@ class SystemFeedingTables {
       miniPuppyFactors: MiniPuppyFactors.defaults,
       adultDogFactors: MiniAdultDogFactors.defaults,
       puppyDogFactors: StandardPuppyFactors.defaults,
+      kittenFactors: FeedingFactors.defaults,
     );
   }
 
@@ -103,6 +106,13 @@ class SystemFeedingTables {
               )
             : null,
       ),
+      kittenFactors: FeedingFactors.fromMap(
+        data[FeedingGuideFields.kittenFactors] is Map
+            ? Map<String, dynamic>.from(
+                data[FeedingGuideFields.kittenFactors] as Map,
+              )
+            : null,
+      ),
     );
   }
 
@@ -118,6 +128,7 @@ class SystemFeedingTables {
         FeedingGuideFields.miniPuppyFactors: miniPuppyFactors.toMap(),
         FeedingGuideFields.adultDogFactors: adultDogFactors.toMap(),
         FeedingGuideFields.puppyDogFactors: puppyDogFactors.toMap(),
+        FeedingGuideFields.kittenFactors: kittenFactors.toMap(),
         FeedingGuideFields.updatedAt: FieldValue.serverTimestamp(),
       };
 
@@ -219,6 +230,7 @@ class SystemFeedingRepository extends ChangeNotifier {
     CatFeedingGuide.gramsOverride = tables.catAdult;
     CatFeedingGuide.factors = tables.factors;
     KittenFeedingGuide.gramsOverride = tables.catKitten;
+    KittenFeedingGuide.factors = tables.kittenFactors;
     AdultDogFeedingGuide.gramsOverride = tables.dogAdult;
     AdultDogFeedingGuide.factors = tables.adultDogFactors;
     MiniAdultDogFeedingGuide.gramsOverride = tables.dogMiniAdult;

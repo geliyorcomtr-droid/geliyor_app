@@ -138,7 +138,7 @@ class AppProductCard extends StatelessWidget {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                     decoration: BoxDecoration(
-                      color: AppColors.primary,
+                      color: AppColors.discount,
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
@@ -236,7 +236,7 @@ class AppProductCard extends StatelessWidget {
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
-                                        color: AppColors.success,
+                                        color: AppColors.discount,
                                         fontSize: 13,
                                         fontWeight: FontWeight.w900,
                                       ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:geliyor_app/data/product_advantage_repository.dart';
 import 'package:geliyor_app/state/favorite_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/utils/product_image.dart';
@@ -43,12 +44,17 @@ class MarketProductData {
     this.deliveryLabel = '3 saatte kapında',
     this.trustBadgeIds = const [],
     this.productAdvantageIds = const [],
+    this.categoryTitles = const [],
     this.productAdvantageValues = const {},
     this.proteinValue = '',
+    this.animalProteinValue = '',
     this.preferredRank = '',
     this.repurchaseRate = '',
     this.barcode = '',
     this.gallery = const [],
+    this.boughtTogetherIds = const [],
+    this.ingredients = '',
+    this.createdAt,
   });
 
   final String id;
@@ -70,12 +76,17 @@ class MarketProductData {
   final String deliveryLabel;
   final List<String> trustBadgeIds;
   final List<String> productAdvantageIds;
+  final List<String> categoryTitles;
   final Map<String, String> productAdvantageValues;
   final String proteinValue;
+  final String animalProteinValue;
   final String preferredRank;
   final String repurchaseRate;
   final String barcode;
   final List<String> gallery;
+  final List<String> boughtTogetherIds;
+  final String ingredients;
+  final DateTime? createdAt;
 
   /// Ana görsel + galeri; boş ve tekrarlayan adresler elenir.
   List<String> get displayImages {
@@ -91,6 +102,20 @@ class MarketProductData {
       add(url);
     }
     return paths;
+  }
+
+  String get animalProteinLabel {
+    final direct = animalProteinValue.trim();
+    if (direct.isNotEmpty) {
+      return ProductAdvantageRepository.formatProteinDisplay(direct);
+    }
+    for (final entry in productAdvantageValues.entries) {
+      if (ProductAdvantageRepository.isAnimalProteinId(entry.key) &&
+          entry.value.trim().isNotEmpty) {
+        return ProductAdvantageRepository.formatProteinDisplay(entry.value);
+      }
+    }
+    return '';
   }
 }
 
@@ -310,13 +335,19 @@ class _MarketProductCardState extends State<MarketProductCard> {
               onToggle: _toggleFavorite,
             ),
           ),
+          if (p.animalProteinLabel.isNotEmpty)
+            Positioned(
+              bottom: 4,
+              right: 4,
+              child: AnimalProteinBadge(label: p.animalProteinLabel),
+            ),
           Positioned(
             top: 4,
             right: 4,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
               decoration: BoxDecoration(
-                color: AppColors.primary,
+                color: AppColors.discount,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -364,51 +395,52 @@ class _MarketProductCardState extends State<MarketProductCard> {
               crossAxisAlignment: CrossAxisAlignment.center,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        formatProductPrice(oldPrice),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: AppColors.subText.withValues(alpha: 0.9),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          decoration: TextDecoration.lineThrough,
-                          decorationColor: AppColors.subText.withValues(
-                            alpha: 0.7,
+                if (oldPrice > price)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          formatProductPrice(oldPrice),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: AppColors.subText.withValues(alpha: 0.9),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            decoration: TextDecoration.lineThrough,
+                            decorationColor: AppColors.subText.withValues(
+                              alpha: 0.7,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.error.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(
-                          color: AppColors.error.withValues(alpha: 0.25),
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.discount.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: AppColors.discount.withValues(alpha: 0.25),
+                          ),
+                        ),
+                        child: Text(
+                          '%${p.discount}',
+                          style: const TextStyle(
+                            color: AppColors.discount,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
                       ),
-                      child: Text(
-                        '%${p.discount}',
-                        style: const TextStyle(
-                          color: AppColors.error,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
                 const SizedBox(height: 3),
                 Text(
                   formatProductPrice(price),
@@ -416,7 +448,7 @@ class _MarketProductCardState extends State<MarketProductCard> {
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
-                    color: AppColors.primary,
+                    color: AppColors.discount,
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
                     height: 1,
@@ -780,6 +812,14 @@ class MarketCompactProductCard extends StatelessWidget {
                       iconSize: 12,
                     ),
                   ),
+                  if (product.animalProteinLabel.isNotEmpty)
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      child: AnimalProteinBadge(
+                        label: product.animalProteinLabel,
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -812,8 +852,8 @@ class MarketCompactProductCard extends StatelessWidget {
                     formatProductPrice(price),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: accent,
+                    style: const TextStyle(
+                      color: AppColors.discount,
                       fontSize: 12,
                       fontWeight: FontWeight.w900,
                     ),
@@ -838,6 +878,33 @@ class MarketCompactProductCard extends StatelessWidget {
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class AnimalProteinBadge extends StatelessWidget {
+  const AnimalProteinBadge({super.key, required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: AppColors.statNumber,
+          fontSize: 9,
+          fontWeight: FontWeight.w900,
+          height: 1.1,
         ),
       ),
     );

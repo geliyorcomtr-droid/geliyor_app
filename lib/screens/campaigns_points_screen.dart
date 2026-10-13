@@ -1,13 +1,16 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'package:geliyor_app/admin/admin_models.dart';
 import 'package:geliyor_app/data/banner_repository.dart';
+import 'package:geliyor_app/data/firestore_collections.dart';
+import 'package:geliyor_app/data/product_repository.dart';
+import 'package:geliyor_app/state/auth_store.dart';
+import 'package:geliyor_app/utils/product_image.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_functions/cloud_functions.dart';
-import 'package:geliyor_app/screens/smart_plan_screen.dart';
-import 'package:geliyor_app/state/coupon_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/utils/login_gate.dart';
-import 'package:geliyor_app/widgets/coupon_sheet.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
 import 'package:geliyor_app/widgets/app_banner_slider.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
@@ -26,49 +29,33 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
   static const String _referralCode = 'GELIYOR100';
 
   bool _inviteOpen = false;
+  bool _streetDonated = false;
+  int _heldPoints = 0;
   bool _inviteSuccess = false;
   bool _inviteSending = false;
   _InviteChannel _inviteChannel = _InviteChannel.phone;
   final TextEditingController _inviteController = TextEditingController();
   String? _inviteError;
 
-  static const List<_RewardProduct> _rewards = [
-    _RewardProduct(
-      name: 'Renkli İp Oyuncak',
-      points: '500 Puan',
-      imagePath: 'assets/images/mama_kabi.png',
-    ),
-    _RewardProduct(
-      name: 'Somonlu Konserve',
-      points: '750 Puan',
-      imagePath: 'assets/images/app_ikonlar/somon.png',
-    ),
-    _RewardProduct(
-      name: 'Doğal Ödül Maması',
-      points: '1000 Puan',
-      imagePath: 'assets/images/app_ikonlar/dogal_icerik.png',
-    ),
-  ];
-
   static const List<_TierInfo> _tiers = [
     _TierInfo(
       name: 'Bronz Dost',
       range: '1 - 1.999 Puan',
-      color: Color(0xFFCD7F32),
+      color: AppColors.primary,
       imagePath: 'assets/images/son_ikonlar/kampanya_bronz_dost.png',
       isCurrent: true,
     ),
     _TierInfo(
       name: 'Gold Dost',
       range: '2.000 - 4.999 Puan',
-      color: Color(0xFFF59E0B),
+      color: AppColors.primary,
       imagePath: 'assets/images/son_ikonlar/kampanya_altin_dost.png',
       isLocked: true,
     ),
     _TierInfo(
       name: 'Premium Dost',
       range: '5.000+ Puan',
-      color: Color(0xFF60A5FA),
+      color: AppColors.primary,
       imagePath: 'assets/images/son_ikonlar/kampanya_premium_dost.png',
       isLocked: true,
     ),
@@ -90,32 +77,47 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
     );
   }
 
-  void _openSmartPlan() {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const SmartPlanScreen()));
-  }
-
-  Future<void> _earnCampaignCoupon(BuildContext context) async {
-    final ok = await LoginGate.require(
-      context: context,
-      message: 'Kupon kazanmak için giriş yapmanız gerekir.',
-    );
-    if (!ok || !context.mounted) return;
-    await CouponStore.instance.ensureLoaded();
-    final granted = await CouponStore.instance.earnReward();
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          granted
-              ? 'DOST25 kuponu hesabınıza eklendi.'
-              : 'Bu kupon zaten hesabınızda.',
-        ),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-    await CouponSheet.show(context, subtotal: 0);
+  void _donateStreetPoints() {
+    final next = !_streetDonated;
+    setState(() => _streetDonated = next);
+    final uid = AuthStore.instance.uid;
+    if (uid == null || uid.isEmpty) return;
+    final ref = FirebaseFirestore.instance
+        .collection(FirestoreCollections.users)
+        .doc(uid);
+    if (!next) {
+      final restore = _heldPoints;
+      _heldPoints = 0;
+      if (restore <= 0) return;
+      ref.set({
+        UserFields.dostPoints: FieldValue.increment(restore),
+        UserFields.updatedAt: FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      return;
+    }
+    FirebaseFirestore.instance.runTransaction<int>((tx) async {
+      final current = await tx.get(ref);
+      final balance =
+          (current.data()?[UserFields.dostPoints] as num?)?.round() ?? 0;
+      if (balance <= 0) return 0;
+      tx.set(ref, {
+        UserFields.dostPoints: 0,
+        UserFields.updatedAt: FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      return balance;
+    }).then((taken) {
+      if (!mounted) return;
+      if (!_streetDonated) {
+        if (taken > 0) {
+          ref.set({
+            UserFields.dostPoints: FieldValue.increment(taken),
+            UserFields.updatedAt: FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+        }
+        return;
+      }
+      _heldPoints = taken;
+    });
   }
 
   Future<void> _openInviteForm() async {
@@ -235,9 +237,7 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
               _buildBanner(),
               const SizedBox(height: 12),
               _buildGiftSection(context),
-              const SizedBox(height: 10),
-              _buildGiftActions(context),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               _buildReferralCard(context),
               const SizedBox(height: 14),
               _buildRewardsSection(context),
@@ -322,86 +322,9 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
           ),
         ),
         const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(
-              child: _GiftOptionCard(
-                imagePath: 'assets/images/son_ikonlar/kampanya_2kat_odul.png',
-                title: '2 Kat Ödül',
-                subtitle: 'Bu ürünlerde puanların 2 katına çıkar!',
-                onTap: () {},
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _GiftOptionCard(
-                imagePath:
-                    'assets/images/son_ikonlar/kampanya_indirim_kupon.png',
-                title: 'İndirim Kuponu',
-                subtitle: 'Sana özel indirim kuponu kazan!',
-                onTap: () => _earnCampaignCoupon(context),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _GiftOptionCard(
-                imagePath:
-                    'assets/images/son_ikonlar/kampanya_sokaktaki_dost.png',
-                title: 'Sokaktaki Dostlar',
-                subtitle: 'Puanlarını sokaktaki dostlar için bağışla!',
-                onTap: () {},
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildGiftActions(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: AppPressableButton.primary(
-            onTap: _openSmartPlan,
-            height: 42,
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.calendar_month_rounded, size: 15),
-                SizedBox(width: 6),
-                Text(
-                  'Siparişi Planla',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: AppPressableButton.outline(
-            onTap: () {},
-            height: 42,
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.notifications_none_rounded, size: 15),
-                SizedBox(width: 6),
-                Flexible(
-                  child: Text(
-                    'Daha Sonra Hatırlat',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+        _CampaignGiftRow(
+          onDonate: _donateStreetPoints,
+          donated: _streetDonated,
         ),
       ],
     );
@@ -787,46 +710,123 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
     );
   }
 
+  Future<void> _redeemReward(AdminProduct product) async {
+    final ok = await LoginGate.require(
+      context: context,
+      message: 'Puanla almak için giriş yapmanız gerekir.',
+    );
+    if (!ok || !mounted) return;
+    final uid = AuthStore.instance.uid;
+    if (uid == null || uid.isEmpty) return;
+    final cost = product.rewardPoints;
+    if (cost <= 0) return;
+    final ref = FirebaseFirestore.instance
+        .collection(FirestoreCollections.users)
+        .doc(uid);
+    try {
+      await FirebaseFirestore.instance.runTransaction((tx) async {
+        final snap = await tx.get(ref);
+        final points =
+            (snap.data()?[UserFields.dostPoints] as num?)?.round() ?? 0;
+        if (points < cost) {
+          throw StateError('yetersiz');
+        }
+        tx.set(ref, {
+          UserFields.dostPoints: points - cost,
+          UserFields.updatedAt: FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${product.title} puanla alındı.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } on StateError {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Dost puanın bu ürün için yeterli değil.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
   Widget _buildRewardsSection(BuildContext context) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            const Expanded(
-              child: Text(
-                'Puanlarını Ödüllere Dönüştür',
-                style: AppTextStyles.sectionHeader,
-              ),
-            ),
-            AppPressableButton(
-              onTap: () {},
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-              backgroundColor: Colors.transparent,
-              pressedBackgroundColor: AppColors.selected,
-              foregroundColor: AppColors.primary,
-              pressedForegroundColor: AppColors.primary,
-              borderColor: Colors.transparent,
-              pressedBorderColor: Colors.transparent,
-              borderWidth: 0,
-              child: const Text(
-                'Tüm Ödüller >',
-                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800),
-              ),
-            ),
-          ],
+        const Text(
+          'Puanlarını Ödüllere Dönüştür',
+          style: AppTextStyles.sectionHeader,
         ),
         const SizedBox(height: 10),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            for (int i = 0; i < _rewards.length; i++) ...[
-              if (i > 0) const SizedBox(width: 8),
-              Expanded(child: _RewardCard(product: _rewards[i])),
-            ],
-          ],
+        StreamBuilder<List<AdminProduct>>(
+          stream: ProductRepository.instance.watchAll(activeOnly: true),
+          builder: (context, snapshot) {
+            final rewards = [
+              for (final product in snapshot.data ?? const <AdminProduct>[])
+                if (product.isPointReward) product,
+            ];
+            if (rewards.isEmpty) {
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 16,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: const Text(
+                  'Henüz puan ödülü seçilmedi.',
+                  style: TextStyle(
+                    color: AppColors.subText,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              );
+            }
+            return _rewardGrid(rewards);
+          },
         ),
       ],
     );
+  }
+
+  Widget _rewardGrid(List<AdminProduct> products) {
+    const columns = 4;
+    const gap = 6.0;
+    final rows = <Widget>[];
+    for (var start = 0; start < products.length; start += columns) {
+      rows.add(
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (var column = 0; column < columns; column++) ...[
+              if (column > 0) const SizedBox(width: gap),
+              Expanded(
+                child: start + column < products.length
+                    ? _RewardCard(
+                        product: products[start + column],
+                        onRedeem: () => _redeemReward(products[start + column]),
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            ],
+          ],
+        ),
+      );
+      if (start + columns < products.length) {
+        rows.add(const SizedBox(height: gap));
+      }
+    }
+    return Column(children: rows);
   }
 
   Widget _buildTiersSection() {
@@ -851,90 +851,182 @@ class _CampaignsPointsScreenState extends State<CampaignsPointsScreen> {
   }
 }
 
-class _GiftOptionCard extends StatelessWidget {
-  const _GiftOptionCard({
-    required this.imagePath,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
+class _CampaignGiftRow extends StatelessWidget {
+  const _CampaignGiftRow({required this.onDonate, required this.donated});
 
-  final String imagePath;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
+  final VoidCallback onDonate;
+  final bool donated;
 
   @override
   Widget build(BuildContext context) {
-    return AppPressableButton(
-      onTap: onTap,
-      padding: const EdgeInsets.fromLTRB(6, 10, 6, 10),
-      backgroundColor: AppColors.surface,
-      pressedBackgroundColor: AppColors.selected,
-      foregroundColor: AppColors.text,
-      pressedForegroundColor: AppColors.text,
-      borderColor: AppColors.border,
-      pressedBorderColor: AppColors.primary,
-      borderRadius: 18,
-      builder: (pressed) => Column(
-        children: [
-          SizedBox(
-            width: double.infinity,
-            height: 64,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: ColoredBox(
-                color: AppColors.white,
-                child: Image.asset(
-                  imagePath,
-                  fit: BoxFit.contain,
-                  width: double.infinity,
-                  height: double.infinity,
-                  filterQuality: FilterQuality.high,
-                  errorBuilder: (_, _, _) => const Icon(
-                    Icons.card_giftcard_rounded,
-                    color: AppColors.primary,
-                    size: 28,
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection(FirestoreCollections.banners)
+          .snapshots(),
+      builder: (context, snapshot) {
+        final docs = snapshot.data?.docs;
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: _CampaignGiftArt(
+                imagePath: _campaignArtPath(
+                  docs: docs,
+                  placement: BannerPlacement.campaignDiscount,
+                  seededId: 'campaign-discount',
+                  fallback: 'assets/images/kampanya_yuzde5_indirim.jpg',
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _CampaignGiftArt(
+                imagePath: _campaignArtPath(
+                  docs: docs,
+                  placement: BannerPlacement.campaignDouble,
+                  seededId: 'campaign-double',
+                  fallback: 'assets/images/kampanya_ilk_siparis_2kat.jpg',
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _CampaignGiftArt(
+                imagePath: _campaignArtPath(
+                  docs: docs,
+                  placement: BannerPlacement.campaignDonate,
+                  seededId: 'campaign-donate',
+                  fallback: 'assets/images/kampanya_sokak_bagis.jpg',
+                ),
+                onTap: onDonate,
+                checked: donated,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+String? _campaignArtPath({
+  required List<QueryDocumentSnapshot<Map<String, dynamic>>>? docs,
+  required BannerPlacement placement,
+  required String seededId,
+  required String fallback,
+}) {
+  if (docs == null) return fallback;
+  final deleted = <String>{};
+  for (final doc in docs) {
+    if (doc.id != BannerRepository.seededDocId) continue;
+    final raw = doc.data()['deletedIds'];
+    if (raw is Iterable) {
+      deleted.addAll(raw.map((item) => item.toString()));
+    }
+  }
+  final forSlot = [
+    for (final doc in docs)
+      if (!doc.id.startsWith('_')) AppBanner.fromDoc(doc),
+  ].where((banner) => banner.placement == placement.id).toList();
+  final visible = forSlot
+      .where(
+        (banner) => banner.active && banner.displayImage.trim().isNotEmpty,
+      )
+      .toList();
+  final picked = AppBanner.latestLive(visible);
+  if (picked != null && picked.displayImage.trim().isNotEmpty) {
+    return picked.displayImage;
+  }
+  if (deleted.contains(seededId) || forSlot.isNotEmpty) return null;
+  return fallback;
+}
+
+class _CampaignGiftArt extends StatelessWidget {
+  const _CampaignGiftArt({
+    required this.imagePath,
+    this.onTap,
+    this.checked = false,
+  });
+
+  final String? imagePath;
+  final VoidCallback? onTap;
+  final bool checked;
+
+  @override
+  Widget build(BuildContext context) {
+    final path = imagePath?.trim() ?? '';
+    final art = AspectRatio(
+      aspectRatio: 1,
+      child: Container(
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: AppColors.statNumber,
+            width: 1.6,
+          ),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: ColoredBox(
+            color: AppColors.surface,
+            child: path.isEmpty
+                ? const SizedBox.expand()
+                : buildProductImage(
+                    path,
+                    fit: BoxFit.contain,
+                    width: double.infinity,
+                    height: double.infinity,
+                    alignment: Alignment.center,
+                    filterQuality: FilterQuality.high,
                   ),
+          ),
+        ),
+      ),
+    );
+    final marked = Stack(
+      children: [
+        art,
+        if (checked)
+          const Positioned(
+            top: 6,
+            right: 6,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: AppColors.statNumber,
+                shape: BoxShape.circle,
+              ),
+              child: SizedBox(
+                width: 22,
+                height: 22,
+                child: Icon(
+                  Icons.check_rounded,
+                  size: 16,
+                  color: AppColors.surface,
                 ),
               ),
             ),
           ),
-          const SizedBox(height: 6),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 9.5,
-              fontWeight: FontWeight.w900,
-              height: 1.1,
-            ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            subtitle,
-            textAlign: TextAlign.center,
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: AppColors.subText.withValues(alpha: 0.95),
-              fontSize: 7.5,
-              fontWeight: FontWeight.w600,
-              height: 1.2,
-            ),
-          ),
-        ],
+      ],
+    );
+    if (onTap == null) return marked;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: marked,
       ),
     );
   }
 }
 
 class _RewardCard extends StatelessWidget {
-  const _RewardCard({required this.product});
+  const _RewardCard({required this.product, required this.onRedeem});
 
-  final _RewardProduct product;
+  final AdminProduct product;
+  final VoidCallback onRedeem;
 
   @override
   Widget build(BuildContext context) {
@@ -959,7 +1051,7 @@ class _RewardCard extends StatelessWidget {
             child: FittedBox(
               fit: BoxFit.scaleDown,
               child: Text(
-                product.points,
+                '${product.rewardPoints} Puan',
                 maxLines: 1,
                 style: const TextStyle(
                   color: AppColors.primary,
@@ -979,13 +1071,12 @@ class _RewardCard extends StatelessWidget {
                 color: AppColors.white,
                 child: Padding(
                   padding: const EdgeInsets.all(4),
-                  child: Image.asset(
-                    product.imagePath,
+                  child: buildProductImage(
+                    product.imageUrl,
                     fit: BoxFit.contain,
-                    filterQuality: FilterQuality.high,
-                    errorBuilder: (_, _, _) => Icon(
+                    errorWidget: Icon(
                       Icons.card_giftcard_rounded,
-                      size: 28,
+                      size: 22,
                       color: AppColors.primary.withValues(alpha: 0.5),
                     ),
                   ),
@@ -997,7 +1088,7 @@ class _RewardCard extends StatelessWidget {
           SizedBox(
             height: 26,
             child: Text(
-              product.name,
+              product.title,
               textAlign: TextAlign.center,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -1011,7 +1102,7 @@ class _RewardCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           AppPressableButton.soft(
-            onTap: () {},
+            onTap: onRedeem,
             width: double.infinity,
             height: 28,
             padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -1197,18 +1288,6 @@ class _InviteChannelChip extends StatelessWidget {
 }
 
 enum _InviteChannel { phone, email }
-
-class _RewardProduct {
-  const _RewardProduct({
-    required this.name,
-    required this.points,
-    required this.imagePath,
-  });
-
-  final String name;
-  final String points;
-  final String imagePath;
-}
 
 class _TierInfo {
   const _TierInfo({

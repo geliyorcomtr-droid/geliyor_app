@@ -35,6 +35,12 @@ class NotificationSettingsStore extends ChangeNotifier {
   int smartFoodReminderDays = 3;
   int customSmartFoodReminderDays = 7;
 
+  /// Akıllı Plan abonelik şeridi. Açıkken mama bitmeden otomatik sipariş kurulur.
+  bool subscriptionEnabled = false;
+
+  /// Siparişten otomatik mama takibi. Kapalıyken sipariş olsa da buradan takip yapılmaz.
+  bool orderFoodTrackingEnabled = true;
+
   /// Otomatik sipariş bildirimleri ve sipariş oluşturma zamanı.
   bool autoOrderNotifications = true;
   int autoOrderDaysBefore = 3;
@@ -183,6 +189,18 @@ class NotificationSettingsStore extends ChangeNotifier {
     _persist();
   }
 
+  void setSubscriptionEnabled(bool value) {
+    subscriptionEnabled = value;
+    notifyListeners();
+    _persist();
+  }
+
+  void setOrderFoodTrackingEnabled(bool value) {
+    orderFoodTrackingEnabled = value;
+    notifyListeners();
+    _persist();
+  }
+
   void setAutoOrderNotifications(bool value) {
     autoOrderNotifications = value;
     notifyListeners();
@@ -235,6 +253,10 @@ class NotificationSettingsStore extends ChangeNotifier {
       customSmartFoodReminderDays =
           (data['customSmartFoodReminderDays'] as num?)?.toInt() ??
           customSmartFoodReminderDays;
+      subscriptionEnabled =
+          data['subscriptionEnabled'] as bool? ?? subscriptionEnabled;
+      orderFoodTrackingEnabled =
+          data['orderFoodTrackingEnabled'] as bool? ?? orderFoodTrackingEnabled;
       autoOrderNotifications =
           data['autoOrderNotifications'] as bool? ?? autoOrderNotifications;
       autoOrderDaysBefore =
@@ -276,6 +298,8 @@ class NotificationSettingsStore extends ChangeNotifier {
     smartFoodReminderEnabled = true;
     smartFoodReminderDays = 3;
     customSmartFoodReminderDays = 7;
+    subscriptionEnabled = false;
+    orderFoodTrackingEnabled = true;
     autoOrderNotifications = true;
     autoOrderDaysBefore = 3;
     healthRemindersEnabled = true;
@@ -315,6 +339,8 @@ class NotificationSettingsStore extends ChangeNotifier {
         'smartFoodReminderEnabled': smartFoodReminderEnabled,
         'smartFoodReminderDays': smartFoodReminderDays,
         'customSmartFoodReminderDays': customSmartFoodReminderDays,
+        'subscriptionEnabled': subscriptionEnabled,
+        'orderFoodTrackingEnabled': orderFoodTrackingEnabled,
         'autoOrderNotifications': autoOrderNotifications,
         'autoOrderDaysBefore': autoOrderDaysBefore,
         'healthRemindersEnabled': healthRemindersEnabled,

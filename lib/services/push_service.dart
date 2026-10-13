@@ -26,7 +26,9 @@ class PushService {
     if (_started) return;
     _started = true;
     if (!kIsWeb) {
-      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+      try {
+        FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+      } catch (_) {}
       await FirebaseMessaging.instance
           .setForegroundNotificationPresentationOptions(
             alert: true,

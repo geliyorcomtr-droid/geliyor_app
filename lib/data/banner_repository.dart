@@ -152,6 +152,42 @@ class BannerPlacement {
     height: 108,
     description: '361×108 · Sahiplendirme sayfası üst banner',
   );
+  static const adoptionBoxAdopt = BannerPlacement(
+    id: 'adoption_box_adopt',
+    title: 'Sahiplendirme kutusu',
+    pageId: 'sahiplendirme',
+    pageLabel: 'Sahiplendirme',
+    slotLabel: 'Sahiplendirme kutusu',
+    height: 118,
+    boxWidth: 115,
+    boxRadius: 18,
+    description:
+        '115×118 · Sahiplendirme ve İlan Ekle. Görsel değişince iki sayfa da güncellenir.',
+  );
+  static const adoptionBoxLost = BannerPlacement(
+    id: 'adoption_box_lost',
+    title: 'Aranıyor kutusu',
+    pageId: 'sahiplendirme',
+    pageLabel: 'Sahiplendirme',
+    slotLabel: 'Aranıyor kutusu',
+    height: 118,
+    boxWidth: 115,
+    boxRadius: 18,
+    description:
+        '115×118 · Sahiplendirme ve İlan Ekle. Görsel değişince iki sayfa da güncellenir.',
+  );
+  static const adoptionBoxFound = BannerPlacement(
+    id: 'adoption_box_found',
+    title: 'Bulundu kutusu',
+    pageId: 'sahiplendirme',
+    pageLabel: 'Sahiplendirme',
+    slotLabel: 'Bulundu kutusu',
+    height: 118,
+    boxWidth: 115,
+    boxRadius: 18,
+    description:
+        '115×118 · Sahiplendirme ve İlan Ekle. Görsel değişince iki sayfa da güncellenir.',
+  );
   static const healthTop = BannerPlacement(
     id: 'health_top',
     title: 'Pet E-nabız — Üst',
@@ -167,6 +203,54 @@ class BannerPlacement {
     pageLabel: 'Pet E-nabız',
     slotLabel: 'Alt banner',
     height: 100,
+  );
+  static const smartPlanAutoOrderStrip = BannerPlacement(
+    id: 'smart_plan_auto_order_strip',
+    title: 'Abonelik',
+    pageId: 'smart_plan',
+    pageLabel: 'Akıllı Plan',
+    slotLabel: 'Abonelik şeridi',
+    height: 139,
+    boxWidth: 361,
+    boxRadius: 24,
+    description:
+        '361×139 · Alttaki beyaz alanda “Hemen abone ol” ve anahtar uygulamada çalışır',
+  );
+  static const smartPlanReminderStrip = BannerPlacement(
+    id: 'smart_plan_reminder_strip',
+    title: 'Akıllı Hatırlatma şeridi',
+    pageId: 'smart_plan',
+    pageLabel: 'Akıllı Plan',
+    slotLabel: 'Akıllı hatırlatma şeridi',
+    height: 139,
+    boxWidth: 361,
+    boxRadius: 24,
+    description:
+        '361×139 · Alttaki beyaz kutu uygulama tarafından gelir, görsel değiştirilebilir',
+  );
+  static const smartPlanOrderTrackStrip = BannerPlacement(
+    id: 'smart_plan_order_track_strip',
+    title: 'Siparişten Otomatik Takip',
+    pageId: 'smart_plan',
+    pageLabel: 'Akıllı Plan',
+    slotLabel: 'Siparişten otomatik takip',
+    height: 139,
+    boxWidth: 361,
+    boxRadius: 24,
+    description:
+        '361×139 · Görselin herhangi bir yerine tıklanınca sipariş takibi açılır',
+  );
+  static const smartPlanManualTrackStrip = BannerPlacement(
+    id: 'smart_plan_manual_track_strip',
+    title: 'Manuel Takip',
+    pageId: 'smart_plan',
+    pageLabel: 'Akıllı Plan',
+    slotLabel: 'Manuel takip',
+    height: 139,
+    boxWidth: 361,
+    boxRadius: 24,
+    description:
+        '361×139 · Görselin herhangi bir yerine tıklanınca mama takip sayfası açılır',
   );
   static const smartPlanAutoOrder = BannerPlacement(
     id: 'smart_plan_auto_order',
@@ -234,28 +318,6 @@ class BannerPlacement {
     boxRadius: 28,
     description: '361×280 · Kutuya tıklanınca açılır',
   );
-  static const smartPlanFoodTrackInnerAuto = BannerPlacement(
-    id: 'smart_plan_food_track_inner_auto',
-    title: 'Mama tüketim iç görsel · Otomatik',
-    pageId: 'smart_plan',
-    pageLabel: 'Akıllı Plan',
-    slotLabel: 'Mama tüketim iç görsel · Otomatik',
-    height: 110,
-    boxWidth: 160,
-    boxRadius: 16,
-    description: 'Mama Tüketim Takibi · Siparişten Otomatik Takip kutusu',
-  );
-  static const smartPlanFoodTrackInnerManual = BannerPlacement(
-    id: 'smart_plan_food_track_inner_manual',
-    title: 'Mama tüketim iç görsel · Manuel',
-    pageId: 'smart_plan',
-    pageLabel: 'Akıllı Plan',
-    slotLabel: 'Mama tüketim iç görsel · Manuel',
-    height: 110,
-    boxWidth: 160,
-    boxRadius: 16,
-    description: 'Mama Tüketim Takibi · Manuel Takip kutusu',
-  );
   static const easyOrder = BannerPlacement(
     id: 'easy_order',
     title: 'Kolay Sipariş',
@@ -266,6 +328,28 @@ class BannerPlacement {
     boxWidth: 361,
     boxRadius: 24,
     description: '361×132 · Kolay Sipariş sayfa bannerı',
+  );
+  static const giftSelect = BannerPlacement(
+    id: 'gift_select',
+    title: 'Hediye Seç',
+    pageId: 'gift_select',
+    pageLabel: 'Hediye Seç',
+    slotLabel: 'Sayfa bannerı',
+    height: 140,
+    boxWidth: 361,
+    boxRadius: 24,
+    description: '361×140 · Hediye Seç sayfa bannerı',
+  );
+  static const hangiMama = BannerPlacement(
+    id: 'hangi_mama',
+    title: 'Hangi Mama',
+    pageId: 'hangi_mama',
+    pageLabel: 'Hangi Mama',
+    slotLabel: 'Sayfa bannerı',
+    height: 140,
+    boxWidth: 361,
+    boxRadius: 24,
+    description: '361×140 · Kedi ve köpek kutularının üstü',
   );
   static const foodTracking = BannerPlacement(
     id: 'food_tracking',
@@ -282,6 +366,40 @@ class BannerPlacement {
     pageLabel: 'Kampanya & Puan',
     slotLabel: 'Sayfa bannerı',
     height: 150,
+  );
+  static const campaignDiscount = BannerPlacement(
+    id: 'campaign_discount',
+    title: 'Abonelere %5 İndirim',
+    pageId: 'kampanyalar',
+    pageLabel: 'Kampanyalar',
+    slotLabel: '%5 İndirim',
+    height: 115,
+    boxWidth: 115,
+    boxRadius: 18,
+    description: '115×115 · tıklanmaz. Silinince veya değişince kutu güncellenir.',
+  );
+  static const campaignDouble = BannerPlacement(
+    id: 'campaign_double',
+    title: 'İlk Siparişe 2 Kat Ödül',
+    pageId: 'kampanyalar',
+    pageLabel: 'Kampanyalar',
+    slotLabel: '2 Kat Ödül',
+    height: 115,
+    boxWidth: 115,
+    boxRadius: 18,
+    description: '115×115 · tıklanmaz. Silinince veya değişince kutu güncellenir.',
+  );
+  static const campaignDonate = BannerPlacement(
+    id: 'campaign_donate',
+    title: 'Sokaktaki Dostlar',
+    pageId: 'kampanyalar',
+    pageLabel: 'Kampanyalar',
+    slotLabel: 'Puan Bağışı',
+    height: 115,
+    boxWidth: 115,
+    boxRadius: 18,
+    description:
+        '115×115 · tıklanınca dost puanı sokaktaki dostlar için bağışlanır.',
   );
   static const assistant = BannerPlacement(
     id: 'assistant',
@@ -324,15 +442,43 @@ class BannerPlacement {
     pageId: 'emergency',
     pageLabel: 'Acil Destek',
     slotLabel: 'Sayfa bannerı',
+    height: 140,
+    boxWidth: 361,
+    boxRadius: 24,
+    description: '361×140 · Acil Destek sayfa bannerı',
+  );
+  static const emergencyNotice = BannerPlacement(
+    id: 'emergency_notice',
+    title: 'Acil Destek — Alt uyarı',
+    pageId: 'emergency',
+    pageLabel: 'Acil Destek',
+    slotLabel: 'Alt uyarı bannerı',
     height: 120,
+    boxWidth: 361,
+    boxRadius: 24,
+    description: '361×120 · Sayfanın en altı. Silinince veya değişince kutu güncellenir.',
+  );
+  static const specialFoods = BannerPlacement(
+    id: 'special_foods',
+    title: 'Özel Sağlık Mamaları',
+    pageId: 'special_foods',
+    pageLabel: 'Özel Sağlık Mamaları',
+    slotLabel: 'Sayfa bannerı',
+    height: 140,
+    boxWidth: 361,
+    boxRadius: 24,
+    description: '361×140 · Sayfanın en üstü',
   );
   static const medicine = BannerPlacement(
     id: 'medicine',
-    title: 'İlaç & Tedavi',
+    title: 'İlaç ve Tedavi',
     pageId: 'medicine',
-    pageLabel: 'İlaç & Tedavi',
+    pageLabel: 'İlaç ve Tedavi',
     slotLabel: 'Sayfa bannerı',
-    height: 100,
+    height: 140,
+    boxWidth: 361,
+    boxRadius: 24,
+    description: '361×140 · Arama kutusunun üstü',
   );
   static const vaccine = BannerPlacement(
     id: 'vaccine',
@@ -340,7 +486,10 @@ class BannerPlacement {
     pageId: 'vaccine',
     pageLabel: 'Aşı Takvimi',
     slotLabel: 'Sayfa bannerı',
-    height: 88,
+    height: 165,
+    boxWidth: 361,
+    boxRadius: 24,
+    description: '361×165 · Aşı Takvimi sayfa bannerı',
   );
   static const featuredQuestions = BannerPlacement(
     id: 'featured_questions',
@@ -367,25 +516,37 @@ class BannerPlacement {
     homePetMarket,
     homeSahiplendirme,
     adoption,
+    adoptionBoxAdopt,
+    adoptionBoxLost,
+    adoptionBoxFound,
     healthTop,
     healthBottom,
+    smartPlanAutoOrderStrip,
+    smartPlanReminderStrip,
+    smartPlanOrderTrackStrip,
+    smartPlanManualTrackStrip,
     smartPlanAutoOrder,
     smartPlanReminder,
     smartPlanFoodTrack,
     smartPlanAutoOrderDetail,
     smartPlanReminderDetail,
     smartPlanFoodTrackDetail,
-    smartPlanFoodTrackInnerAuto,
-    smartPlanFoodTrackInnerManual,
     easyOrder,
+    hangiMama,
+    giftSelect,
     foodTracking,
     campaignsPoints,
+    campaignDiscount,
+    campaignDouble,
+    campaignDonate,
     assistant,
     knowledge,
     articles,
     meetPet,
     emergency,
+    emergencyNotice,
     medicine,
+    specialFoods,
     vaccine,
     featuredQuestions,
     allTopics,
@@ -553,11 +714,7 @@ class AppBanner {
 
   static String liveNetworkPath(List<AppBanner> banners) {
     final live = latestLive(banners);
-    final url = live?.imageUrl.trim() ?? '';
-    if (url.isEmpty) return '';
-    final stamp = live!.updatedAt?.millisecondsSinceEpoch;
-    if (stamp == null) return url;
-    return url.contains('?') ? '$url&v=$stamp' : '$url?v=$stamp';
+    return live?.imageUrl.trim() ?? '';
   }
 }
 
@@ -581,6 +738,12 @@ const defaultBanners = <AppBanner>[
     placement: 'adoption',
   ),
   AppBanner(
+    id: 'adoption-box-adopt',
+    title: 'Sahiplendirme',
+    assetPath: 'assets/images/sahiplendirme_kutu.jpg',
+    placement: 'adoption_box_adopt',
+  ),
+  AppBanner(
     id: 'health-top',
     title: 'Sağlık',
     assetPath: 'assets/images/saglik_banner.png',
@@ -591,6 +754,18 @@ const defaultBanners = <AppBanner>[
     title: 'Sağlık Alt',
     assetPath: 'assets/images/saglik_alt_banner.png',
     placement: 'health_bottom',
+  ),
+  AppBanner(
+    id: 'smart-plan-auto-order-strip',
+    title: 'Abonelik',
+    assetPath: 'assets/images/smart_plan_auto_order_strip.jpg',
+    placement: 'smart_plan_auto_order_strip',
+  ),
+  AppBanner(
+    id: 'smart-plan-reminder-strip',
+    title: 'Akıllı Hatırlatma',
+    assetPath: 'assets/images/smart_plan_reminder_strip.jpg',
+    placement: 'smart_plan_reminder_strip',
   ),
   AppBanner(
     id: 'smart-plan-auto-order',
@@ -611,10 +786,34 @@ const defaultBanners = <AppBanner>[
     placement: 'smart_plan_food_track',
   ),
   AppBanner(
+    id: 'smart-plan-order-track-strip',
+    title: 'Siparişten Otomatik Takip',
+    assetPath: 'assets/images/smart_plan_order_track_strip.jpg',
+    placement: 'smart_plan_order_track_strip',
+  ),
+  AppBanner(
+    id: 'smart-plan-manual-track-strip',
+    title: 'Manuel Takip',
+    assetPath: 'assets/images/smart_plan_manual_track_strip.jpg',
+    placement: 'smart_plan_manual_track_strip',
+  ),
+  AppBanner(
     id: 'easy-order',
     title: 'Kolay Sipariş',
     assetPath: 'assets/images/kolay_siparis_banner.png',
     placement: 'easy_order',
+  ),
+  AppBanner(
+    id: 'hangi-mama',
+    title: 'Tedarik Ediyoruz',
+    assetPath: 'assets/images/hangi_mama_banner.jpg',
+    placement: 'hangi_mama',
+  ),
+  AppBanner(
+    id: 'hediye-sec',
+    title: 'Ne Severiz',
+    assetPath: 'assets/images/hediye_sec_banner.jpg',
+    placement: 'gift_select',
   ),
   AppBanner(
     id: 'food-tracking',
@@ -627,6 +826,27 @@ const defaultBanners = <AppBanner>[
     title: 'Kampanya & Puan',
     assetPath: 'assets/images/kampanya_puan_banner.png',
     placement: 'campaigns_points',
+  ),
+  AppBanner(
+    id: 'campaign-discount',
+    title: 'Abonelere %5 İndirim',
+    assetPath: 'assets/images/kampanya_yuzde5_indirim.jpg',
+    placement: 'campaign_discount',
+    order: 0,
+  ),
+  AppBanner(
+    id: 'campaign-double',
+    title: 'İlk Siparişe 2 Kat Ödül',
+    assetPath: 'assets/images/kampanya_ilk_siparis_2kat.jpg',
+    placement: 'campaign_double',
+    order: 1,
+  ),
+  AppBanner(
+    id: 'campaign-donate',
+    title: 'Sokaktaki Dostlar',
+    assetPath: 'assets/images/kampanya_sokak_bagis.jpg',
+    placement: 'campaign_donate',
+    order: 2,
   ),
   AppBanner(
     id: 'assistant',
@@ -659,10 +879,23 @@ const defaultBanners = <AppBanner>[
     placement: 'emergency',
   ),
   AppBanner(
+    id: 'emergency-notice',
+    title: 'Acil Destek Uyarı',
+    assetPath: 'assets/images/acil_destek_uyari_banner.jpg',
+    placement: 'emergency_notice',
+    order: 1,
+  ),
+  AppBanner(
     id: 'medicine',
-    title: 'İlaç & Tedavi',
-    assetPath: 'assets/images/ilac_tedavi_banner.png',
+    title: 'İlaç ve Tedavi',
+    assetPath: 'assets/images/ilac_tedavi_banner.jpg',
     placement: 'medicine',
+  ),
+  AppBanner(
+    id: 'special-foods',
+    title: 'Özel Sağlık Mamaları',
+    assetPath: 'assets/images/ozel_saglik_mamalari_banner.jpg',
+    placement: 'special_foods',
   ),
   AppBanner(
     id: 'vaccine',
@@ -744,10 +977,29 @@ class BannerRepository {
         if (hasWrites) await batch.commit();
       }
       await pruneStaleStripBanners();
+      await retireRemovedFoodTrackBanners();
       await restoreHomeDostEkleIfMeetPetLeaked();
+      await refreshMedicineBannerAsset();
     } catch (_) {
       // Mobil istemci yazma yetkisine sahip olmayabilir.
     }
+  }
+
+  /// Eski ilaç bannerını, özel görsel yüklenmediyse yeni görselle değiştirir.
+  Future<void> refreshMedicineBannerAsset() async {
+    const nextAsset = 'assets/images/ilac_tedavi_banner.jpg';
+    final doc = await _col.doc('medicine').get();
+    if (!doc.exists) return;
+    final data = doc.data() ?? {};
+    final imageUrl = (data[BannerFields.imageUrl] as String?)?.trim() ?? '';
+    if (imageUrl.isNotEmpty) return;
+    final asset = (data[BannerFields.assetPath] as String?)?.trim() ?? '';
+    if (asset == nextAsset) return;
+    await doc.reference.set({
+      BannerFields.title: 'İlaç ve Tedavi',
+      BannerFields.assetPath: nextAsset,
+      BannerFields.updatedAt: FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
   }
 
   /// Ana sayfa Dost Ekle şeridine Dostlarım bannerı yazıldıysa geri al.
@@ -836,6 +1088,23 @@ class BannerRepository {
     } catch (_) {}
   }
 
+  /// Kaldırılan mama tüketim kartı ve iç görsellerini kayıttan siler.
+  Future<void> retireRemovedFoodTrackBanners() async {
+    const retiredPlacements = {
+      'smart_plan_food_track_card',
+      'smart_plan_food_track_inner_auto',
+      'smart_plan_food_track_inner_manual',
+    };
+    try {
+      final snap = await _col.get(const GetOptions(source: Source.server));
+      for (final doc in snap.docs.where(_isBannerDoc)) {
+        final banner = AppBanner.fromDoc(doc);
+        if (!retiredPlacements.contains(banner.placement)) continue;
+        await deleteBanner(banner);
+      }
+    } catch (_) {}
+  }
+
   /// Aynı slottaki eski bannerleri kapatır ve Storage dosyalarını siler.
   Future<void> pruneStaleStripBanners() async {
     const placements = {
@@ -895,6 +1164,69 @@ class BannerRepository {
         } catch (_) {}
       }
     } catch (_) {}
+  }
+
+  Future<void> moveBanner({
+    required List<AppBanner> catalog,
+    required String id,
+    required String placement,
+    String? beforeId,
+  }) async {
+    final dest = placement.trim();
+    final bannerId = id.trim();
+    if (bannerId.isEmpty || dest.isEmpty) return;
+    if (!BannerPlacement.values.any((item) => item.id == dest)) return;
+
+    AppBanner? moved;
+    for (final item in catalog) {
+      if (item.id == bannerId) {
+        moved = item;
+        break;
+      }
+    }
+    if (moved == null) return;
+    if (moved.placement == dest && beforeId == bannerId) return;
+    if (moved.placement == dest && beforeId == null) {
+      final ordered = catalog
+          .where((item) => item.placement == dest)
+          .toList()
+        ..sort((a, b) => a.order.compareTo(b.order));
+      if (ordered.isNotEmpty && ordered.last.id == bannerId) return;
+    }
+
+    final source = moved.placement;
+    final destItems = catalog
+        .where((item) => item.placement == dest && item.id != bannerId)
+        .toList()
+      ..sort((a, b) => a.order.compareTo(b.order));
+    var insertAt = destItems.length;
+    if (beforeId != null && beforeId != bannerId) {
+      final index = destItems.indexWhere((item) => item.id == beforeId);
+      if (index >= 0) insertAt = index;
+    }
+    destItems.insert(insertAt, moved);
+
+    final batch = FirebaseFirestore.instance.batch();
+    for (var i = 0; i < destItems.length; i++) {
+      batch.set(_col.doc(destItems[i].id), {
+        BannerFields.placement: dest,
+        BannerFields.order: i,
+        BannerFields.updatedAt: FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    }
+    if (source != dest) {
+      final sourceItems = catalog
+          .where((item) => item.placement == source && item.id != bannerId)
+          .toList()
+        ..sort((a, b) => a.order.compareTo(b.order));
+      for (var i = 0; i < sourceItems.length; i++) {
+        batch.set(_col.doc(sourceItems[i].id), {
+          BannerFields.order: i,
+          BannerFields.updatedAt: FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
+    }
+    await batch.commit();
   }
 
   Future<void> deleteBanner(AppBanner banner) async {
@@ -957,6 +1289,18 @@ class BannerRepository {
 
   Future<List<AppBanner>> fetchActiveFromServer({String? placement}) async {
     final snap = await _col.get(const GetOptions(source: Source.server));
+    return _activeFrom(snap, placement: placement);
+  }
+
+  Future<List<AppBanner>> fetchActiveFromCache({String? placement}) async {
+    final snap = await _col.get(const GetOptions(source: Source.cache));
+    return _activeFrom(snap, placement: placement);
+  }
+
+  List<AppBanner> _activeFrom(
+    QuerySnapshot<Map<String, dynamic>> snap, {
+    String? placement,
+  }) {
     return snap.docs
         .where(_isBannerDoc)
         .map(AppBanner.fromDoc)

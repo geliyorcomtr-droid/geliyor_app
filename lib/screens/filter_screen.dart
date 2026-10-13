@@ -52,14 +52,14 @@ class _FilterScreenState extends State<FilterScreen> {
       imagePath: 'assets/images/urunler_kedi.png',
       title: 'Kedi',
       badgeIcon: Icons.pets_rounded,
-      subtitle: 'Mama, yavru, kum, ödül ve daha fazlası',
+      subtitle: 'Yetişkin, yavru, kum, ödül ve daha fazlası',
       route: _FilterRoute.cat,
     ),
     _FilterCategory(
       imagePath: 'assets/images/urunler_kopek.png',
       title: 'Köpek',
       badgeIcon: Icons.pets_rounded,
-      subtitle: 'Mama, yavru, mini ırk ve ödül',
+      subtitle: 'Yetişkin, yavru, mini ırk ve ödül',
       route: _FilterRoute.dog,
     ),
     _FilterCategory(

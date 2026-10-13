@@ -8,12 +8,16 @@ class CatFeedingTableCard extends StatefulWidget {
     this.highlighted,
     this.bodyType,
     this.activityLevel,
+    this.neutered,
+    this.extraFood,
     this.accent = AppColors.primary,
   });
 
   final CatFeedingRow? highlighted;
   final String? bodyType;
   final String? activityLevel;
+  final String? neutered;
+  final String? extraFood;
   final Color accent;
 
   @override
@@ -94,12 +98,14 @@ class _CatFeedingTableCardState extends State<CatFeedingTableCard> {
                       const SizedBox(height: 8),
                       _HeaderRow(accent: widget.accent),
                       const SizedBox(height: 4),
-                      for (final row in CatFeedingGuide.rows)
+                      for (final row in CatFeedingGuide.liveRows)
                         _DataRow(
                           row: row,
                           daily: row.gramsFor(
                             bodyType: widget.bodyType,
                             activityLevel: widget.activityLevel,
+                            neutered: widget.neutered,
+                            extraFood: widget.extraFood,
                           ),
                           selected: widget.highlighted != null &&
                               widget.highlighted!.catKg == row.catKg,

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
@@ -19,6 +20,9 @@ bool isUiIconAsset(String path) {
 /// UI ikonları ekranda en fazla ~64 logical px; 3x ekran için 256 px yeter.
 const int uiIconAssetPx = 256;
 
+/// Marka logoları kartta ~84 logical px; 3x için 256 px yeter.
+const int brandLogoCachePx = 256;
+
 /// Ürün fotoğrafı detayda ~240 logical px; 3x için 900 px decode yeter.
 const int productPhotoCachePx = 900;
 
@@ -27,6 +31,9 @@ const int productThumbCachePx = 480;
 
 /// Ana sayfa ve sayfa bannerleri (361 logical px, 3x).
 const int bannerCachePx = 1080;
+
+/// Karşılama ekranı (393 logical px, 3x).
+const int splashCachePx = 1179;
 
 ImageProvider? productImageProvider(
   String path, {
@@ -38,16 +45,19 @@ ImageProvider? productImageProvider(
   if (trimmed.isEmpty) return null;
 
   if (isNetworkProductImage(trimmed)) {
-    final html = kIsWeb || useHtmlElement;
-    final network = NetworkImage(
-      trimmed,
-      webHtmlElementStrategy: html
-          ? WebHtmlElementStrategy.prefer
-          : WebHtmlElementStrategy.never,
+    if (kIsWeb) {
+      return NetworkImage(
+        trimmed,
+        webHtmlElementStrategy: useHtmlElement
+            ? WebHtmlElementStrategy.prefer
+            : WebHtmlElementStrategy.never,
+      );
+    }
+    return ResizeImage.resizeIfNeeded(
+      cacheWidth,
+      cacheHeight,
+      CachedNetworkImageProvider(trimmed),
     );
-    // Web'de ResizeImage canvas + CORS ister; Storage görselleri HTML img ile görünür.
-    if (kIsWeb) return network;
-    return ResizeImage.resizeIfNeeded(cacheWidth, cacheHeight, network);
   }
 
   return ResizeImage.resizeIfNeeded(
@@ -57,7 +67,6 @@ ImageProvider? productImageProvider(
   );
 }
 
-/// Görseli ImageCache'e alır; gösterimle aynı cacheWidth kullanılmalı.
 Future<void> precacheProductImage(
   BuildContext context,
   String path, {
@@ -72,7 +81,6 @@ Future<void> precacheProductImage(
   return precacheImage(provider, context).onError((_, _) {});
 }
 
-/// Aynı URL'yi tekrar indirmemek için tek seferlik ısıtma.
 abstract final class ImageWarmup {
   static final Set<String> _queued = <String>{};
 
@@ -104,6 +112,7 @@ Widget buildProductImage(
   bool useHtmlElement = true,
   int? cacheWidth,
   int? cacheHeight,
+  int? maxDecodePx,
 }) {
   final fallback =
       errorWidget ??
@@ -116,7 +125,9 @@ Widget buildProductImage(
   if (path.trim().isEmpty) return fallback;
 
   final icon = isUiIconAsset(path);
+  final html = !icon && useHtmlElement;
   return _FittedDecodeImage(
+    key: ValueKey('${path.trim()}|$html'),
     path: path,
     fit: fit,
     width: width,
@@ -126,14 +137,15 @@ Widget buildProductImage(
     fallback: fallback,
     cacheWidth: cacheWidth,
     cacheHeight: cacheHeight,
-    maxDecodePx: icon ? uiIconAssetPx : productPhotoCachePx,
+    maxDecodePx: maxDecodePx ?? (icon ? uiIconAssetPx : productPhotoCachePx),
     minDecodePx: icon ? 64 : 160,
-    useHtmlElement: kIsWeb || useHtmlElement,
+    useHtmlElement: html,
   );
 }
 
 class _FittedDecodeImage extends StatefulWidget {
   const _FittedDecodeImage({
+    super.key,
     required this.path,
     required this.fit,
     required this.width,
@@ -166,7 +178,11 @@ class _FittedDecodeImage extends StatefulWidget {
 }
 
 class _FittedDecodeImageState extends State<_FittedDecodeImage> {
-  int? _decodePx;
+  late int _decodePx = widget.cacheWidth?.clamp(
+        widget.minDecodePx,
+        widget.maxDecodePx,
+      ) ??
+      widget.minDecodePx;
 
   @override
   void didUpdateWidget(covariant _FittedDecodeImage oldWidget) {
@@ -174,7 +190,11 @@ class _FittedDecodeImageState extends State<_FittedDecodeImage> {
     if (oldWidget.path != widget.path ||
         oldWidget.cacheWidth != widget.cacheWidth ||
         oldWidget.cacheHeight != widget.cacheHeight) {
-      _decodePx = null;
+      _decodePx = widget.cacheWidth?.clamp(
+            widget.minDecodePx,
+            widget.maxDecodePx,
+          ) ??
+          widget.minDecodePx;
     }
   }
 
@@ -192,47 +212,158 @@ class _FittedDecodeImageState extends State<_FittedDecodeImage> {
           maxPx: widget.maxDecodePx,
           minPx: widget.minDecodePx,
         );
-        final tight =
-            (widget.cacheWidth != null) ||
-            (widget.width != null &&
-                widget.width!.isFinite &&
-                widget.width! > 0) ||
-            (constraints.hasBoundedWidth &&
-                constraints.maxWidth.isFinite &&
-                constraints.maxWidth > 0 &&
-                constraints.maxWidth < 4000);
-
-        if (tight) {
-          _decodePx ??= next;
-          if (next > _decodePx! * 1.5) {
-            _decodePx = next;
-          }
+        if (next > _decodePx * 1.5) {
+          _decodePx = next;
         }
 
-        if (_decodePx == null) {
-          return SizedBox(width: widget.width, height: widget.height);
+        final network = isNetworkProductImage(widget.path);
+        // Web Storage görselleri CORS ister; HTML <img> istemez.
+        // Frozen RawImage decode yolu yalnızca native'de (wifi kopunca pixel tutmak).
+        if (network && !kIsWeb) {
+          return _FrozenNetworkImage(
+            path: widget.path.trim(),
+            fit: widget.fit,
+            width: widget.width,
+            height: widget.height,
+            alignment: widget.alignment,
+            filterQuality: widget.filterQuality,
+            decodePx: _decodePx,
+            fallback: widget.fallback,
+          );
         }
 
         final provider = productImageProvider(
           widget.path,
-          useHtmlElement: widget.useHtmlElement,
-          cacheWidth: _decodePx,
-          cacheHeight: widget.cacheHeight == null ? null : _decodePx,
+          useHtmlElement: kIsWeb || widget.useHtmlElement,
+          cacheWidth: kIsWeb ? null : _decodePx,
+          cacheHeight: kIsWeb || widget.cacheHeight == null ? null : _decodePx,
         );
         if (provider == null) return widget.fallback;
 
-        return Image(
-          image: provider,
-          fit: widget.fit,
-          width: widget.width,
-          height: widget.height,
-          alignment: widget.alignment,
-          filterQuality: widget.filterQuality,
-          gaplessPlayback: true,
-          errorBuilder: (_, _, _) => widget.fallback,
+        return SizedBox.expand(
+          child: Image(
+            image: provider,
+            fit: widget.fit,
+            alignment: widget.alignment,
+            filterQuality: widget.filterQuality,
+            gaplessPlayback: true,
+            errorBuilder: (_, _, _) => widget.fallback,
+          ),
         );
       },
     );
+  }
+}
+
+class _FrozenNetworkImage extends StatefulWidget {
+  const _FrozenNetworkImage({
+    required this.path,
+    required this.fit,
+    required this.width,
+    required this.height,
+    required this.alignment,
+    required this.filterQuality,
+    required this.decodePx,
+    required this.fallback,
+  });
+
+  final String path;
+  final BoxFit fit;
+  final double? width;
+  final double? height;
+  final Alignment alignment;
+  final FilterQuality filterQuality;
+  final int decodePx;
+  final Widget fallback;
+
+  @override
+  State<_FrozenNetworkImage> createState() => _FrozenNetworkImageState();
+}
+
+class _FrozenNetworkImageState extends State<_FrozenNetworkImage> {
+  ImageStream? _stream;
+  ImageStreamListener? _listener;
+  ImageInfo? _info;
+  var _failed = false;
+  var _attached = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_attached) return;
+    _attached = true;
+    _listen();
+  }
+
+  @override
+  void didUpdateWidget(covariant _FrozenNetworkImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.path != widget.path) {
+      _listen();
+    }
+  }
+
+  void _listen() {
+    final provider = productImageProvider(
+      widget.path,
+      useHtmlElement: false,
+      cacheWidth: widget.decodePx,
+    );
+    if (provider == null) return;
+    _listener ??= ImageStreamListener(_onImage, onError: _onError);
+    final next = provider.resolve(createLocalImageConfiguration(context));
+    if (_stream == next) return;
+    _stream?.removeListener(_listener!);
+    _stream = next;
+    _stream!.addListener(_listener!);
+  }
+
+  void _onImage(ImageInfo info, bool synchronousCall) {
+    _info?.dispose();
+    _info = info.clone();
+    _failed = false;
+    if (!mounted) return;
+    if (synchronousCall) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() {});
+      });
+    } else {
+      setState(() {});
+    }
+  }
+
+  void _onError(Object error, StackTrace? stackTrace) {
+    if (_info != null) return;
+    if (mounted) setState(() => _failed = true);
+  }
+
+  @override
+  void dispose() {
+    if (_listener != null) {
+      _stream?.removeListener(_listener!);
+    }
+    _info?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final info = _info;
+    if (info != null) {
+      return SizedBox.expand(
+        child: RawImage(
+          image: info.image,
+          scale: info.scale,
+          fit: widget.fit,
+          alignment: widget.alignment,
+          filterQuality: widget.filterQuality,
+        ),
+      );
+    }
+    if (_failed) {
+      return SizedBox.expand(child: widget.fallback);
+    }
+    return const SizedBox.expand();
   }
 }
 
@@ -250,7 +381,6 @@ int _layoutDecodePx({
   if (cacheHeight != null) return cacheHeight.clamp(minPx, maxPx);
 
   final dpr = MediaQuery.maybeDevicePixelRatioOf(context) ?? 3;
-  // cacheWidth görselin genişliğidir; kısa kenarı (banner yüksekliği) kullanma.
   final logical = _firstFinite([
     width,
     constraints.maxWidth,

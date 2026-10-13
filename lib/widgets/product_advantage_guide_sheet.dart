@@ -10,14 +10,19 @@ class ProductAdvantageGuideSheet {
     BuildContext context, {
     required AppProductAdvantage item,
     String mainCategory = 'cat',
-  }) {
-    final iconPath = ProductAdvantageRepository.displayAssetPath(item);
-    return InfoGuideSheet.show(
+  }) async {
+    var template = '';
+    try {
+      template =
+          await ProductAdvantageRepository.instance.fetchOverlayTemplateUrl();
+    } catch (_) {}
+    if (!context.mounted) return;
+
+    return InfoGuideSheet.showAdvantageOverlay(
       context,
-      title: item.name,
-      guide: ProductAdvantageRepository.guideFor(item),
-      iconPath: iconPath,
-      imageUrl: ProductAdvantageRepository.displayImageUrl(item),
+      templatePath: template,
+      title: item.overlayTitle,
+      description: ProductAdvantageRepository.explanationFor(item),
       onSeeProducts: () {
         Navigator.of(context).push(
           MaterialPageRoute(

@@ -1,6 +1,9 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:geliyor_app/admin/admin_models.dart';
+import 'package:geliyor_app/data/banner_repository.dart';
+import 'package:geliyor_app/data/firestore_collections.dart';
 import 'package:geliyor_app/data/order_repository.dart';
 import 'package:geliyor_app/data/product_repository.dart';
 import 'package:geliyor_app/state/order_store.dart';
@@ -30,123 +33,79 @@ class _GiftSelectScreenState extends State<GiftSelectScreen> {
   late int selectedTier;
   final Map<String, _GiftItem> selectedGifts = {};
   bool _saving = false;
+  bool _locked = false;
+  bool _loadingOrder = true;
+  String _boundOrderId = '';
 
   final List<_GiftTier> tiers = const [
-    _GiftTier(id: 0, label: '₺1.000–1.999', subtitle: '1 Hediye', maxSelect: 1),
-    _GiftTier(id: 1, label: '₺2.000–3.999', subtitle: '2 Hediye', maxSelect: 2),
-    _GiftTier(id: 2, label: '₺4.000+', subtitle: 'Premium 2', maxSelect: 2),
+    _GiftTier(id: 0, label: '₺1.000–1.999', subtitle: 'Bronz', maxSelect: 1),
+    _GiftTier(id: 1, label: '₺2.000–3.999', subtitle: 'Altın', maxSelect: 1),
+    _GiftTier(id: 2, label: '₺4.000+', subtitle: 'Premium', maxSelect: 1),
   ];
 
-  final List<_GiftItem> normalGifts = const [
-    _GiftItem(
-      id: 'n1',
-      title: 'Mama & Su Kabı',
-      points: '900 Puan',
-      imagePath: 'assets/images/mama_kabi.png',
-    ),
-    _GiftItem(
-      id: 'n2',
-      title: 'Somonlu Ödül',
-      points: '850 Puan',
-      imagePath: 'assets/images/app_ikonlar/somon.png',
-    ),
-    _GiftItem(
-      id: 'n3',
-      title: 'Doğal Bakım',
-      points: '950 Puan',
-      imagePath: 'assets/images/app_ikonlar/dogal_icerik.png',
-    ),
-    _GiftItem(
-      id: 'n4',
-      title: 'Yavru Kedi Seti',
-      points: '1.100 Puan',
-      imagePath: 'assets/images/icons/yavru_kedi.png',
-    ),
-    _GiftItem(
-      id: 'n5',
-      title: 'Tavuklu Mama',
-      points: '1.000 Puan',
-      imagePath: 'assets/images/app_ikonlar/tavuk.png',
-    ),
-    _GiftItem(
-      id: 'n6',
-      title: 'Kuzu Etli Mama',
-      points: '1.050 Puan',
-      imagePath: 'assets/images/app_ikonlar/kuzu.png',
-    ),
-  ];
-
-  final List<_GiftItem> premiumGifts = const [
-    _GiftItem(
-      id: 'p1',
-      title: 'Akıllı Mama Kabı',
-      points: '1.800 Puan',
-      imagePath: 'assets/images/market_akilli_pet.png',
-      premium: true,
-    ),
-    _GiftItem(
-      id: 'p2',
-      title: 'Premium Mama 2kg',
-      points: '1.500 Puan',
-      imagePath: 'assets/images/app_ikonlar/mama_kabi.png',
-      premium: true,
-    ),
-    _GiftItem(
-      id: 'p3',
-      title: 'Taşıma Çantası',
-      points: '1.600 Puan',
-      imagePath: 'assets/images/market_kedi.png',
-      premium: true,
-    ),
-    _GiftItem(
-      id: 'p4',
-      title: 'Tüy Bakım Seti',
-      points: '1.400 Puan',
-      imagePath: 'assets/images/app_ikonlar/tuy_deri.png',
-      premium: true,
-    ),
-    _GiftItem(
-      id: 'p5',
-      title: 'Omega Destek',
-      points: '1.350 Puan',
-      imagePath: 'assets/images/icons/omega.png',
-      premium: true,
-    ),
-    _GiftItem(
-      id: 'p6',
-      title: 'Sokaktakiler Paket',
-      points: '1.700 Puan',
-      imagePath: 'assets/images/app_ikonlar/sokak.png',
-      premium: true,
-    ),
-  ];
 
   @override
   void initState() {
     super.initState();
-    selectedTier = _tierFromTotal(widget.orderTotal);
+    selectedTier = widget.orderId.trim().isEmpty
+        ? -1
+        : _tierFromTotal(widget.orderTotal);
+    _loadOrderChoice();
+  }
+
+  Future<void> _loadOrderChoice() async {
+    final orderId = await _resolveOrderId();
+    if (!mounted) return;
+    if (orderId.isEmpty) {
+      setState(() {
+        _loadingOrder = false;
+        _locked = true;
+        selectedTier = -1;
+      });
+      return;
+    }
+    final choice = await OrderRepository.instance.giftChoice(orderId);
+    if (!mounted) return;
+    final saved = choice?.gifts ?? const <Map<String, dynamic>>[];
+    setState(() {
+      _boundOrderId = orderId;
+      _loadingOrder = false;
+      if (choice != null) {
+        selectedTier = _tierFromTotal(choice.total);
+      }
+      _locked = saved.isNotEmpty;
+      if (_locked) {
+        selectedGifts
+          ..clear()
+          ..addEntries(
+            saved.map((item) {
+              final gift = _giftFromSaved(item);
+              return MapEntry(gift.id, gift);
+            }),
+          );
+      }
+    });
+  }
+
+  _GiftItem _giftFromSaved(Map<String, dynamic> item) {
+    final id = '${item['productId'] ?? item['id'] ?? ''}'.trim();
+    final title = '${item['title'] ?? ''}'.trim();
+    return _GiftItem(
+      id: id.isEmpty ? title : id,
+      title: title.isEmpty ? 'Hediye' : title,
+      points: '',
+      imagePath: '${item['imageUrl'] ?? item['imagePath'] ?? ''}'.trim(),
+    );
   }
 
   int _tierFromTotal(double total) {
     if (total >= 4000) return 2;
     if (total >= 2000) return 1;
     if (total >= 1000) return 0;
-    return 0;
+    return -1;
   }
 
-  int get maxSelect => tiers[selectedTier].maxSelect;
-
-  bool get canSelectPremium => selectedTier == 2;
-
-  String get _statusMessage {
-    if (selectedTier == 0) {
-      return '1 hediye hakkın var. Sadece hediye seçeneklerinden seç.';
-    }
-    if (selectedTier == 1) {
-      return '2 hediye hakkın var. Sadece hediye seçeneklerinden seç.';
-    }
-    return 'Premium 2 hediye hakkın var. Her iki listeden toplam 2 seç.';
-  }
+  int get maxSelect => selectedTier < 0 ? 0 : tiers[selectedTier].maxSelect;
 
   String _formatPrice(double price) {
     final whole = price.round().toString();
@@ -159,44 +118,38 @@ class _GiftSelectScreenState extends State<GiftSelectScreen> {
     return '${buffer.toString()} TL';
   }
 
-  void _toggleGift(_GiftItem gift, {required bool fromPremium}) {
+  void _toggleGift(_GiftItem gift) {
+    if (_locked || _loadingOrder || selectedTier < 0) return;
     setState(() {
       if (selectedGifts.containsKey(gift.id)) {
         selectedGifts.remove(gift.id);
         return;
       }
-      if (fromPremium && !canSelectPremium) return;
-      if (selectedGifts.length >= maxSelect) return;
-      selectedGifts[gift.id] = gift.copyWith(premium: fromPremium);
+      selectedGifts
+        ..clear()
+        ..[gift.id] = gift;
     });
   }
 
-  _GiftItem _giftFromProduct(AdminProduct product, {required bool premium}) {
+  _GiftItem _giftFromProduct(AdminProduct product) {
     final title = product.title.trim().isEmpty
         ? 'Hediye'
         : product.title.trim();
-    final points = product.unitPrice > 0
-        ? '${product.unitPrice.round()} TL'
-        : product.weight.trim();
+    final strike = product.oldPrice > 0 ? product.oldPrice : product.unitPrice;
     return _GiftItem(
       id: product.id,
       title: title,
-      points: points,
+      points: strike > 0 ? _formatPrice(strike) : '',
       imagePath: product.imageUrl.trim(),
-      premium: premium,
     );
   }
 
-  List<_GiftItem> _resolveGifts(
-    List<AdminProduct> products, {
-    required bool premium,
-  }) {
-    final tagged = products
-        .where((p) => premium ? p.showAsPremiumGift : p.showAsGift)
-        .map((product) => _giftFromProduct(product, premium: premium))
-        .toList();
-    if (tagged.isEmpty) return premium ? premiumGifts : normalGifts;
-    return tagged;
+  List<_GiftItem> _resolveGifts(List<AdminProduct> products) {
+    if (selectedTier < 0) return const [];
+    return [
+      for (final product in products)
+        if (product.giftTier == selectedTier) _giftFromProduct(product),
+    ];
   }
 
   @override
@@ -212,9 +165,7 @@ class _GiftSelectScreenState extends State<GiftSelectScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildHeroBanner(),
-              const SizedBox(height: 12),
-              _buildProgressSection(),
+              _buildBanner(),
               const SizedBox(height: 12),
               _buildTierSection(),
               const SizedBox(height: 12),
@@ -225,31 +176,16 @@ class _GiftSelectScreenState extends State<GiftSelectScreen> {
                 ),
                 builder: (context, snapshot) {
                   final products = snapshot.data ?? const <AdminProduct>[];
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildGiftSection(
-                        number: '3',
-                        title: 'Hediye Seçenekleri',
-                        subtitle: selectedTier == 2
-                            ? 'Normal hediyelerden de seçebilirsin'
-                            : 'Bu kademede sadece buradan seçim yap',
-                        items: _resolveGifts(products, premium: false),
-                        enabled: true,
-                        fromPremium: false,
-                      ),
-                      const SizedBox(height: 12),
-                      _buildGiftSection(
-                        number: '4',
-                        title: 'Premium Hediyeler',
-                        subtitle: canSelectPremium
-                            ? 'Premium listedenden de seçebilirsin'
-                            : 'Bu kademede premium hediye seçilemez',
-                        items: _resolveGifts(products, premium: true),
-                        enabled: canSelectPremium,
-                        fromPremium: true,
-                      ),
-                    ],
+                  return _buildGiftSection(
+                    number: '2',
+                    title: 'Hediye Seçenekleri',
+                    subtitle: _locked
+                        ? 'Hediye seçimin tamamlandı.'
+                        : selectedTier < 0
+                        ? 'Bu sipariş tutarında hediye hakkı yok.'
+                        : 'Bu kademeden ${tiers[selectedTier].maxSelect} hediye seçebilirsin.',
+                    items: _resolveGifts(products),
+                    enabled: !_locked && !_loadingOrder && selectedTier >= 0,
                   );
                 },
               ),
@@ -310,155 +246,73 @@ class _GiftSelectScreenState extends State<GiftSelectScreen> {
     );
   }
 
-  Widget _buildHeroBanner() {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.selected,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.border),
-            ),
-            child: const Icon(
-              Icons.card_giftcard_rounded,
-              color: AppColors.primary,
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Dostun için hediye seç',
-                  style: TextStyle(
-                    color: AppColors.text,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  _statusMessage,
-                  style: const TextStyle(
-                    color: AppColors.subText,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    height: 1.3,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProgressSection() {
-    final progress = (widget.orderTotal / 4000).clamp(0.0, 1.0);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _sectionHeader('1', 'Sipariş Tutarı'),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: _cardDecoration(),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: AppColors.selected,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: const Icon(
-                      Icons.pets_rounded,
-                      color: AppColors.primary,
-                      size: 18,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  const Expanded(
-                    child: Text(
-                      'Toplam sipariş tutarın',
-                      style: TextStyle(
-                        color: AppColors.subText,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    _formatPrice(widget.orderTotal),
-                    style: const TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(999),
-                child: LinearProgressIndicator(
-                  value: progress,
-                  minHeight: 8,
-                  backgroundColor: AppColors.selected,
-                  color: AppColors.primary,
+  Widget _buildBanner() {
+    const fallback = 'assets/images/hediye_sec_banner.jpg';
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection(FirestoreCollections.banners)
+          .snapshots(),
+      builder: (context, snapshot) {
+        var path = fallback;
+        var hidden = false;
+        final docs = snapshot.data?.docs;
+        if (docs != null) {
+          final deleted = <String>{};
+          for (final doc in docs) {
+            if (doc.id != BannerRepository.seededDocId) continue;
+            final raw = doc.data()['deletedIds'];
+            if (raw is Iterable) {
+              deleted.addAll(raw.map((item) => item.toString()));
+            }
+          }
+          final live = [
+            for (final doc in docs)
+              if (!doc.id.startsWith('_')) AppBanner.fromDoc(doc),
+          ].where((banner) {
+            return banner.active &&
+                banner.placement == BannerPlacement.giftSelect.id &&
+                banner.displayImage.trim().isNotEmpty;
+          }).toList();
+          final picked = AppBanner.latestLive(live);
+          if (picked != null) {
+            path = picked.displayImage;
+          } else if (deleted.contains('hediye-sec')) {
+            hidden = true;
+          }
+        }
+        if (hidden) return const SizedBox.shrink();
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            const framePad = 3.0;
+            final width = constraints.maxWidth - framePad * 2;
+            final height = width * 140 / 361;
+            return Container(
+              padding: const EdgeInsets.all(framePad),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.25),
                 ),
               ),
-              const SizedBox(height: 8),
-              const Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '₺1.000',
-                    style: TextStyle(
-                      color: AppColors.subText,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                    ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(21),
+                child: SizedBox(
+                  width: width,
+                  height: height,
+                  child: buildProductImage(
+                    path,
+                    fit: BoxFit.fill,
+                    width: width,
+                    height: height,
+                    cacheWidth: 1024,
                   ),
-                  Text(
-                    '₺2.000',
-                    style: TextStyle(
-                      color: AppColors.subText,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  Text(
-                    '₺4.000+',
-                    style: TextStyle(
-                      color: AppColors.subText,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ],
-          ),
-        ),
-      ],
+            );
+          },
+        );
+      },
     );
   }
 
@@ -466,7 +320,7 @@ class _GiftSelectScreenState extends State<GiftSelectScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionHeader('2', 'Hediye Kademesi'),
+        _sectionHeader('1', 'Hediye Kademesi'),
         const SizedBox(height: 8),
         Row(
           children: [
@@ -483,15 +337,9 @@ class _GiftSelectScreenState extends State<GiftSelectScreen> {
   Widget _buildTierTab(_GiftTier tier) {
     final isSelected = selectedTier == tier.id;
 
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          selectedTier = tier.id;
-          selectedGifts.clear();
-        });
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
+    return Opacity(
+      opacity: isSelected ? 1 : 0.4,
+      child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.primary : AppColors.surface,
@@ -534,7 +382,6 @@ class _GiftSelectScreenState extends State<GiftSelectScreen> {
     required String subtitle,
     required List<_GiftItem> items,
     required bool enabled,
-    required bool fromPremium,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -560,9 +407,11 @@ class _GiftSelectScreenState extends State<GiftSelectScreen> {
               borderRadius: BorderRadius.circular(18),
               border: Border.all(color: AppColors.border),
             ),
-            child: const Text(
-              'Bu liste için henüz ürün işaretlenmedi.',
-              style: TextStyle(
+            child: Text(
+              enabled
+                  ? 'Bu kademe için henüz hediye işaretlenmedi.'
+                  : 'Bu sipariş tutarında hediye hakkı yok.',
+              style: const TextStyle(
                 color: AppColors.subText,
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
@@ -570,55 +419,50 @@ class _GiftSelectScreenState extends State<GiftSelectScreen> {
             ),
           )
         else
-          SizedBox(
-            height: 158,
-            child: Opacity(
-              opacity: enabled ? 1 : 0.45,
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  const gap = 10.0;
-                  const visibleCount = 2.4;
-                  final cardWidth = (constraints.maxWidth - gap) / visibleCount;
-
-                  return ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    physics: const BouncingScrollPhysics(),
-                    itemCount: items.length,
-                    separatorBuilder: (context, index) =>
-                        const SizedBox(width: gap),
-                    itemBuilder: (context, index) => _buildGiftCard(
-                      items[index],
-                      enabled: enabled,
-                      fromPremium: fromPremium,
-                      width: cardWidth,
-                    ),
-                  );
-                },
-              ),
-            ),
+          Opacity(
+            opacity: enabled ? 1 : 0.45,
+            child: _buildGiftGrid(items, enabled: enabled),
           ),
       ],
     );
   }
 
-  Widget _buildGiftCard(
-    _GiftItem gift, {
-    required bool enabled,
-    required bool fromPremium,
-    required double width,
-  }) {
+  Widget _buildGiftGrid(List<_GiftItem> items, {required bool enabled}) {
+    const columns = 3;
+    const gap = 8.0;
+    final rows = <Widget>[];
+    for (var start = 0; start < items.length; start += columns) {
+      rows.add(
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (var column = 0; column < columns; column++) ...[
+              if (column > 0) const SizedBox(width: gap),
+              Expanded(
+                child: start + column < items.length
+                    ? _buildGiftCard(items[start + column], enabled: enabled)
+                    : const SizedBox.shrink(),
+              ),
+            ],
+          ],
+        ),
+      );
+      if (start + columns < items.length) {
+        rows.add(const SizedBox(height: gap));
+      }
+    }
+    return Column(children: rows);
+  }
+
+  Widget _buildGiftCard(_GiftItem gift, {required bool enabled}) {
     final isSelected = selectedGifts.containsKey(gift.id);
-    final canSelect =
-        enabled && (isSelected || selectedGifts.length < maxSelect);
+    final canSelect = enabled;
 
     return GestureDetector(
-      onTap: canSelect
-          ? () => _toggleGift(gift, fromPremium: fromPremium)
-          : null,
+      onTap: canSelect ? () => _toggleGift(gift) : null,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
-        width: width,
-        padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+        padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(18),
@@ -658,16 +502,16 @@ class _GiftSelectScreenState extends State<GiftSelectScreen> {
                 ),
               ],
             ),
-            Expanded(
-              child: Center(
-                child: buildProductImage(
-                  gift.imagePath,
-                  fit: BoxFit.contain,
-                  errorWidget: const Icon(
-                    Icons.card_giftcard_rounded,
-                    color: AppColors.primary,
-                    size: 32,
-                  ),
+            SizedBox(
+              height: 64,
+              width: double.infinity,
+              child: buildProductImage(
+                gift.imagePath,
+                fit: BoxFit.contain,
+                errorWidget: const Icon(
+                  Icons.card_giftcard_rounded,
+                  color: AppColors.primary,
+                  size: 32,
                 ),
               ),
             ),
@@ -683,17 +527,21 @@ class _GiftSelectScreenState extends State<GiftSelectScreen> {
                 fontWeight: FontWeight.w800,
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              gift.points,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: AppColors.primary,
-                fontSize: 11,
-                fontWeight: FontWeight.w900,
+            if (gift.points.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                gift.points,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.subText,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  decoration: TextDecoration.lineThrough,
+                  decorationColor: AppColors.subText,
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),
@@ -728,7 +576,22 @@ class _GiftSelectScreenState extends State<GiftSelectScreen> {
   }
 
   Widget _buildConfirmButton() {
-    final ready = selectedGifts.length == maxSelect && !_saving;
+    if (_locked) {
+      return AppPressableButton.primary(
+        onTap: null,
+        enabled: false,
+        height: 48,
+        width: double.infinity,
+        child: const Text(
+          'İşlem tamam',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900),
+        ),
+      );
+    }
+    final ready = !_loadingOrder &&
+        maxSelect > 0 &&
+        selectedGifts.length == maxSelect &&
+        !_saving;
 
     return AppPressableButton.primary(
       onTap: ready ? _confirmSelection : null,
@@ -745,10 +608,18 @@ class _GiftSelectScreenState extends State<GiftSelectScreen> {
   }
 
   Future<void> _confirmSelection() async {
-    if (_saving || selectedGifts.length != maxSelect) return;
+    if (_locked ||
+        _loadingOrder ||
+        _saving ||
+        maxSelect <= 0 ||
+        selectedGifts.length != maxSelect) {
+      return;
+    }
     setState(() => _saving = true);
     try {
-      final orderId = await _resolveOrderId();
+      final orderId = _boundOrderId.isNotEmpty
+          ? _boundOrderId
+          : await _resolveOrderId();
       if (orderId.isEmpty) {
         throw StateError('Sipariş bulunamadı.');
       }
@@ -760,20 +631,21 @@ class _GiftSelectScreenState extends State<GiftSelectScreen> {
               'productId': gift.id,
               'title': gift.title,
               'imageUrl': gift.imagePath,
-              'premium': gift.premium,
+              'premium': false,
             },
         ],
       );
       if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _locked = true;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '${selectedGifts.length} hediye seçimin onaylandı.',
-          ),
+        const SnackBar(
+          content: Text('İşlem tamam.'),
           backgroundColor: AppColors.primary,
         ),
       );
-      Navigator.of(context).maybePop();
     } catch (error) {
       if (!mounted) return;
       setState(() => _saving = false);
@@ -830,20 +702,6 @@ class _GiftSelectScreenState extends State<GiftSelectScreen> {
     );
   }
 
-  BoxDecoration _cardDecoration() {
-    return BoxDecoration(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.circular(24),
-      border: Border.all(color: AppColors.border),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withValues(alpha: 0.03),
-          blurRadius: 8,
-          offset: const Offset(0, 2),
-        ),
-      ],
-    );
-  }
 }
 
 class _GiftTier {
@@ -866,22 +724,10 @@ class _GiftItem {
     required this.title,
     required this.points,
     required this.imagePath,
-    this.premium = false,
   });
 
   final String id;
   final String title;
   final String points;
   final String imagePath;
-  final bool premium;
-
-  _GiftItem copyWith({bool? premium}) {
-    return _GiftItem(
-      id: id,
-      title: title,
-      points: points,
-      imagePath: imagePath,
-      premium: premium ?? this.premium,
-    );
-  }
 }

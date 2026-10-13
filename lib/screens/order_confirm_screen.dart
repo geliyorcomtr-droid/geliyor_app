@@ -5,13 +5,16 @@ import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/data/order_repository.dart';
 import 'package:geliyor_app/screens/addresses_screen.dart';
 import 'package:geliyor_app/screens/order_success_screen.dart';
+import 'package:geliyor_app/services/user_profile_sync.dart';
 import 'package:geliyor_app/state/address_store.dart';
+import 'package:geliyor_app/state/auth_store.dart';
 import 'package:geliyor_app/state/cart_store.dart';
 import 'package:geliyor_app/state/coupon_store.dart';
 import 'package:geliyor_app/state/order_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/utils/courier_fee.dart';
 import 'package:geliyor_app/utils/login_gate.dart';
+import 'package:geliyor_app/utils/subscription_discount.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
@@ -44,6 +47,10 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
     AddressStore.instance.addListener(_onChanged);
     CouponStore.instance.addListener(_onChanged);
     CouponStore.instance.ensureLoaded();
+    if (AuthStore.instance.uid != null &&
+        !AddressStore.instance.hasDeliveryAddress) {
+      unawaited(UserProfileSync.sync(force: true));
+    }
   }
 
   @override
@@ -121,6 +128,8 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
       OrderStore.instance.saveLastOrderFromCart(orderId: id);
       final coupon = CouponStore.instance.selected;
       final couponDiscount = CouponStore.instance.discountFor(widget.cartTotal);
+      final subscriptionDiscount =
+          SubscriptionDiscount.amountFor(widget.cartTotal);
       await CouponStore.instance.onOrderPlaced();
       CartStore.instance.clear();
       if (!mounted) return;
@@ -134,6 +143,7 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
             paymentMethod: selectedPayment,
             couponTitle: coupon?.title ?? '',
             couponDiscount: couponDiscount,
+            subscriptionDiscount: subscriptionDiscount,
             orderId: id,
           ),
         ),
@@ -163,9 +173,17 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
   @override
   Widget build(BuildContext context) {
     final coupons = CouponStore.instance;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      coupons.syncWelcome(widget.cartTotal);
+    });
     final courierFee = CourierFee.forSubtotal(widget.cartTotal);
     final couponDiscount = coupons.discountFor(widget.cartTotal);
-    final payableTotal = coupons.payableTotal(widget.cartTotal);
+    final subscriptionDiscount = SubscriptionDiscount.amountFor(widget.cartTotal);
+    final payableTotal = SubscriptionDiscount.payable(
+      subtotal: widget.cartTotal,
+      couponDiscount: couponDiscount,
+      courierFee: courierFee,
+    );
     final productText = '${_formatPrice(widget.cartTotal)} TL';
     final payableText = '${_formatPrice(payableTotal)} TL';
     final courierText = courierFee > 0
@@ -199,6 +217,7 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
                 payableText,
                 courierFee,
                 couponDiscount,
+                subscriptionDiscount,
               ),
               const SizedBox(height: 10),
               _buildCompleteButton(payableText),
@@ -772,6 +791,7 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
     String payableText,
     double courierFee,
     double couponDiscount,
+    double subscriptionDiscount,
   ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -789,6 +809,14 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
                 _summaryRow(
                   'Kupon',
                   '-${_formatPrice(couponDiscount)} TL',
+                  valueColor: AppColors.primary,
+                ),
+              ],
+              if (subscriptionDiscount > 0) ...[
+                const SizedBox(height: 6),
+                _summaryRow(
+                  SubscriptionDiscount.name,
+                  '-${_formatPrice(subscriptionDiscount)} TL',
                   valueColor: AppColors.primary,
                 ),
               ],

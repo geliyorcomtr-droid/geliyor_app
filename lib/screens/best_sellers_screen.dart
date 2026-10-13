@@ -34,7 +34,7 @@ class BestSellersScreen extends StatelessWidget {
           imagePath: 'assets/images/petmarket_mama.png',
           badgeIcon: Icons.star_rounded,
           badgeIconColor: AppColors.warning,
-          onTap: () => _openProducts(context, 'cat', subCategory: 'Mama'),
+          onTap: () => _openProducts(context, 'cat', subCategory: 'Yetişkin'),
         ),
         FilterSubpageItem(
           title: 'Popüler Kum ve Bakım',

@@ -267,13 +267,13 @@ class _CartProductCardState extends State<CartProductCard> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
               decoration: BoxDecoration(
-                color: AppColors.error.withValues(alpha: 0.12),
+                color: AppColors.discount.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(999),
               ),
               child: Text(
                 '%${item.discountPercent}',
                 style: const TextStyle(
-                  color: AppColors.error,
+                  color: AppColors.discount,
                   fontSize: 8,
                   fontWeight: FontWeight.w900,
                   height: 1,
@@ -286,8 +286,8 @@ class _CartProductCardState extends State<CartProductCard> {
         Text(
           formatProductPrice(item.unitPrice, withDecimals: true),
           maxLines: 1,
-          style: TextStyle(
-            color: widget.accent,
+          style: const TextStyle(
+            color: AppColors.discount,
             fontSize: 13,
             fontWeight: FontWeight.w900,
             height: 1,

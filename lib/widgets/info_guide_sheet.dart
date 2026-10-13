@@ -156,6 +156,301 @@ class InfoGuideSheet {
     );
   }
 
+  /// Akıllı Plan otomatik sipariş görseliyle aynı kutu: görsel, sağ üst çarpı,
+  /// altta beyaz “Bu etiketli ürünleri gör”. Görsele dokununca kapanır.
+  static Future<void> showImageOverlay(
+    BuildContext context, {
+    required String imagePath,
+    String buttonLabel = 'Bu etiketli ürünleri gör',
+    VoidCallback? onSeeProducts,
+    IconData fallbackIcon = Icons.pets_rounded,
+    Color fallbackIconColor = AppColors.primary,
+  }) {
+    const panelHeight = 280.0;
+    const panelWidth = 361.0;
+    final path = imagePath.trim();
+    return showCentered(
+      context,
+      dismissOnContentTap: false,
+      height: panelHeight,
+      maxWidth: panelWidth,
+      builder: (sheetContext) {
+        void close() {
+          if (Navigator.of(sheetContext).canPop()) {
+            Navigator.of(sheetContext).pop();
+          }
+        }
+
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              GestureDetector(
+                onTap: close,
+                behavior: HitTestBehavior.opaque,
+                child: ColoredBox(
+                  color: AppColors.surface,
+                  child: path.isEmpty
+                      ? Center(
+                          child: Icon(
+                            fallbackIcon,
+                            color: fallbackIconColor,
+                            size: 72,
+                          ),
+                        )
+                      : buildProductImage(
+                          path,
+                          fit: BoxFit.contain,
+                          width: double.infinity,
+                          height: double.infinity,
+                          alignment: Alignment.center,
+                          filterQuality: FilterQuality.high,
+                          cacheWidth: 1083,
+                          errorWidget: Center(
+                            child: Icon(
+                              fallbackIcon,
+                              color: fallbackIconColor,
+                              size: 72,
+                            ),
+                          ),
+                        ),
+                ),
+              ),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: GestureDetector(
+                  onTap: close,
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    alignment: Alignment.center,
+                    decoration: const BoxDecoration(
+                      color: AppColors.surface,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.close_rounded,
+                      color: AppColors.text,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ),
+              if (onSeeProducts != null)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 6,
+                  child: Center(
+                    child: IntrinsicWidth(
+                      child: AppPressableButton(
+                        onTap: () {
+                          close();
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            onSeeProducts();
+                          });
+                        },
+                        backgroundColor: AppColors.surface,
+                        pressedBackgroundColor: AppColors.selected,
+                        foregroundColor: AppColors.text,
+                        pressedForegroundColor: AppColors.primary,
+                        borderColor: AppColors.border,
+                        pressedBorderColor: AppColors.primary,
+                        height: 28,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 4,
+                        ),
+                        child: Text(
+                          buttonLabel,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: AppColors.text,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// Ürün özelliği kalıp görseli: sabit arka plan, değişen başlık ve açıklama.
+  static Future<void> showAdvantageOverlay(
+    BuildContext context, {
+    required String templatePath,
+    required String title,
+    required String description,
+    String buttonLabel = 'Bu etiketli ürünleri gör',
+    VoidCallback? onSeeProducts,
+  }) {
+    const panelHeight = 280.0;
+    const panelWidth = 361.0;
+    final template = templatePath.trim();
+    final paragraphs = description
+        .split(RegExp(r'\n+'))
+        .map((part) => part.trim())
+        .where((part) => part.isNotEmpty)
+        .toList();
+    final heading = title.trim();
+
+    return showCentered(
+      context,
+      dismissOnContentTap: false,
+      height: panelHeight,
+      maxWidth: panelWidth,
+      builder: (sheetContext) {
+        void close() {
+          if (Navigator.of(sheetContext).canPop()) {
+            Navigator.of(sheetContext).pop();
+          }
+        }
+
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              GestureDetector(
+                onTap: close,
+                behavior: HitTestBehavior.opaque,
+                child: ColoredBox(
+                  color: AppColors.surface,
+                  child: template.isEmpty
+                      ? const SizedBox.expand()
+                      : buildProductImage(
+                          template,
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          height: double.infinity,
+                          alignment: Alignment.centerRight,
+                          filterQuality: FilterQuality.high,
+                          cacheWidth: 1083,
+                        ),
+                ),
+              ),
+              Positioned(
+                left: 16,
+                top: 14,
+                width: 168,
+                bottom: 40,
+                child: IgnorePointer(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (heading.isNotEmpty)
+                        Text(
+                          heading,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: AppColors.text,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            height: 1.15,
+                          ),
+                        ),
+                      const SizedBox(height: 8),
+                      Expanded(
+                        child: ListView(
+                          padding: EdgeInsets.zero,
+                          physics: const BouncingScrollPhysics(),
+                          children: [
+                            for (int i = 0; i < paragraphs.length; i++) ...[
+                              if (i > 0) const SizedBox(height: 8),
+                              Text(
+                                paragraphs[i],
+                                style: const TextStyle(
+                                  color: AppColors.text,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  height: 1.35,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: GestureDetector(
+                  onTap: close,
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    alignment: Alignment.center,
+                    decoration: const BoxDecoration(
+                      color: AppColors.surface,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.close_rounded,
+                      color: AppColors.text,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ),
+              if (onSeeProducts != null)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 6,
+                  child: Center(
+                    child: IntrinsicWidth(
+                      child: AppPressableButton(
+                        onTap: () {
+                          close();
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            onSeeProducts();
+                          });
+                        },
+                        backgroundColor: AppColors.surface,
+                        pressedBackgroundColor: AppColors.selected,
+                        foregroundColor: AppColors.text,
+                        pressedForegroundColor: AppColors.primary,
+                        borderColor: AppColors.border,
+                        pressedBorderColor: AppColors.primary,
+                        height: 28,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 4,
+                        ),
+                        child: Text(
+                          buttonLabel,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: AppColors.text,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   static Future<void> showCentered(
     BuildContext context, {
     required Widget Function(BuildContext sheetContext) builder,

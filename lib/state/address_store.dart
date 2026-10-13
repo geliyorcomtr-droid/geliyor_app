@@ -161,6 +161,14 @@ class AddressStore extends ChangeNotifier {
 
   List<AddressData> _addresses = List<AddressData>.from(_guestAddresses);
   bool _suppressPersist = false;
+  int _editGeneration = 0;
+  int _ackedGeneration = 0;
+
+  bool get _hasPendingEdit => _editGeneration != _ackedGeneration;
+
+  void _touch() {
+    _editGeneration++;
+  }
 
   static const _guestAddresses = [
     AddressData(
@@ -196,7 +204,11 @@ class AddressStore extends ChangeNotifier {
     ),
   ];
 
-  List<AddressData> get addresses => List.unmodifiable(_addresses);
+  /// Örnek misafir adresleri teslimat listesinde görünmez.
+  List<AddressData> get addresses {
+    if (hasOnlyGuestAddresses) return const [];
+    return List.unmodifiable(_addresses);
+  }
 
   AddressData? get defaultAddress {
     for (final item in _addresses) {
@@ -236,6 +248,8 @@ class AddressStore extends ChangeNotifier {
   }
 
   void showGuestAddresses() {
+    _editGeneration = 0;
+    _ackedGeneration = 0;
     _suppressPersist = true;
     _addresses = List<AddressData>.from(_guestAddresses);
     _suppressPersist = false;
@@ -243,16 +257,28 @@ class AddressStore extends ChangeNotifier {
   }
 
   void applyRemote(List<Map<String, dynamic>> rows) {
-    _suppressPersist = true;
-    _addresses = rows
+    if (_hasPendingEdit) return;
+    final incoming = rows
         .map(AddressData.fromMap)
-        .where((item) => item.address.trim().isNotEmpty || item.title.trim().isNotEmpty)
+        .where(
+          (item) =>
+              item.address.trim().isNotEmpty || item.title.trim().isNotEmpty,
+        )
         .toList();
+    final keepSaved =
+        incoming.isEmpty && _addresses.isNotEmpty && !hasOnlyGuestAddresses;
+    if (keepSaved) {
+      unawaited(_write());
+      return;
+    }
+    _suppressPersist = true;
+    _addresses = incoming;
     _suppressPersist = false;
     notifyListeners();
   }
 
   void setDefault(String id) {
+    _touch();
     for (var i = 0; i < _addresses.length; i++) {
       _addresses[i] = _addresses[i].copyWith(isDefault: _addresses[i].id == id);
     }
@@ -261,6 +287,10 @@ class AddressStore extends ChangeNotifier {
   }
 
   void add(AddressData address) {
+    _touch();
+    if (hasOnlyGuestAddresses) {
+      _addresses = [];
+    }
     final makeDefault = address.isDefault || _addresses.isEmpty;
     if (makeDefault) {
       for (var i = 0; i < _addresses.length; i++) {
@@ -275,6 +305,7 @@ class AddressStore extends ChangeNotifier {
   void update(String id, AddressData address) {
     final index = _addresses.indexWhere((a) => a.id == id);
     if (index < 0) return;
+    _touch();
 
     final makeDefault = address.isDefault;
     if (makeDefault) {
@@ -305,6 +336,7 @@ class AddressStore extends ChangeNotifier {
   }
 
   void remove(String id) {
+    _touch();
     _addresses.removeWhere((item) => item.id == id);
     if (_addresses.isNotEmpty && !_addresses.any((a) => a.isDefault)) {
       _addresses[0] = _addresses[0].copyWith(isDefault: true);
@@ -325,8 +357,14 @@ class AddressStore extends ChangeNotifier {
   }
 
   Future<void> _write() async {
+    if (hasOnlyGuestAddresses) return;
+    final generation = _editGeneration;
+    final payload = _addresses.map((item) => item.toMap()).toList();
     await UserDocPersist.merge({
-      UserFields.addresses: _addresses.map((item) => item.toMap()).toList(),
+      UserFields.addresses: payload,
     });
+    if (generation == _editGeneration) {
+      _ackedGeneration = generation;
+    }
   }
 }

@@ -62,6 +62,12 @@ class _AddressesScreenState extends State<AddressesScreen> {
   void initState() {
     super.initState();
     AddressStore.instance.addListener(_onStoreChanged);
+    if (widget.selectForDelivery && AddressStore.instance.addresses.isEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || AddressStore.instance.addresses.isNotEmpty) return;
+        _openAddForm();
+      });
+    }
   }
 
   @override
@@ -308,6 +314,11 @@ class _AddressesScreenState extends State<AddressesScreen> {
     }
     await AddressStore.instance.persistNow();
     if (!mounted) return;
+
+    if (widget.selectForDelivery && !wasEditing) {
+      Navigator.of(context).pop();
+      return;
+    }
 
     setState(() {
       _formError = null;
@@ -1258,7 +1269,14 @@ class _AddressesScreenState extends State<AddressesScreen> {
                 ),
               ),
             ),
-            _buildMoreButton(address),
+            widget.selectForDelivery
+                ? AppPressableButton.primary(
+                    onTap: () => _pickAddress(address),
+                    height: 32,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: const Text('Seç', style: TextStyle(fontSize: 12)),
+                  )
+                : _buildMoreButton(address),
           ],
         ),
       ),

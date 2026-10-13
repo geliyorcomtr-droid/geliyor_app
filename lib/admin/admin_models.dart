@@ -14,6 +14,7 @@ class AdminProduct {
     this.skt = '',
     required this.unitPrice,
     required this.oldPrice,
+    this.purchasePrice = 0,
     required this.discountPercent,
     required this.imageUrl,
     required this.category,
@@ -21,6 +22,7 @@ class AdminProduct {
     this.placements = const [],
     this.mainCategory = 'cat',
     required this.description,
+    this.ingredients = '',
     required this.active,
     required this.stock,
     this.features = const [],
@@ -29,14 +31,18 @@ class AdminProduct {
     this.productAdvantageIds = const [],
     this.productAdvantageValues = const {},
     this.proteinValue = '',
+    this.animalProteinValue = '',
     this.preferredRank = '',
     this.repurchaseRate = '',
     this.rating = 0,
     this.reviewCount = 0,
     this.gallery = const [],
+    this.boughtTogetherIds = const [],
     this.seoTitle = '',
     this.metaDescription = '',
+    this.rewardPoints = 0,
     this.createdAt,
+    this.softtrMatched = false,
   });
 
   final String id;
@@ -54,6 +60,9 @@ class AdminProduct {
   final String skt;
   final double unitPrice;
   final double oldPrice;
+
+  /// Softtr alış fiyatı (KDV hariç kabul edilir).
+  final double purchasePrice;
   final int discountPercent;
   final String imageUrl;
   final String category;
@@ -61,6 +70,7 @@ class AdminProduct {
   final List<String> placements;
   final String mainCategory;
   final String description;
+  final String ingredients;
   final bool active;
   final int stock;
   final List<AdminProductFeature> features;
@@ -69,18 +79,44 @@ class AdminProduct {
   final List<String> productAdvantageIds;
   final Map<String, String> productAdvantageValues;
   final String proteinValue;
+  final String animalProteinValue;
   final String preferredRank;
   final String repurchaseRate;
   final double rating;
   final int reviewCount;
   final List<String> gallery;
+  final List<String> boughtTogetherIds;
   final String seoTitle;
   final String metaDescription;
-  final DateTime? createdAt;
 
-  bool get showAsGift => placements.contains(ProductPlacements.gift);
+  /// Puanla alınacak ürünün maliyeti. 0 ise puan ödülü değildir.
+  final int rewardPoints;
+  final DateTime? createdAt;
+  final bool softtrMatched;
+
+  bool get showAsGift =>
+      placements.contains(ProductPlacements.gift) ||
+      placements.contains(ProductPlacements.giftTier1);
   bool get showAsPremiumGift =>
-      placements.contains(ProductPlacements.giftPremium);
+      placements.contains(ProductPlacements.giftPremium) ||
+      placements.contains(ProductPlacements.giftTier3);
+
+  /// 0: ₺1.000–1.999, 1: ₺2.000–3.999, 2: ₺4.000+. İşaret yoksa null.
+  bool get isPointReward =>
+      placements.contains(ProductPlacements.pointReward) && rewardPoints > 0;
+
+  int? get giftTier {
+    if (placements.contains(ProductPlacements.giftTier3) ||
+        placements.contains(ProductPlacements.giftPremium)) {
+      return 2;
+    }
+    if (placements.contains(ProductPlacements.giftTier2)) return 1;
+    if (placements.contains(ProductPlacements.giftTier1) ||
+        placements.contains(ProductPlacements.gift)) {
+      return 0;
+    }
+    return null;
+  }
   bool get isInStock => stock > 0;
 
   factory AdminProduct.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
@@ -96,6 +132,7 @@ class AdminProduct {
       skt: ProductSkt.fromFirestore(d),
       unitPrice: (d[ProductFields.unitPrice] as num?)?.toDouble() ?? 0,
       oldPrice: (d[ProductFields.oldPrice] as num?)?.toDouble() ?? 0,
+      purchasePrice: (d[ProductFields.purchasePrice] as num?)?.toDouble() ?? 0,
       discountPercent: (d[ProductFields.discountPercent] as num?)?.toInt() ?? 0,
       imageUrl: (d[ProductFields.imageUrl] as String?) ?? '',
       category: (d[ProductFields.category] as String?) ?? '',
@@ -103,6 +140,7 @@ class AdminProduct {
       placements: _stringList(d[ProductFields.placements]),
       mainCategory: (d[ProductFields.mainCategory] as String?) ?? 'cat',
       description: (d[ProductFields.description] as String?) ?? '',
+      ingredients: (d[ProductFields.ingredients] as String?) ?? '',
       active: d[ProductFields.active] as bool? ?? true,
       stock: (d[ProductFields.stock] as num?)?.toInt() ?? 0,
       features: _featuresFrom(d[ProductFields.features]),
@@ -124,14 +162,21 @@ class AdminProduct {
         d[ProductFields.proteinValue],
         d[ProductFields.productAdvantageValues],
       ),
+      animalProteinValue: _animalProteinValueFrom(
+        d[ProductFields.animalProteinValue],
+        d[ProductFields.productAdvantageValues],
+      ),
       preferredRank: _preferredRankFrom(d[ProductFields.preferredRank]),
-      repurchaseRate: _rateFrom(d[ProductFields.repurchaseRate]),
+      repurchaseRate: _bagDaysFrom(d[ProductFields.repurchaseRate]),
       rating: (d[ProductFields.rating] as num?)?.toDouble() ?? 0,
       reviewCount: (d[ProductFields.reviewCount] as num?)?.toInt() ?? 0,
       gallery: _stringList(d[ProductFields.gallery]),
+      boughtTogetherIds: _idList(d[ProductFields.boughtTogetherIds], limit: 3),
       seoTitle: (d[ProductFields.seoTitle] as String?) ?? '',
       metaDescription: (d[ProductFields.metaDescription] as String?) ?? '',
+      rewardPoints: (d[ProductFields.rewardPoints] as num?)?.toInt() ?? 0,
       createdAt: created is Timestamp ? created.toDate() : null,
+      softtrMatched: d[ProductFields.softtrMatched] == true,
     );
   }
 
@@ -145,6 +190,7 @@ class AdminProduct {
       ...ProductSkt.toFirestoreFields(skt),
       ProductFields.unitPrice: unitPrice,
       ProductFields.oldPrice: oldPrice,
+      ProductFields.purchasePrice: purchasePrice,
       ProductFields.discountPercent: discountPercent,
       ProductFields.imageUrl: imageUrl.trim(),
       ProductFields.category: category.trim(),
@@ -155,6 +201,7 @@ class AdminProduct {
       ProductFields.placements: placements,
       ProductFields.mainCategory: mainCategory.trim(),
       ProductFields.description: description.trim(),
+      ProductFields.ingredients: ingredients.trim(),
       ProductFields.active: active,
       ProductFields.stock: stock,
       ProductFields.features: features.map((e) => e.toMap()).toList(),
@@ -165,13 +212,16 @@ class AdminProduct {
       ProductFields.productAdvantageIds: productAdvantageIds,
       ProductFields.productAdvantageValues: productAdvantageValues,
       ProductFields.proteinValue: proteinValue.trim(),
+      ProductFields.animalProteinValue: animalProteinValue.trim(),
       ProductFields.preferredRank: preferredRank.trim(),
       ProductFields.repurchaseRate: repurchaseRate.trim(),
       ProductFields.rating: rating,
       ProductFields.reviewCount: reviewCount,
       ProductFields.gallery: gallery,
+      ProductFields.boughtTogetherIds: _idList(boughtTogetherIds, limit: 3),
       ProductFields.seoTitle: seoTitle.trim(),
       ProductFields.metaDescription: metaDescription.trim(),
+      ProductFields.rewardPoints: rewardPoints < 0 ? 0 : rewardPoints,
       ProductFields.updatedAt: FieldValue.serverTimestamp(),
       if (isCreate) ProductFields.createdAt: FieldValue.serverTimestamp(),
     };
@@ -186,6 +236,18 @@ class AdminProduct {
         .toList();
   }
 
+  static List<String> _idList(dynamic raw, {required int limit}) {
+    final ids = <String>[];
+    if (raw is! List) return ids;
+    for (final value in raw) {
+      final id = '$value'.trim();
+      if (id.isEmpty || ids.contains(id)) continue;
+      ids.add(id);
+      if (ids.length >= limit) break;
+    }
+    return ids;
+  }
+
   static List<AdminProductFeature> _featuresFrom(dynamic raw) {
     if (raw is! List) return const [];
     return raw
@@ -197,21 +259,48 @@ class AdminProduct {
         .toList();
   }
 
+  static String _textValue(dynamic raw) {
+    if (raw == null) return '';
+    if (raw is num) {
+      final rounded = raw.round();
+      return raw == rounded ? '$rounded' : '$raw';
+    }
+    return '$raw'.trim();
+  }
+
   static Map<String, String> _advantageValuesFrom(dynamic raw) {
     if (raw is! Map) return const {};
     return raw.map(
-      (key, value) => MapEntry('$key', (value as String?)?.trim() ?? ''),
+      (key, value) => MapEntry('$key', _textValue(value)),
     )..removeWhere((_, value) => value.isEmpty);
   }
 
   static String _proteinValueFrom(dynamic proteinField, dynamic advantageValues) {
-    final direct = (proteinField as String?)?.trim() ?? '';
+    final direct = _textValue(proteinField);
     if (direct.isNotEmpty) return direct;
     if (advantageValues is Map) {
-      final legacy = (advantageValues[ProductAdvantageRepository.proteinAdvantageId]
-              as String?)
-          ?.trim();
-      if (legacy != null && legacy.isNotEmpty) return legacy;
+      final legacy = _textValue(
+        advantageValues[ProductAdvantageRepository.proteinAdvantageId],
+      );
+      if (legacy.isNotEmpty) return legacy;
+    }
+    return '';
+  }
+
+  static String _animalProteinValueFrom(
+    dynamic proteinField,
+    dynamic advantageValues,
+  ) {
+    final direct = _textValue(proteinField);
+    if (direct.isNotEmpty) return direct;
+    if (advantageValues is Map) {
+      for (final entry in advantageValues.entries) {
+        if (!ProductAdvantageRepository.isAnimalProteinId('${entry.key}')) {
+          continue;
+        }
+        final legacy = _textValue(entry.value);
+        if (legacy.isNotEmpty) return legacy;
+      }
     }
     return '';
   }
@@ -222,11 +311,11 @@ class AdminProduct {
     return value.endsWith('.') ? value : '$value.';
   }
 
-  static String _rateFrom(dynamic raw) {
-    if (raw is num) return '%${raw.round()}';
+  static String _bagDaysFrom(dynamic raw) {
+    if (raw is num) return '${raw.round()}';
     final value = (raw as String?)?.trim() ?? '';
     if (value.isEmpty) return '';
-    return value.startsWith('%') ? value : '%$value';
+    return value.replaceAll('%', '').trim();
   }
 
   /// Yeni ürün olarak kopyala — barkod boş, id yok (yeni kayıt).
@@ -242,6 +331,7 @@ class AdminProduct {
       skt: skt,
       unitPrice: unitPrice,
       oldPrice: oldPrice,
+      purchasePrice: purchasePrice,
       discountPercent: discountPercent,
       imageUrl: imageUrl,
       category: category,
@@ -249,6 +339,7 @@ class AdminProduct {
       placements: placements,
       mainCategory: mainCategory,
       description: description,
+      ingredients: ingredients,
       active: active,
       stock: stock,
       features: features,
@@ -257,13 +348,16 @@ class AdminProduct {
       productAdvantageIds: productAdvantageIds,
       productAdvantageValues: productAdvantageValues,
       proteinValue: proteinValue,
+      animalProteinValue: animalProteinValue,
       preferredRank: preferredRank,
       repurchaseRate: repurchaseRate,
       rating: rating,
       reviewCount: reviewCount,
       gallery: gallery,
+      boughtTogetherIds: boughtTogetherIds,
       seoTitle: seoTitle,
       metaDescription: metaDescription,
+      rewardPoints: rewardPoints,
     );
   }
 }

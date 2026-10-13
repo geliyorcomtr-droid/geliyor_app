@@ -1,4 +1,10 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'package:geliyor_app/data/banner_repository.dart';
+import 'package:geliyor_app/data/firestore_collections.dart';
+import 'package:geliyor_app/data/product_advantage_repository.dart';
 import 'package:geliyor_app/data/product_repository.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/screens/cart_screen.dart';
@@ -8,6 +14,7 @@ import 'package:geliyor_app/screens/product_detail_screen.dart';
 import 'package:geliyor_app/state/cart_store.dart';
 import 'package:geliyor_app/state/favorite_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:geliyor_app/utils/market_product_helpers.dart';
 import 'package:geliyor_app/utils/product_image.dart';
 import 'package:geliyor_app/utils/product_price.dart';
 import 'package:geliyor_app/utils/product_tag_filter.dart';
@@ -35,61 +42,73 @@ class _SpecialFoodsScreenState extends State<SpecialFoodsScreen> {
     _HealthProblem(
       id: 'diyabet',
       title: 'Diyabet',
+      advantageId: 'diyabet',
       iconPath: 'assets/images/app_ikonlar/diyabet.png',
     ),
     _HealthProblem(
       id: 'bobrek',
       title: 'Böbrek',
+      advantageId: 'bobrek',
       iconPath: 'assets/images/app_ikonlar/bobrek.png',
     ),
     _HealthProblem(
       id: 'tuy',
       title: 'Tüy',
+      advantageId: 'tuy_deri',
       iconPath: 'assets/images/app_ikonlar/tuy_deri.png',
     ),
     _HealthProblem(
       id: 'eklem',
       title: 'Eklem',
+      advantageId: 'eklem',
       iconPath: 'assets/images/app_ikonlar/eklem.png',
     ),
     _HealthProblem(
       id: 'sindirim',
       title: 'Sindirim',
+      advantageId: 'sindirim',
       iconPath: 'assets/images/app_ikonlar/sindirim.png',
     ),
     _HealthProblem(
       id: 'bagisiklik',
       title: 'Bağışıklık',
+      advantageId: 'bagisiklik',
       iconPath: 'assets/images/app_ikonlar/bagisiklik.png',
     ),
     _HealthProblem(
       id: 'idrar',
       title: 'İdrar',
-      iconPath: 'assets/images/app_ikonlar/idrar.png',
+      advantageId: 'idrar',
+      iconPath: '',
     ),
     _HealthProblem(
       id: 'kalp',
       title: 'Kalp',
+      advantageId: 'kalp',
       iconPath: 'assets/images/app_ikonlar/kalp.png',
     ),
     _HealthProblem(
       id: 'dis',
       title: 'Diş',
+      advantageId: 'dis',
       iconPath: 'assets/images/app_ikonlar/dis.png',
     ),
     _HealthProblem(
       id: 'karaciger',
       title: 'Karaciğer',
+      advantageId: 'karaciger',
       iconPath: 'assets/images/app_ikonlar/karaciger.png',
     ),
     _HealthProblem(
       id: 'hipo',
       title: 'Hipo',
-      iconPath: 'assets/images/app_ikonlar/dogal_icerik.png',
+      advantageId: 'hypoallergenic',
+      iconPath: 'assets/images/app_ikonlar/hypoallergenic.png',
     ),
     _HealthProblem(
       id: 'kilo',
       title: 'Kilo',
+      advantageId: 'kilo_kontrol',
       iconPath: 'assets/images/app_ikonlar/kilo_kontrol.png',
     ),
   ];
@@ -120,6 +139,39 @@ class _SpecialFoodsScreenState extends State<SpecialFoodsScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    unawaited(ProductAdvantageRepository.instance.ensureDefaults());
+  }
+
+  String _iconFor(
+    _HealthProblem problem,
+    List<AppProductAdvantage> catalog,
+  ) {
+    for (final item in catalog) {
+      if (item.id != problem.advantageId) continue;
+      final url = item.imageUrl.trim();
+      if (url.isNotEmpty) return url;
+      final asset = item.assetPath.trim();
+      if (asset.isNotEmpty) return asset;
+      return '';
+    }
+    return '';
+  }
+
+  Widget _problemIcon(String path) {
+    if (path.trim().isEmpty) return const SizedBox.expand();
+    return buildProductImage(
+      path,
+      fit: BoxFit.contain,
+      width: double.infinity,
+      height: double.infinity,
+      filterQuality: FilterQuality.high,
+      errorWidget: const SizedBox.expand(),
+    );
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
@@ -138,16 +190,7 @@ class _SpecialFoodsScreenState extends State<SpecialFoodsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Veteriner gözetiminde sağlık desteği için formüle edilmiş mamalar.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: AppColors.subText,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  height: 1.3,
-                ),
-              ),
+              _buildBanner(),
               const SizedBox(height: 12),
               _buildPetTypeSelector(),
               const SizedBox(height: 10),
@@ -168,23 +211,14 @@ class _SpecialFoodsScreenState extends State<SpecialFoodsScreen> {
               const SizedBox(height: 8),
               StreamBuilder<List<MarketProductData>>(
                 stream: ProductRepository.instance.watchMarketProducts(),
+                initialData: ProductRepository.instance.cachedMarketProducts(),
                 builder: (context, snapshot) {
                   final catalog = snapshot.data ?? const <MarketProductData>[];
                   final products = _productsForSelection(catalog);
                   if (products.isEmpty) {
-                    return const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 24),
-                      child: Center(
-                        child: Text(
-                          'Bu sağlık problemi için mama bulunamadı.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: AppColors.subText,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
+                    return marketProductsPlaceholder(
+                      isEmpty: true,
+                      emptyMessage: 'Bu sağlık problemi için mama bulunamadı.',
                     );
                   }
                   return _buildProductGrid(products);
@@ -195,6 +229,76 @@ class _SpecialFoodsScreenState extends State<SpecialFoodsScreen> {
         ),
         navbar: const AppBottomNavbar(),
       ),
+    );
+  }
+
+  Widget _buildBanner() {
+    const fallback = 'assets/images/ozel_saglik_mamalari_banner.jpg';
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection(FirestoreCollections.banners)
+          .snapshots(),
+      builder: (context, snapshot) {
+        var path = fallback;
+        var hidden = false;
+        final docs = snapshot.data?.docs;
+        if (docs != null) {
+          final deleted = <String>{};
+          for (final doc in docs) {
+            if (doc.id != BannerRepository.seededDocId) continue;
+            final raw = doc.data()['deletedIds'];
+            if (raw is Iterable) {
+              deleted.addAll(raw.map((item) => item.toString()));
+            }
+          }
+          final live = [
+            for (final doc in docs)
+              if (!doc.id.startsWith('_')) AppBanner.fromDoc(doc),
+          ].where((banner) {
+            return banner.active &&
+                banner.placement == BannerPlacement.specialFoods.id &&
+                banner.imageUrl.trim().isNotEmpty;
+          }).toList();
+          final picked = AppBanner.latestLive(live);
+          if (picked != null) {
+            path = picked.imageUrl;
+          } else if (deleted.contains('special-foods')) {
+            hidden = true;
+          }
+        }
+        if (hidden) return const SizedBox.shrink();
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            const framePad = 3.0;
+            final width = constraints.maxWidth - framePad * 2;
+            final height = width * 140 / 361;
+            return Container(
+              padding: const EdgeInsets.all(framePad),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.25),
+                ),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(21),
+                child: SizedBox(
+                  width: width,
+                  height: height,
+                  child: buildProductImage(
+                    path,
+                    fit: BoxFit.fill,
+                    width: width,
+                    height: height,
+                    cacheWidth: 1024,
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -374,10 +478,10 @@ class _SpecialFoodsScreenState extends State<SpecialFoodsScreen> {
           height: 40,
           padding: const EdgeInsets.symmetric(horizontal: 12),
           borderRadius: 999,
-          backgroundColor: AppColors.primary,
-          pressedBackgroundColor: AppColors.primary,
-          foregroundColor: AppColors.surface,
-          pressedForegroundColor: AppColors.surface,
+          backgroundColor: AppColors.surface,
+          pressedBackgroundColor: AppColors.selected,
+          foregroundColor: AppColors.primary,
+          pressedForegroundColor: AppColors.primary,
           borderColor: AppColors.primary,
           pressedBorderColor: AppColors.primary,
           child: const Row(
@@ -394,6 +498,18 @@ class _SpecialFoodsScreenState extends State<SpecialFoodsScreen> {
   }
 
   Widget _buildProblemGrid() {
+    final cached = ProductAdvantageRepository.instance.cached;
+    return StreamBuilder<List<AppProductAdvantage>>(
+      stream: ProductAdvantageRepository.instance.watchAll(activeOnly: true),
+      initialData: cached.isEmpty ? null : cached,
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return _problemGrid(const []);
+        return _problemGrid(snapshot.data!);
+      },
+    );
+  }
+
+  Widget _problemGrid(List<AppProductAdvantage> catalog) {
     const columns = 6;
     const gap = 4.0;
     final rows = <Widget>[];
@@ -408,7 +524,7 @@ class _SpecialFoodsScreenState extends State<SpecialFoodsScreen> {
               if (i > 0) const SizedBox(width: gap),
               Expanded(
                 child: start + i < end
-                    ? _buildProblemCard(_problems[start + i])
+                    ? _buildProblemCard(_problems[start + i], catalog)
                     : const SizedBox.shrink(),
               ),
             ],
@@ -420,7 +536,10 @@ class _SpecialFoodsScreenState extends State<SpecialFoodsScreen> {
     return Column(children: rows);
   }
 
-  Widget _buildProblemCard(_HealthProblem problem) {
+  Widget _buildProblemCard(
+    _HealthProblem problem,
+    List<AppProductAdvantage> catalog,
+  ) {
     final selected = _selectedProblemId == problem.id;
     return GestureDetector(
       onTap: () => setState(() => _selectedProblemId = problem.id),
@@ -449,20 +568,7 @@ class _SpecialFoodsScreenState extends State<SpecialFoodsScreen> {
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(1, 1, 1, 1),
-                    child: Image.asset(
-                      problem.iconPath,
-                      fit: BoxFit.contain,
-                      width: double.infinity,
-                      height: double.infinity,
-                      filterQuality: FilterQuality.high,
-                      errorBuilder: (context, error, stackTrace) {
-                        return const Icon(
-                          Icons.health_and_safety_outlined,
-                          color: AppColors.primary,
-                          size: 22,
-                        );
-                      },
-                    ),
+                    child: _problemIcon(_iconFor(problem, catalog)),
                   ),
                 ),
                 Text(
@@ -617,6 +723,14 @@ class _SpecialFoodsScreenState extends State<SpecialFoodsScreen> {
                       iconSize: 12,
                     ),
                   ),
+                  if ((product.source?.animalProteinLabel ?? '').isNotEmpty)
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      child: AnimalProteinBadge(
+                        label: product.source!.animalProteinLabel,
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -802,11 +916,13 @@ class _HealthProblem {
   const _HealthProblem({
     required this.id,
     required this.title,
+    required this.advantageId,
     required this.iconPath,
   });
 
   final String id;
   final String title;
+  final String advantageId;
   final String iconPath;
 }
 

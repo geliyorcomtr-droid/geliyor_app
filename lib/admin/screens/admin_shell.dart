@@ -16,14 +16,19 @@ import 'package:geliyor_app/admin/screens/admin_categories_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_coupons_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_dashboard_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_food_tracking_screen.dart';
+import 'package:geliyor_app/admin/screens/admin_hangi_mama_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_knowledge_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_members_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_orders_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_product_advantages_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_product_form_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_products_screen.dart';
+import 'package:geliyor_app/admin/screens/admin_reporting_screen.dart';
+import 'package:geliyor_app/admin/screens/admin_softtr_stock_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_support_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_trust_badges_screen.dart';
+import 'package:geliyor_app/admin/screens/admin_welcome_splash_screen.dart';
+import 'package:geliyor_app/data/product_repository.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 
 class AdminShell extends StatefulWidget {
@@ -54,6 +59,7 @@ class _AdminShellState extends State<AdminShell> {
   void initState() {
     super.initState();
     unawaited(CategoryRepository.instance.ensureDefaults());
+    unawaited(ProductRepository.instance.backfillBagDays());
   }
 
   void _go(
@@ -132,6 +138,9 @@ class _AdminShellState extends State<AdminShell> {
       AdminPage.categories => const AdminCategoriesScreen(),
       AdminPage.trustBadges => const AdminTrustBadgesScreen(),
       AdminPage.advantages => const AdminProductAdvantagesScreen(),
+      AdminPage.softtrStock => const AdminSofttrStockScreen(),
+      AdminPage.reporting => const AdminReportingScreen(),
+      AdminPage.hangiMama => const AdminHangiMamaScreen(),
       AdminPage.foodTracking => const AdminFoodTrackingScreen(),
       AdminPage.members => const AdminMembersScreen(),
       AdminPage.campaigns => const AdminCampaignsScreen(),
@@ -141,6 +150,7 @@ class _AdminShellState extends State<AdminShell> {
         key: ValueKey(_bannerGroup ?? 'all'),
         initialGroup: _bannerGroup ?? 'all',
       ),
+      AdminPage.welcomeSplash => const AdminWelcomeSplashScreen(),
       AdminPage.knowledge => AdminKnowledgeScreen(
         key: ValueKey(_knowledgeGroup ?? 'topics'),
         initialGroup: _knowledgeGroup ?? 'topics',
@@ -190,7 +200,7 @@ class _AdminShellState extends State<AdminShell> {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20),
               gradient: const LinearGradient(
-                colors: [AppColors.primary, Color(0xFF6366F1)],
+                colors: [AppColors.primary, AppColors.primaryLight],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),

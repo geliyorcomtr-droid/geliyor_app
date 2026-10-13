@@ -1,5 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:geliyor_app/data/product_advantage_repository.dart';
+import 'package:geliyor_app/data/product_bag_days.dart';
 import 'package:geliyor_app/data/product_repository.dart';
 import 'package:geliyor_app/data/trust_badge_repository.dart';
 import 'package:geliyor_app/screens/cart_screen.dart';
@@ -10,6 +11,7 @@ import 'package:geliyor_app/state/favorite_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/utils/product_image.dart';
+import 'package:geliyor_app/utils/product_ingredients.dart';
 import 'package:geliyor_app/utils/product_price.dart';
 import 'package:geliyor_app/utils/product_skt.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
@@ -66,12 +68,35 @@ class ProductDetailScreen extends StatelessWidget {
       product?.discount ?? _fallbackDiscountPercent;
   String get _productDescription {
     final subtitle = product?.subtitle.trim() ?? '';
-    if (subtitle.isNotEmpty) return subtitle;
-    return _fallbackDescription;
+    if (subtitle.isEmpty) return _fallbackDescription;
+    if (ProductIngredients.looksLike(subtitle) &&
+        (product?.ingredients.trim().isEmpty ?? true)) {
+      return '';
+    }
+    return subtitle;
+  }
+
+  String get _productIngredients {
+    final dedicated = product?.ingredients.trim() ?? '';
+    if (dedicated.isNotEmpty) return dedicated;
+    final subtitle = product?.subtitle.trim() ?? '';
+    if (ProductIngredients.looksLike(subtitle)) return subtitle;
+    return '';
   }
 
   String? _advantageStatValue(AppProductAdvantage item) {
-    if (ProductAdvantageRepository.displaysAsStat(item)) {
+    if (ProductAdvantageRepository.isAnimalProteinAdvantage(item)) {
+      final value = product?.animalProteinValue.trim() ?? '';
+      if (value.isNotEmpty) {
+        return ProductAdvantageRepository.formatProteinDisplay(value);
+      }
+      final override = product?.productAdvantageValues[item.id]?.trim();
+      if (override != null && override.isNotEmpty) {
+        return ProductAdvantageRepository.formatProteinDisplay(override);
+      }
+      return null;
+    }
+    if (ProductAdvantageRepository.isProteinStat(item)) {
       final protein = product?.proteinValue.trim() ?? '';
       if (protein.isNotEmpty) {
         return ProductAdvantageRepository.formatProteinDisplay(protein);
@@ -133,7 +158,8 @@ class ProductDetailScreen extends StatelessWidget {
   }
 
   String get _repurchaseDisplayValue {
-    return TrustBadgeRepository.formatRate(product?.repurchaseRate ?? '');
+    final value = ProductBagDays.digits(product?.repurchaseRate);
+    return value.isEmpty ? '—' : value;
   }
 
   bool _isRatingBadge(AppTrustBadge badge) {
@@ -168,6 +194,7 @@ class ProductDetailScreen extends StatelessWidget {
   }) {
     return StreamBuilder<List<MarketProductData>>(
       stream: ProductRepository.instance.watchMarketProducts(),
+      initialData: ProductRepository.instance.cachedMarketProducts(),
       builder: (context, snapshot) {
         final catalog = snapshot.data ?? const <MarketProductData>[];
         final example = product ?? (catalog.isNotEmpty ? catalog.first : null);
@@ -178,16 +205,22 @@ class ProductDetailScreen extends StatelessWidget {
   }
 
   static const double _sideColumnWidth = 54;
-  static const int _sideSlotCount = ProductAdvantageRepository.heroSlotCount;
+  static const int _sideSlotCount = 6;
   static const double _sideCardGap = 8;
-  static const double _sideIconSize = 28;
   static const double _cardGap = 8;
   static const double _heroHeight = 488;
+  static const double _cardPaddingTop = 10;
+  static const double _cardPaddingBottom = 12;
+  static const double _afterGalleryGap = 6;
+  static const double _afterTitleGap = 8;
+  static const double _afterMetaGap = 10;
+  static const double _dividerHeight = 1;
+  static const double _afterDividerGap = 10;
   static const double _titleBlockHeight = 62;
   static const double _metaRowHeight = 28;
   static const double _priceBlockHeight = 62;
   static const double _sectionGap = 12;
-  static const Color _accent = Color(0xFF6CB6FF);
+  static const Color _accent = AppColors.primary;
 
   static BoxDecoration get _boxDecoration => BoxDecoration(
     color: AppColors.surface,
@@ -255,17 +288,14 @@ class ProductDetailScreen extends StatelessWidget {
     );
   }
 
-  void _openFeatureProducts(
-    BuildContext context, {
-    String? feature,
-    bool openFeatureSheet = false,
-  }) {
+  void _openBrandProducts(BuildContext context) {
+    final brand = _productBrand.trim();
+    if (brand.isEmpty) return;
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => PetMarketProductsScreen(
           initialMainCategory: _marketMainCategory,
-          initialFeature: feature,
-          openFeatureSheet: openFeatureSheet,
+          initialBrand: brand,
         ),
       ),
     );
@@ -280,64 +310,25 @@ class ProductDetailScreen extends StatelessWidget {
   }
 
   void _openTrustGuide(BuildContext context, _SideBadge badge) {
-    final filter = badge.catalogFilter;
-    if (filter == null) return;
-    InfoGuideSheet.show(
+    InfoGuideSheet.showImageOverlay(
       context,
-      title: badge.label.replaceAll('\n', ' '),
-      subtitle: 'Bu bilgi ne anlama gelir?',
-      guide: _trustGuideFor(filter),
-      iconPath: badge.iconPath,
-      imageUrl: badge.imageUrl ?? '',
+      imagePath: (badge.detailImageUrl ?? '').trim(),
       fallbackIcon: badge.isRating
           ? Icons.star_rounded
           : Icons.workspace_premium_rounded,
       fallbackIconColor: badge.isRating ? AppColors.warning : AppColors.primary,
-      buttonLabel: _trustButtonLabel(filter),
       onSeeProducts: () {
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => PetMarketProductsScreen(
               initialMainCategory: _marketMainCategory,
-              initialCatalogFilter: filter,
+              initialCatalogFilter: badge.catalogFilter,
+              initialFeature: badge.feature,
             ),
           ),
         );
       },
     );
-  }
-
-  static String _trustButtonLabel(String filter) {
-    return switch (filter) {
-      'bestSellers' => 'En çok satan ürünleri gör',
-      'topRated' => 'En çok puan alan ürünleri gör',
-      'affordable' => 'Uygun fiyatlı ürünleri gör',
-      'repurchase' => 'Tekrar alınan ürünleri gör',
-      _ => 'Ürünleri gör',
-    };
-  }
-
-  static String _trustGuideFor(String filter) {
-    return switch (filter) {
-      'bestSellers' =>
-          'Çok satan ürün, müşterilerin en sık tercih ettiği mamaları ve pet ürünlerini gösterir. Sıralama, satış ve tercih yoğunluğuna göre yapılır.\n\n'
-          'Bu rozet, ürünün kendi kategorisinde öne çıktığını anlatır. “En çok satan 2. ürün” gibi bir sıra, o ürünün listedeki yerini özetler.\n\n'
-          'Aynı listedeki diğer çok satanlara bakarak benzer, güvenilir alternatifleri görebilirsiniz.',
-      'topRated' =>
-          'Puan, ürünü alan müşterilerin memnuniyetini özetler. Yüksek puan; lezzet, tazelik ve tekrar alma isteğinin güçlü olduğunu gösterir.\n\n'
-          'Tek bir puan her dost için aynı sonucu garanti etmez. Yine de en çok puan alan ürünler, kalabalık bir deneyim havuzuna dayanır.\n\n'
-          'Puanın yanında yorumları da okuyun; özellikle kendi petinizin yaşı ve ihtiyacıyla eşleşen deneyimleri arayın.',
-      'affordable' =>
-          'Uygun fiyat, kaliteden vazgeçmeden bütçeyi koruyan ürünleri işaret eder. İndirim, gramaj avantajı veya kampanya bu rozetin parçası olabilir.\n\n'
-          'En ucuz mama her zaman en doğru mama değildir. Protein kaynağı, petinizin ihtiyacı ve veteriner önerisi asıl ölçüttür.\n\n'
-          'Uygun fiyatlı listedeki ürünler, aynı ihtiyacı daha ekonomik karşılamanız için bir araya getirilir.',
-      'repurchase' =>
-          'Tekrar alım, müşterilerin aynı ürünü yeniden sipariş etme oranını gösterir. Yüksek oran, lezzet ve memnuniyetin sürdüğüne işaret eder.\n\n'
-          'Petiniz mamayı kabul ettiyse tekrar alım oranı yüksek ürünler, stok bitmeden aynı formülü sürdürmenize yardımcı olur.\n\n'
-          'Ani mama değişimi sindirimi bozabilir; alışılan üründe kalmak çoğu zaman daha iyidir.',
-      _ =>
-          'Bu rozet, ürünün öne çıkan bir güven veya tercih bilgisini gösterir. Aynı gruptaki diğer ürünlere göz atabilirsiniz.',
-    };
   }
 
   @override
@@ -349,6 +340,7 @@ class ProductDetailScreen extends StatelessWidget {
 
     return StreamBuilder<List<MarketProductData>>(
       stream: ProductRepository.instance.watchMarketProducts(),
+      initialData: ProductRepository.instance.cachedMarketProducts(),
       builder: (context, snapshot) {
         final items = snapshot.data ?? const <MarketProductData>[];
         MarketProductData? live;
@@ -363,7 +355,9 @@ class ProductDetailScreen extends StatelessWidget {
           live = items.first;
         }
 
-        if (snapshot.hasData && seedId.isNotEmpty && live == null) {
+        if (ProductRepository.instance.catalogReady &&
+            seedId.isNotEmpty &&
+            live == null) {
           return Scaffold(
             backgroundColor: AppColors.surface,
             body: AppPageFrame.standard(
@@ -421,14 +415,13 @@ class ProductDetailScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: _sectionGap),
-              _buildFeatureExplanations(context),
+              _buildTogetherBox(context),
               const SizedBox(height: _sectionGap),
               _buildDescriptionBox(),
               const SizedBox(height: _sectionGap),
-              const _ProductReviewsSection(),
+              _buildIngredientsBox(),
               const SizedBox(height: _sectionGap),
-              _buildTogetherBox(context),
+              const _ProductReviewsSection(),
               const SizedBox(height: _sectionGap),
               _buildSimilarBox(context),
             ],
@@ -439,27 +432,23 @@ class ProductDetailScreen extends StatelessWidget {
   }
 
   Widget _buildTrustBadgeColumn(BuildContext context) {
+    final cached = TrustBadgeRepository.instance.cached;
     return StreamBuilder<List<AppTrustBadge>>(
+      initialData: cached.isEmpty ? null : cached,
       stream: TrustBadgeRepository.instance.watchAll(activeOnly: true),
       builder: (context, snapshot) {
-        final allBadges = snapshot.data ?? const <AppTrustBadge>[];
-        final selectedIds = product?.trustBadgeIds;
-        final badges = (selectedIds == null
-                ? allBadges
-                : [
+        final allBadges = snapshot.data ?? cached;
+        if (allBadges.isEmpty) {
+          return _buildSideColumn(context, const []);
+        }
+        final selectedIds = product?.trustBadgeIds ?? const <String>[];
+        final badges = [
                     for (final id in selectedIds)
                       ...allBadges.where((badge) => badge.id == id),
-                  ])
+                  ]
             .where((badge) => !TrustBadgeRepository.isSmartSuggestionBadge(badge))
             .where((badge) => !TrustBadgeRepository.isProteinBadge(badge))
             .toList();
-        if (!badges.any(_isRepurchaseBadge)) {
-          final insertAt = badges.length >= 3 ? 3 : badges.length;
-          badges.insert(
-            insertAt,
-            TrustBadgeRepository.defaultRepurchaseBadge,
-          );
-        }
         if (!badges.any(_isAffordableBadge)) {
           final insertAt = badges.length >= 4 ? 4 : badges.length;
           badges.insert(
@@ -477,15 +466,12 @@ class ProductDetailScreen extends StatelessWidget {
               id: badge.id,
               label: _isRatingBadge(badge)
                   ? 'Puan'
-                  : _isPreferredBadge(badge)
-                  ? 'Çok Satan\nÜrün'
-                  : _isRepurchaseBadge(badge)
-                  ? 'Tekrar\nAlım'
-                  : _isAffordableBadge(badge)
-                  ? 'Uygun\nFiyat'
-                  : _balancedSideLabel(badge.name),
+                  : _shortSideLabel(
+                      TrustBadgeRepository.displayName(badge),
+                    ),
               iconPath: TrustBadgeRepository.displayAssetPath(badge),
               imageUrl: TrustBadgeRepository.displayImageUrl(badge),
+              detailImageUrl: TrustBadgeRepository.displayDetailImageUrl(badge),
               isFavoriteAction:
                   !_isPreferredBadge(badge) &&
                   !_isRepurchaseBadge(badge) &&
@@ -521,14 +507,20 @@ class ProductDetailScreen extends StatelessWidget {
   }
 
   Widget _buildAdvantageColumn(BuildContext context) {
+    final cached = ProductAdvantageRepository.instance.cached;
     return StreamBuilder<List<AppProductAdvantage>>(
+      initialData: cached.isEmpty ? null : cached,
       stream: ProductAdvantageRepository.instance.watchAll(activeOnly: true),
       builder: (context, snapshot) {
-        final selectedIds = product?.productAdvantageIds;
-        final catalog = snapshot.data ?? const <AppProductAdvantage>[];
-        final items = ProductAdvantageRepository.orderedForProduct(
+        final catalog = snapshot.data ?? cached;
+        if (catalog.isEmpty) {
+          return _buildSideColumn(context, const []);
+        }
+        final selectedIds = product?.productAdvantageIds ?? const <String>[];
+        final items = ProductAdvantageRepository.forProductDetail(
           selectedIds: selectedIds,
           catalog: catalog,
+          animalProteinValue: product?.animalProteinValue ?? '',
         ).take(_sideSlotCount).toList();
         if (items.isEmpty) {
           return const SizedBox(width: _sideColumnWidth);
@@ -537,9 +529,12 @@ class ProductDetailScreen extends StatelessWidget {
           for (final item in items)
             _SideBadge(
               id: item.id,
-              label: _balancedSideLabel(item.name),
+              label: _shortSideLabel(item.name),
               iconPath: ProductAdvantageRepository.displayAssetPath(item),
-              imageUrl: ProductAdvantageRepository.displayImageUrl(item),
+              imageUrl: ProductAdvantageRepository.sharedDisplayImageUrl(
+                item,
+                catalog: catalog,
+              ),
               feature: item.name,
               advantage: item,
               isStat: _showsAsStat(item),
@@ -561,7 +556,10 @@ class ProductDetailScreen extends StatelessWidget {
             if (i > 0) const SizedBox(height: _sideCardGap),
             Expanded(
               child: i < visible.length
-                  ? _buildSideCard(context, visible[i])
+                  ? KeyedSubtree(
+                      key: ValueKey(visible[i].id),
+                      child: _buildSideCard(context, visible[i]),
+                    )
                   : const SizedBox.expand(),
             ),
           ],
@@ -578,7 +576,7 @@ class ProductDetailScreen extends StatelessWidget {
     final card = Container(
       width: double.infinity,
       height: double.infinity,
-      padding: const EdgeInsets.fromLTRB(4, 6, 4, 5),
+      padding: const EdgeInsets.fromLTRB(2, 2, 2, 2),
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -603,18 +601,8 @@ class ProductDetailScreen extends StatelessWidget {
       );
     }
 
-    if (badge.catalogFilter != null) {
-      return GestureDetector(
-        onTap: () => _openTrustGuide(context, badge),
-        behavior: HitTestBehavior.opaque,
-        child: card,
-      );
-    }
-
-    if (badge.feature == null) return card;
-
     return GestureDetector(
-      onTap: () => _openFeatureProducts(context, feature: badge.feature),
+      onTap: () => _openTrustGuide(context, badge),
       behavior: HitTestBehavior.opaque,
       child: card,
     );
@@ -627,21 +615,12 @@ class ProductDetailScreen extends StatelessWidget {
           Expanded(
             flex: 7,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 1),
-              child: ClipRRect(
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(32),
-                  topRight: Radius.circular(32),
-                ),
-                child: Transform.scale(
-                  scale: 1.12,
-                  child: PreferredRankMedal(
-                    rank: badge.preferredRank ?? '2.',
-                    imagePath: (badge.imageUrl?.trim().isNotEmpty ?? false)
-                        ? badge.imageUrl
-                        : badge.iconPath,
-                  ),
-                ),
+              padding: const EdgeInsets.fromLTRB(2, 2, 2, 0),
+              child: PreferredRankMedal(
+                rank: badge.preferredRank ?? '2.',
+                imagePath: (badge.imageUrl?.trim().isNotEmpty ?? false)
+                    ? badge.imageUrl
+                    : badge.iconPath,
               ),
             ),
           ),
@@ -657,10 +636,10 @@ class ProductDetailScreen extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           SizedBox(
-            height: 36,
+            height: 32,
             width: double.infinity,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 2),
               child: _sideBadgeImage(badge),
             ),
           ),
@@ -678,11 +657,13 @@ class ProductDetailScreen extends StatelessWidget {
       );
     }
     if (badge.isStat) {
+      final isBagDays = badge.id == 'tekrar-alim';
       return _iconNumberLabelCard(
         icon: _sideBadgeImage(badge),
         value: badge.statValue ?? '—',
         label: badge.label,
         valueColor: _sideValueColor(badge),
+        valueFontSize: isBagDays ? 13 : 12,
       );
     }
     return Column(
@@ -694,30 +675,38 @@ class ProductDetailScreen extends StatelessWidget {
   }
 
   Color _sideValueColor(_SideBadge badge) {
-    if (badge.id == 'tekrar-alim') return AppColors.error;
-    if (badge.id == 'protein' || badge.isStat) return AppColors.warning;
-    if (badge.isRating || badge.id == 'degerlendirme') return AppColors.warning;
+    if (badge.id == 'tekrar-alim') return AppColors.statNumber;
+    if (badge.id == 'protein' ||
+        ProductAdvantageRepository.isAnimalProteinId(badge.id) ||
+        badge.isStat) {
+      return AppColors.statNumber;
+    }
+    if (badge.isRating || badge.id == 'degerlendirme') return AppColors.statNumber;
     return AppColors.primary;
   }
 
-  /// Yıldız / değer / etiket eşit aralıklı; üstte fazla boşluk kalmaz.
+  /// İkon önde; protein / gün yeter / puan rakamı küçük kalır.
   Widget _iconNumberLabelCard({
     required Widget icon,
     required String value,
     required String label,
     required Color valueColor,
     bool compactTexts = false,
+    double valueFontSize = 12,
   }) {
-    final valueText = Text(
-      value,
-      textAlign: TextAlign.center,
-      maxLines: 1,
-      style: TextStyle(
-        color: valueColor,
-        fontSize: 16,
-        fontWeight: FontWeight.w900,
-        height: 1,
-        letterSpacing: -0.3,
+    final valueText = FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Text(
+        value,
+        textAlign: TextAlign.center,
+        maxLines: 1,
+        style: TextStyle(
+          color: valueColor,
+          fontSize: compactTexts ? 11 : valueFontSize,
+          fontWeight: FontWeight.w800,
+          height: 1,
+          letterSpacing: -0.2,
+        ),
       ),
     );
     final labelText = Padding(
@@ -727,76 +716,56 @@ class ProductDetailScreen extends StatelessWidget {
         child: Text(
           label,
           textAlign: TextAlign.center,
-          maxLines: 2,
-          style: const TextStyle(
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
             color: AppColors.text,
-            fontSize: 8,
+            fontSize: compactTexts ? 9 : 10,
             fontWeight: FontWeight.w800,
-            height: 1.05,
+            height: 1,
           ),
         ),
       ),
     );
 
-    if (compactTexts) {
-      return Column(
-        children: [
-          SizedBox(
-            height: 36,
-            width: double.infinity,
+    return Column(
+      children: [
+        Expanded(
+          flex: 6,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(1, 1, 1, 0),
             child: icon,
           ),
-          const Spacer(),
-          valueText,
-          const SizedBox(height: 1),
-          labelText,
-          const SizedBox(height: 8),
-        ],
-      );
-    }
-
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        SizedBox(
-          height: 36,
-          width: double.infinity,
-          child: icon,
         ),
-        valueText,
-        labelText,
+        Expanded(flex: 2, child: Center(child: valueText)),
+        Expanded(flex: 2, child: Center(child: labelText)),
       ],
     );
   }
 
-  /// Uzun adları en fazla 2 dengeli satıra böler; her kelimeyi ayrı satıra düşürmez.
-  String _balancedSideLabel(String name) {
-    final raw = name.trim();
-    if (raw.isEmpty) return raw;
-    final existing = raw
-        .split(RegExp(r'[\n\r]+'))
-        .map((line) => line.trim())
-        .where((line) => line.isNotEmpty)
-        .toList();
-    if (existing.length >= 2) return existing.take(2).join('\n');
-
-    final words = existing.single.split(RegExp(r'\s+'));
-    if (words.length <= 1) return existing.single;
-    if (words.length == 2) return '${words[0]}\n${words[1]}';
-
-    var bestMid = 1;
-    var bestMax = 1 << 30;
-    for (var mid = 1; mid < words.length; mid++) {
-      final first = words.take(mid).join(' ');
-      final second = words.skip(mid).join(' ');
-      final longest =
-          first.length >= second.length ? first.length : second.length;
-      if (longest < bestMax) {
-        bestMax = longest;
-        bestMid = mid;
-      }
-    }
-    return '${words.take(bestMid).join(' ')}\n${words.skip(bestMid).join(' ')}';
+  /// Tek satır kısa etiket: yetişkin kedi → yetişkin, tavuklu formül → tavuklu.
+  String _shortSideLabel(String name) {
+    var text = name
+        .trim()
+        .replaceAll(RegExp(r'[\n\r]+'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ');
+    if (text.isEmpty) return text;
+    text = text.replaceAll(
+      RegExp(r'\s+(sağlığı|sagligi|sağlık|saglik)$', caseSensitive: false),
+      '',
+    );
+    text = text.replaceAll(
+      RegExp(
+        r'\s+(formülü|formulü|formül|formul|formula)$',
+        caseSensitive: false,
+      ),
+      '',
+    );
+    text = text.replaceAll(
+      RegExp(r'\s+(kedi|köpek|kopek)$', caseSensitive: false),
+      '',
+    );
+    return text.trim();
   }
 
   Widget _fitSideLabel(String label) {
@@ -807,14 +776,15 @@ class ProductDetailScreen extends StatelessWidget {
         child: FittedBox(
           fit: BoxFit.scaleDown,
           child: Text(
-            label,
+            _shortSideLabel(label),
             textAlign: TextAlign.center,
-            maxLines: 2,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               color: AppColors.text,
-              fontSize: 8,
-              fontWeight: FontWeight.w800,
-              height: 1.05,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+              height: 1,
             ),
           ),
         ),
@@ -829,9 +799,9 @@ class ProductDetailScreen extends StatelessWidget {
   }) {
     return [
       Expanded(
-        flex: 5,
+        flex: 7,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(3, 1, 3, 0),
+          padding: const EdgeInsets.fromLTRB(1, 1, 1, 0),
           child: icon,
         ),
       ),
@@ -857,7 +827,7 @@ class ProductDetailScreen extends StatelessWidget {
           ),
         ),
       Expanded(
-        flex: 4,
+        flex: 3,
         child: _fitSideLabel(label),
       ),
     ];
@@ -901,8 +871,9 @@ class ProductDetailScreen extends StatelessWidget {
 
     final wrongDefaultFavorite = assetPath.endsWith('/favori.png');
 
+    Widget image;
     if (uploadedUrl.isNotEmpty) {
-      return buildProductImage(
+      image = buildProductImage(
         uploadedUrl,
         fit: BoxFit.contain,
         width: double.infinity,
@@ -921,9 +892,8 @@ class ProductDetailScreen extends StatelessWidget {
                 errorWidget: fallback,
               ),
       );
-    }
-    if (assetPath.isNotEmpty && !wrongDefaultFavorite) {
-      return buildProductImage(
+    } else if (assetPath.isNotEmpty && !wrongDefaultFavorite) {
+      image = buildProductImage(
         assetPath,
         fit: BoxFit.contain,
         width: double.infinity,
@@ -932,9 +902,21 @@ class ProductDetailScreen extends StatelessWidget {
         cacheWidth: decodePx,
         errorWidget: fallback,
       );
+    } else {
+      return fallback;
     }
-    return fallback;
+    return ColorFiltered(
+      colorFilter: _knockOutWhite,
+      child: image,
+    );
   }
+
+  static const _knockOutWhite = ColorFilter.matrix(<double>[
+    1, 0, 0, 0, 0,
+    0, 1, 0, 0, 0,
+    0, 0, 1, 0, 0,
+    -1, -1, -1, 3, 0,
+  ]);
 
   Widget _buildFavoriteSideCard(BuildContext context) {
     return ListenableBuilder(
@@ -953,16 +935,11 @@ class ProductDetailScreen extends StatelessWidget {
           child: Container(
             width: double.infinity,
             height: double.infinity,
-            padding: const EdgeInsets.fromLTRB(2, 4, 2, 4),
+            padding: const EdgeInsets.fromLTRB(2, 2, 2, 2),
             decoration: BoxDecoration(
-              color: isFavorite
-                  ? AppColors.error.withValues(alpha: 0.08)
-                  : AppColors.surface,
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: isFavorite ? AppColors.error : _accent,
-                width: isFavorite ? 1.4 : 1,
-              ),
+              border: Border.all(color: _accent, width: 1),
               boxShadow: const [
                 BoxShadow(
                   color: Color(0x0D000000),
@@ -976,18 +953,14 @@ class ProductDetailScreen extends StatelessWidget {
                 Expanded(
                   child: Center(
                     child: Container(
-                      width: _sideIconSize,
-                      height: _sideIconSize,
+                      width: 26,
+                      height: 26,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: isFavorite
-                            ? AppColors.error.withValues(alpha: 0.12)
-                            : AppColors.selected,
+                        color: AppColors.statNumber.withValues(alpha: 0.12),
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: isFavorite
-                              ? AppColors.error
-                              : AppColors.primary,
+                          color: AppColors.statNumber,
                           width: 1.2,
                         ),
                       ),
@@ -995,8 +968,8 @@ class ProductDetailScreen extends StatelessWidget {
                         isFavorite
                             ? Icons.favorite_rounded
                             : Icons.favorite_border_rounded,
-                        size: 20,
-                        color: isFavorite ? AppColors.error : AppColors.primary,
+                        size: 16,
+                        color: AppColors.statNumber,
                       ),
                     ),
                   ),
@@ -1004,15 +977,15 @@ class ProductDetailScreen extends StatelessWidget {
                 Expanded(
                   child: Center(
                     child: Text(
-                      isFavorite ? 'Favorilerde' : 'Favorilere\nEkle',
+                      'Favori',
                       textAlign: TextAlign.center,
-                      maxLines: 2,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: isFavorite ? AppColors.error : AppColors.text,
-                        fontSize: 8.5,
-                        fontWeight: FontWeight.w800,
-                        height: 1.15,
+                      style: const TextStyle(
+                        color: AppColors.text,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                        height: 1,
                       ),
                     ),
                   ),
@@ -1039,19 +1012,35 @@ class ProductDetailScreen extends StatelessWidget {
           ),
         ],
       ),
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+      padding: const EdgeInsets.fromLTRB(
+        12,
+        _cardPaddingTop,
+        12,
+        _cardPaddingBottom,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(child: _buildGallery(context)),
-          const SizedBox(height: 6),
-          SizedBox(height: _titleBlockHeight, child: _buildTitleBlock(context)),
-          const SizedBox(height: 8),
-          SizedBox(height: _metaRowHeight, child: _buildMetaRow()),
-          const SizedBox(height: 10),
-          const _DashedDivider(),
-          const SizedBox(height: 10),
-          SizedBox(height: _priceBlockHeight, child: _buildPriceRow(context)),
+          Expanded(
+            child: ClipRect(child: _buildGallery(context)),
+          ),
+          const SizedBox(height: _afterGalleryGap),
+          SizedBox(
+            height: _titleBlockHeight,
+            child: ClipRect(child: _buildTitleBlock(context)),
+          ),
+          const SizedBox(height: _afterTitleGap),
+          SizedBox(
+            height: _metaRowHeight,
+            child: ClipRect(child: _buildMetaRow()),
+          ),
+          const SizedBox(height: _afterMetaGap),
+          const SizedBox(height: _dividerHeight, child: _DashedDivider()),
+          const SizedBox(height: _afterDividerGap),
+          SizedBox(
+            height: _priceBlockHeight,
+            child: ClipRect(child: _buildPriceRow(context)),
+          ),
         ],
       ),
     );
@@ -1066,25 +1055,25 @@ class ProductDetailScreen extends StatelessWidget {
   }
 
   Widget _buildTitleBlock(BuildContext context) {
-    return GestureDetector(
-      onTap: () => _openFeatureProducts(context, openFeatureSheet: true),
-      behavior: HitTestBehavior.opaque,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            _productTitle,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: AppColors.text,
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              height: 1.2,
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          _productTitle,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: AppColors.text,
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            height: 1.2,
           ),
-          const SizedBox(height: 4),
-          Text(
+        ),
+        const SizedBox(height: 4),
+        GestureDetector(
+          onTap: () => _openBrandProducts(context),
+          behavior: HitTestBehavior.opaque,
+          child: Text(
             _productBrand,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -1094,8 +1083,8 @@ class ProductDetailScreen extends StatelessWidget {
               fontWeight: FontWeight.w700,
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -1149,28 +1138,32 @@ class ProductDetailScreen extends StatelessWidget {
   static const double _priceLineGap = 6;
 
   Widget _buildPriceRow(BuildContext context) {
+    final showOldPrice = _productOldPrice > _productUnitPrice;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          '${formatProductPrice(_productOldPrice, withDecimals: false).replaceAll('₺', '').trim()} ₺',
-          style: const TextStyle(
-            color: AppColors.subText,
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            decoration: TextDecoration.lineThrough,
-            decorationColor: AppColors.subText,
-            height: 1.1,
+        if (showOldPrice) ...[
+          Text(
+            '${formatProductPrice(_productOldPrice, withDecimals: false).replaceAll('₺', '').trim()} ₺',
+            style: const TextStyle(
+              color: AppColors.subText,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              decoration: TextDecoration.lineThrough,
+              decorationColor: AppColors.subText,
+              height: 1.1,
+            ),
           ),
-        ),
-        const SizedBox(height: _priceLineGap),
+          const SizedBox(height: _priceLineGap),
+        ],
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Text(
               '${formatProductPrice(_productUnitPrice, withDecimals: false).replaceAll('₺', '').trim()} ₺',
               style: const TextStyle(
-                color: AppColors.warning,
+                color: AppColors.statNumber,
                 fontSize: 21,
                 fontWeight: FontWeight.w900,
                 height: 1,
@@ -1232,137 +1225,11 @@ class ProductDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildFeatureExplanations(BuildContext context) {
-    return StreamBuilder<List<AppProductAdvantage>>(
-      stream: ProductAdvantageRepository.instance.watchAll(activeOnly: true),
-      builder: (context, snapshot) {
-        final selectedIds = product?.productAdvantageIds;
-        final catalog = snapshot.data ?? const <AppProductAdvantage>[];
-        final items = ProductAdvantageRepository.orderedForProduct(
-          selectedIds: selectedIds,
-          catalog: catalog,
-        );
-        if (items.isEmpty) return const SizedBox.shrink();
-        return Container(
-          width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
-          decoration: _boxDecoration,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Ürün Özellikleri',
-                style: TextStyle(
-                  color: AppColors.text,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 10),
-              for (int i = 0; i < items.length; i++) ...[
-                if (i > 0) const SizedBox(height: _sectionGap),
-                _buildAdvantageRow(context, items[i]),
-              ],
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildAdvantageRow(BuildContext context, AppProductAdvantage item) {
-    final statValue = _advantageStatValue(item);
-    final isStat = _showsAsStat(item);
-    final explanation = ProductAdvantageRepository.explanationFor(item);
-    return GestureDetector(
-      onTap: () => _openAdvantageGuide(context, item),
-      behavior: HitTestBehavior.opaque,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: _accent, width: 1),
-            ),
-            child: _advantageImage(item),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  isStat
-                      ? '${item.name}  ${statValue ?? '%42'}'
-                      : item.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppColors.text,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    height: 1.2,
-                  ),
-                ),
-                if (explanation.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    explanation,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.subText,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      height: 1.3,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _advantageImage(AppProductAdvantage item) {
-    const fallback = Icon(
-      Icons.pets_rounded,
-      size: 22,
-      color: AppColors.primary,
-    );
-    final imageUrl = ProductAdvantageRepository.displayImageUrl(item);
-    final assetPath = ProductAdvantageRepository.displayAssetPath(item);
-    if (imageUrl.isNotEmpty) {
-      return buildProductImage(
-        imageUrl,
-        fit: BoxFit.contain,
-        filterQuality: FilterQuality.high,
-        errorWidget: assetPath.isEmpty
-            ? fallback
-            : buildProductImage(
-                assetPath,
-                fit: BoxFit.contain,
-                errorWidget: fallback,
-              ),
-      );
-    }
-    if (assetPath.isEmpty) return fallback;
-    return buildProductImage(
-      assetPath,
-      fit: BoxFit.contain,
-      filterQuality: FilterQuality.high,
-      errorWidget: fallback,
-    );
-  }
-
   Widget _buildDescriptionBox() {
+    final text = _productDescription.trim();
+    if (text.isEmpty || ProductIngredients.looksLike(text)) {
+      return const SizedBox.shrink();
+    }
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
@@ -1380,7 +1247,7 @@ class ProductDetailScreen extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            _productDescription,
+            text,
             style: const TextStyle(
               color: AppColors.subText,
               fontSize: 11.5,
@@ -1393,10 +1260,70 @@ class ProductDetailScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildIngredientsBox() {
+    final sections = ProductIngredients.parse(_productIngredients);
+    if (sections.isEmpty) return const SizedBox.shrink();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+      decoration: _boxDecoration,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'İçindekiler',
+            style: TextStyle(
+              color: AppColors.text,
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          for (final section in sections) ...[
+            const SizedBox(height: 10),
+            Text(
+              section.title,
+              style: const TextStyle(
+                color: AppColors.text,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              section.body,
+              style: const TextStyle(
+                color: AppColors.subText,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w500,
+                height: 1.45,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildTogetherBox(BuildContext context) {
-    return _buildExampleRelated(
-      builder: (items) {
-        return Container(
+    final ids = [
+      for (final id in product?.boughtTogetherIds ?? const <String>[])
+        if (id.trim().isNotEmpty && id.trim() != product?.id) id.trim(),
+    ];
+    if (ids.isEmpty) return const SizedBox.shrink();
+    return StreamBuilder<List<MarketProductData>>(
+      stream: ProductRepository.instance.watchActiveProducts(),
+      initialData: ProductRepository.instance.cachedActiveProducts(),
+      builder: (context, snapshot) {
+        final catalog = snapshot.data ?? const <MarketProductData>[];
+        final byId = {for (final item in catalog) item.id: item};
+        final items = <_RelatedProduct>[
+          for (final id in ids)
+            if (byId[id] != null) _relatedFrom(byId[id]!),
+        ];
+        if (items.isEmpty) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(top: _sectionGap),
+          child: Container(
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
           decoration: _boxDecoration,
@@ -1429,6 +1356,7 @@ class ProductDetailScreen extends StatelessWidget {
               ),
             ],
           ),
+        ),
         );
       },
     );
@@ -1508,6 +1436,14 @@ class ProductDetailScreen extends StatelessWidget {
                       iconSize: 12,
                     ),
                   ),
+                  if (product.animalProteinLabel.isNotEmpty)
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      child: AnimalProteinBadge(
+                        label: product.animalProteinLabel,
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -1541,7 +1477,7 @@ class ProductDetailScreen extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color: _accent,
+                      color: AppColors.discount,
                       fontSize: 12,
                       fontWeight: FontWeight.w900,
                     ),
@@ -1621,6 +1557,14 @@ class ProductDetailScreen extends StatelessWidget {
                       iconSize: 11,
                     ),
                   ),
+                  if (product.animalProteinLabel.isNotEmpty)
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: AnimalProteinBadge(
+                        label: product.animalProteinLabel,
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -1657,7 +1601,7 @@ class ProductDetailScreen extends StatelessWidget {
                       Text(
                         product.price,
                         style: const TextStyle(
-                          color: _accent,
+                          color: AppColors.discount,
                           fontSize: 13,
                           fontWeight: FontWeight.w900,
                         ),
@@ -2082,6 +2026,7 @@ class _SideBadge {
     required this.label,
     required this.iconPath,
     this.imageUrl,
+    this.detailImageUrl,
     this.feature,
     this.advantage,
     this.isFavoriteAction = false,
@@ -2098,6 +2043,7 @@ class _SideBadge {
   final String label;
   final String iconPath;
   final String? imageUrl;
+  final String? detailImageUrl;
   final String? feature;
   final AppProductAdvantage? advantage;
   final bool isFavoriteAction;
@@ -2130,6 +2076,8 @@ class _RelatedProduct {
   final MarketProductData? source;
 
   String get id => source?.id ?? 'related-$title-$weight';
+
+  String get animalProteinLabel => source?.animalProteinLabel ?? '';
 }
 
 class _DashedDivider extends StatelessWidget {
@@ -2207,20 +2155,22 @@ class _ProductHeroGalleryState extends State<_ProductHeroGallery> {
                           return GestureDetector(
                             onTap: () => widget.onOpenFullscreen(index),
                             behavior: HitTestBehavior.opaque,
-                            child: buildProductImage(
-                              images[index],
-                              fit: BoxFit.contain,
-                              width: double.infinity,
-                              height: double.infinity,
-                              alignment: Alignment.center,
-                              filterQuality: FilterQuality.medium,
-                              useHtmlElement: false,
-                              cacheWidth: productPhotoCachePx,
-                              errorWidget: const Center(
-                                child: Icon(
-                                  Icons.image_outlined,
-                                  size: 72,
-                                  color: AppColors.subText,
+                            child: SizedBox.expand(
+                              child: buildProductImage(
+                                images[index],
+                                fit: BoxFit.contain,
+                                width: double.infinity,
+                                height: double.infinity,
+                                alignment: Alignment.center,
+                                filterQuality: FilterQuality.medium,
+                                useHtmlElement: false,
+                                cacheWidth: productPhotoCachePx,
+                                errorWidget: const Center(
+                                  child: Icon(
+                                    Icons.image_outlined,
+                                    size: 72,
+                                    color: AppColors.subText,
+                                  ),
                                 ),
                               ),
                             ),
@@ -2236,7 +2186,7 @@ class _ProductHeroGalleryState extends State<_ProductHeroGallery> {
                 width: 46,
                 padding: const EdgeInsets.symmetric(vertical: 7),
                 decoration: BoxDecoration(
-                  color: AppColors.warning,
+                  color: AppColors.statNumber,
                   borderRadius: BorderRadius.circular(18),
                 ),
                 child: const Column(

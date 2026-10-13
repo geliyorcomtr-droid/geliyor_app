@@ -130,7 +130,7 @@ const defaultCoupons = <AppCoupon>[
     id: 'hosgeldin-50',
     code: 'HOSGELDIN50',
     title: 'Hoş geldin kuponu',
-    description: 'İlk siparişlerde 50 TL indirim.',
+    description: 'Yalnızca ilk siparişte 50 TL indirim.',
     type: CouponTypes.amount,
     value: 50,
     minSubtotal: 250,
@@ -168,6 +168,7 @@ class CouponRepository {
   CouponRepository._();
   static final CouponRepository instance = CouponRepository._();
 
+  static const welcomeCouponId = 'hosgeldin-50';
   static const earnedRewardId = 'dost-25';
   static const foodReminderCouponId = 'mama-25';
 

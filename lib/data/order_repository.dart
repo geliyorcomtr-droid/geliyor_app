@@ -5,8 +5,10 @@ import 'package:geliyor_app/data/firestore_collections.dart';
 import 'package:geliyor_app/state/address_store.dart';
 import 'package:geliyor_app/state/auth_store.dart';
 import 'package:geliyor_app/state/cart_store.dart';
+import 'package:geliyor_app/data/user_doc_persist.dart';
 import 'package:geliyor_app/state/coupon_store.dart';
 import 'package:geliyor_app/utils/order_no.dart';
+import 'package:geliyor_app/utils/subscription_discount.dart';
 
 class OrderRepository {
   OrderRepository._();
@@ -29,9 +31,16 @@ class OrderRepository {
     final invoice = AddressStore.instance.defaultInvoiceAddress ?? address;
     final cart = CartStore.instance;
     final coupons = CouponStore.instance;
+    await coupons.ensureLoaded();
+    coupons.syncWelcome(cart.cartTotal);
     final coupon = coupons.selected;
     final couponDiscount = coupons.discountFor(cart.cartTotal);
-    final total = coupons.payableTotal(cart.cartTotal);
+    final subscriptionDiscount = SubscriptionDiscount.amountFor(cart.cartTotal);
+    final total = SubscriptionDiscount.payable(
+      subtotal: cart.cartTotal,
+      couponDiscount: couponDiscount,
+      courierFee: cart.courierFee,
+    );
     final catalogIds = {
       for (final item in items) catalogProductIdFromCartItem(item),
     }.where((id) => id.isNotEmpty).toList();
@@ -59,6 +68,9 @@ class OrderRepository {
       OrderFields.couponCode: coupon?.code ?? '',
       OrderFields.couponTitle: coupon?.title ?? '',
       OrderFields.couponDiscount: couponDiscount,
+      OrderFields.subscriptionTitle:
+          subscriptionDiscount > 0 ? SubscriptionDiscount.name : '',
+      OrderFields.subscriptionDiscount: subscriptionDiscount,
       OrderFields.total: total,
       OrderFields.customerName:
           address.contactName.trim().isNotEmpty
@@ -113,6 +125,12 @@ class OrderRepository {
       OrderFields.updatedAt: FieldValue.serverTimestamp(),
       OrderFields.orderNo: OrderNo.fromId(ref.id),
     });
+    final earned = (total * 0.01).round();
+    if (earned > 0) {
+      await UserDocPersist.merge({
+        UserFields.dostPoints: FieldValue.increment(earned),
+      });
+    }
     return ref.id;
   }
 
@@ -165,6 +183,27 @@ class OrderRepository {
       });
       return list;
     });
+  }
+
+  Future<({double total, List<Map<String, dynamic>> gifts})?> giftChoice(
+    String orderId,
+  ) async {
+    final id = orderId.trim();
+    if (id.isEmpty) return null;
+    final snap = await _col.doc(id).get();
+    if (!snap.exists) return null;
+    final data = snap.data() ?? {};
+    final raw = data[OrderFields.gifts];
+    final gifts = <Map<String, dynamic>>[];
+    if (raw is List) {
+      for (final item in raw) {
+        if (item is Map) gifts.add(Map<String, dynamic>.from(item));
+      }
+    }
+    return (
+      total: (data[OrderFields.total] as num?)?.toDouble() ?? 0,
+      gifts: gifts,
+    );
   }
 
   Future<String> latestOrderId() async {
@@ -224,6 +263,10 @@ class PlacedOrder {
     required this.items,
     this.gifts = const [],
     this.createdAt,
+    this.paymentMethod = '',
+    this.address = '',
+    this.city = '',
+    this.district = '',
   });
 
   final String id;
@@ -233,6 +276,21 @@ class PlacedOrder {
   final List<PlacedOrderLine> items;
   final List<String> gifts;
   final DateTime? createdAt;
+  final String paymentMethod;
+  final String address;
+  final String city;
+  final String district;
+
+  String get addressLabel {
+    final place = [
+      district.trim(),
+      city.trim(),
+    ].where((part) => part.isNotEmpty).join(' / ');
+    final line = address.trim();
+    if (line.isEmpty) return place;
+    if (place.isEmpty) return line;
+    return '$line · $place';
+  }
 
   factory PlacedOrder.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? {};
@@ -254,6 +312,10 @@ class PlacedOrder {
       items: items,
       gifts: giftTitlesFromRaw(data[OrderFields.gifts]),
       createdAt: created is Timestamp ? created.toDate() : null,
+      paymentMethod: (data[OrderFields.paymentMethod] as String?)?.trim() ?? '',
+      address: (data[OrderFields.address] as String?)?.trim() ?? '',
+      city: (data[OrderFields.city] as String?)?.trim() ?? '',
+      district: (data[OrderFields.district] as String?)?.trim() ?? '',
     );
   }
 }

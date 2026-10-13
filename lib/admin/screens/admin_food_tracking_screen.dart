@@ -117,6 +117,22 @@ class _AdminFoodTrackingScreenState extends State<AdminFoodTrackingScreen> {
     _factorField('clampLow', f.clampLow);
     _factorField('clampHigh', f.clampHigh);
 
+    final k = tables.kittenFactors;
+    _factorField('kit_neuteredYes', k.neuteredYes);
+    _factorField('kit_neuteredNo', k.neuteredNo);
+    _factorField('kit_bodyThin', k.bodyThin);
+    _factorField('kit_bodyIdeal', k.bodyIdeal);
+    _factorField('kit_bodyHeavy', k.bodyHeavy);
+    _factorField('kit_activityLow', k.activityLow);
+    _factorField('kit_activityMid', k.activityMid);
+    _factorField('kit_activityHigh', k.activityHigh);
+    _factorField('kit_extraNone', k.extraNone);
+    _factorField('kit_extraTreat', k.extraTreat);
+    _factorField('kit_extraWet', k.extraWet);
+    _factorField('kit_extraBoth', k.extraBoth);
+    _factorField('kit_clampLow', k.clampLow);
+    _factorField('kit_clampHigh', k.clampHigh);
+
     final m = tables.miniAdultFactors;
     _factorField('mini_neuteredYes', m.neuteredYes);
     _factorField('mini_neuteredNo', m.neuteredNo);
@@ -232,6 +248,22 @@ class _AdminFoodTrackingScreenState extends State<AdminFoodTrackingScreen> {
             extraBoth: _readFactor('extraBoth', d.extraBoth),
             clampLow: _readFactor('clampLow', d.clampLow),
             clampHigh: _readFactor('clampHigh', d.clampHigh),
+          ),
+          kittenFactors: FeedingFactors(
+            neuteredYes: _readFactor('kit_neuteredYes', d.neuteredYes),
+            neuteredNo: _readFactor('kit_neuteredNo', d.neuteredNo),
+            bodyThin: _readFactor('kit_bodyThin', d.bodyThin),
+            bodyIdeal: _readFactor('kit_bodyIdeal', d.bodyIdeal),
+            bodyHeavy: _readFactor('kit_bodyHeavy', d.bodyHeavy),
+            activityLow: _readFactor('kit_activityLow', d.activityLow),
+            activityMid: _readFactor('kit_activityMid', d.activityMid),
+            activityHigh: _readFactor('kit_activityHigh', d.activityHigh),
+            extraNone: _readFactor('kit_extraNone', d.extraNone),
+            extraTreat: _readFactor('kit_extraTreat', d.extraTreat),
+            extraWet: _readFactor('kit_extraWet', d.extraWet),
+            extraBoth: _readFactor('kit_extraBoth', d.extraBoth),
+            clampLow: _readFactor('kit_clampLow', d.clampLow),
+            clampHigh: _readFactor('kit_clampHigh', d.clampHigh),
           ),
           miniAdultFactors: MiniAdultDogFactors(
             neuteredYes: _readFactor('mini_neuteredYes', md.neuteredYes),
@@ -373,24 +405,19 @@ class _AdminFoodTrackingScreenState extends State<AdminFoodTrackingScreen> {
         ),
         const SizedBox(height: 18),
         _tableCard(),
-        if (_profile == 0 ||
-            _profile == 2 ||
-            _profile == 3 ||
-            _profile == 4 ||
-            _profile == 5) ...[
-          const SizedBox(height: 18),
-          _FactorsCard(
-            kind: switch (_profile) {
-              2 => _FactorKind.adultDog,
-              3 => _FactorKind.standardPuppy,
-              4 => _FactorKind.miniAdult,
-              5 => _FactorKind.miniPuppy,
-              _ => _FactorKind.cat,
-            },
-            enabled: !_saving,
-            field: _factorField,
-          ),
-        ],
+        const SizedBox(height: 18),
+        _FactorsCard(
+          kind: switch (_profile) {
+            1 => _FactorKind.kitten,
+            2 => _FactorKind.adultDog,
+            3 => _FactorKind.standardPuppy,
+            4 => _FactorKind.miniAdult,
+            5 => _FactorKind.miniPuppy,
+            _ => _FactorKind.cat,
+          },
+          enabled: !_saving,
+          field: _factorField,
+        ),
         const SizedBox(height: 16),
         Align(
           alignment: Alignment.centerRight,
@@ -485,6 +512,7 @@ class _FormulaCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final kitten = profile == 1;
     final adultDog = profile == 2;
     final standardPuppy = profile == 3;
     final miniAdult = profile == 4;
@@ -509,7 +537,9 @@ class _FormulaCard extends StatelessWidget {
                         ? 'Yetişkin köpek formülü'
                         : miniAdult
                             ? 'Mini Irk Yetişkin formülü'
-                            : 'Yetişkin kedi formülü',
+                            : kitten
+                                ? 'Yavru kedi formülü'
+                                : 'Yetişkin kedi formülü',
             style: const TextStyle(
               fontWeight: FontWeight.w800,
               fontSize: 15,
@@ -527,6 +557,9 @@ class _FormulaCard extends StatelessWidget {
                     : adultDog || miniAdult
                     ? 'Baz gram × kısır × aktivite × vücut × ek gıda\n'
                         'Sonuç tam grama yuvarlanır. Paket günü = alınan mama gramı / günlük gram.'
+                    : kitten
+                    ? 'Kilo × yaş dönemi baz gram × kısır × vücut × aktivite × ek besin\n'
+                        'Satırlar 0,5–5 kg, sütunlar 1–12 ay. Sonuç temel tüketimin %75–%125 aralığında, tam grama yuvarlanır.'
                     : 'Temel gram × kısır × vücut × aktivite × ek besin\n'
                         'Sonuç temel tüketimin %75–%125 aralığında, tam grama yuvarlanır.\n'
                         'Paket günü = alınan mama gramı / günlük gram.',
@@ -711,7 +744,7 @@ class _KittenGramsGrid extends StatelessWidget {
   }
 }
 
-enum _FactorKind { cat, adultDog, standardPuppy, miniAdult, miniPuppy }
+enum _FactorKind { cat, kitten, adultDog, standardPuppy, miniAdult, miniPuppy }
 
 class _MiniPuppyGramsGrid extends StatelessWidget {
   const _MiniPuppyGramsGrid({
@@ -1080,6 +1113,7 @@ class _FactorsCard extends StatelessWidget {
               _FactorKind.standardPuppy => 'Çarpanlar (Köpek Yavru)',
               _FactorKind.miniAdult => 'Çarpanlar (Mini Irk Yetişkin)',
               _FactorKind.miniPuppy => 'Çarpanlar (Mini Irk Yavru)',
+              _FactorKind.kitten => 'Çarpanlar (yavru kedi)',
               _FactorKind.cat => 'Çarpanlar (yetişkin kedi)',
             },
             style: const TextStyle(
@@ -1191,6 +1225,21 @@ class _FactorsCard extends StatelessWidget {
             _factorRow('Ödül', field('pup_extraTreat', p.extraTreat)),
             _factorRow('Yaş mama', field('pup_extraWet', p.extraWet)),
             _factorRow('Her ikisi', field('pup_extraBoth', p.extraBoth)),
+          ] else if (kind == _FactorKind.kitten) ...[
+            _factorRow('Kısır evet', field('kit_neuteredYes', d.neuteredYes)),
+            _factorRow('Kısır hayır', field('kit_neuteredNo', d.neuteredNo)),
+            _factorRow('Vücut zayıf', field('kit_bodyThin', d.bodyThin)),
+            _factorRow('Vücut ideal', field('kit_bodyIdeal', d.bodyIdeal)),
+            _factorRow('Vücut kilolu', field('kit_bodyHeavy', d.bodyHeavy)),
+            _factorRow('Aktivite düşük', field('kit_activityLow', d.activityLow)),
+            _factorRow('Aktivite orta', field('kit_activityMid', d.activityMid)),
+            _factorRow('Aktivite yüksek', field('kit_activityHigh', d.activityHigh)),
+            _factorRow('Ek besin yok', field('kit_extraNone', d.extraNone)),
+            _factorRow('Ödül', field('kit_extraTreat', d.extraTreat)),
+            _factorRow('Yaş mama', field('kit_extraWet', d.extraWet)),
+            _factorRow('Her ikisi', field('kit_extraBoth', d.extraBoth)),
+            _factorRow('Alt sınır', field('kit_clampLow', d.clampLow)),
+            _factorRow('Üst sınır', field('kit_clampHigh', d.clampHigh)),
           ] else ...[
             _factorRow('Kısır evet', field('neuteredYes', d.neuteredYes)),
             _factorRow('Kısır hayır', field('neuteredNo', d.neuteredNo)),

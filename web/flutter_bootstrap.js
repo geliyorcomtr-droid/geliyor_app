@@ -11,4 +11,11 @@ if (_flutter.buildConfig && _flutter.buildConfig.builds) {
   }
 }
 
-_flutter.loader.load();
+_flutter.loader.load({
+  onEntrypointLoaded: async function (engineInitializer) {
+    var appRunner = await engineInitializer.initializeEngine();
+    var boot = document.getElementById('admin-boot');
+    if (boot) boot.remove();
+    await appRunner.runApp();
+  }
+});

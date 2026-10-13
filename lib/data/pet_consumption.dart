@@ -63,6 +63,10 @@ abstract final class PetConsumption {
       return KittenFeedingGuide.dailyGramsFor(
         weightLabel: pet.weight,
         months: months,
+        bodyType: pet.bodyType,
+        activityLevel: pet.activityLevel,
+        neutered: pet.neutered,
+        extraFood: pet.extraFood,
       );
     }
     return CatFeedingGuide.dailyGramsFor(

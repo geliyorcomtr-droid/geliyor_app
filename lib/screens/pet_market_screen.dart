@@ -1,13 +1,19 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
+import 'package:geliyor_app/admin/category_repository.dart';
+import 'package:geliyor_app/data/health_product_groups.dart';
+import 'package:geliyor_app/data/product_advantage_repository.dart';
 import 'package:geliyor_app/data/product_repository.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
+import 'package:geliyor_app/screens/brands_screen.dart';
 import 'package:geliyor_app/screens/cart_screen.dart';
 import 'package:geliyor_app/screens/pet_market_products_screen.dart';
 import 'package:geliyor_app/screens/product_detail_screen.dart';
 import 'package:geliyor_app/state/cart_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/utils/advantage_search.dart';
+import 'package:geliyor_app/utils/category_icon.dart';
+import 'package:geliyor_app/utils/market_product_helpers.dart';
 import 'package:geliyor_app/utils/product_image.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
@@ -55,50 +61,11 @@ class _PetMarketScreenState extends State<PetMarketScreen> {
     ),
   ];
 
-  static const _catCategoryIcons = [
-    _CategoryIcon('Mama', 'assets/images/petmarket_mama.png'),
-    _CategoryIcon('Yavru', 'assets/images/petmarket_yavru.png'),
-    _CategoryIcon('Kum', 'assets/images/petmarket_kum.png'),
-    _CategoryIcon('Ödül', 'assets/images/petmarket_odul.png'),
-    _CategoryIcon('Bakım', 'assets/images/petmarket_bakim.png'),
-    _CategoryIcon('Oyuncak', 'assets/images/petmarket_oyun.png'),
-    _CategoryIcon('Sağlık', 'assets/images/petmarket_saglik.png'),
-    _CategoryIcon('Taşıma', 'assets/images/petmarket_tasima.png'),
-  ];
-
-  static const _dogCategoryIcons = [
-    _CategoryIcon('Mama', 'assets/images/petmarket_mama.png'),
-    _CategoryIcon('Yavru', 'assets/images/petmarket_kopek_yavru.png'),
-    _CategoryIcon('Mini Irk', 'assets/images/petmarket_mini_irk.png'),
-    _CategoryIcon(
-      'Mini Irk Yavru',
-      'assets/images/petmarket_kopek_yavru.png',
-    ),
-    _CategoryIcon('Ödül', 'assets/images/petmarket_odul.png'),
-  ];
-
-  static const _smartCategoryIcons = [
-    _CategoryIcon('Akıllı Pet', 'assets/images/petmarket_akilli_ikon.png'),
-  ];
-
-  List<_CategoryIcon> get _categoryIcons {
-    if (selectedMainCategory == 'dog') return _dogCategoryIcons;
-    if (selectedMainCategory == 'smart') return _smartCategoryIcons;
-    return _catCategoryIcons;
-  }
-
-  String _defaultSubCategoryFor(String mainCategory) {
-    if (mainCategory == 'smart') return 'Akıllı Pet';
-    return 'Mama';
-  }
-
   @override
   void initState() {
     super.initState();
     selectedMainCategory = widget.initialMainCategory;
-    selectedSubCategory =
-        widget.initialSubCategory ??
-        _defaultSubCategoryFor(selectedMainCategory);
+    selectedSubCategory = widget.initialSubCategory ?? '';
   }
 
   @override
@@ -122,14 +89,22 @@ class _PetMarketScreenState extends State<PetMarketScreen> {
     }
     if (q.contains('oyuncak') || q.contains('oyun')) return 'Oyuncak';
     if (q.contains('bakım') || q.contains('bakim')) return 'Bakım';
-    if (q.contains('sağlık') || q.contains('saglik') || q.contains('vitamin')) {
-      return 'Sağlık';
+    if (q.contains('malt')) return HealthProductGroup.malt.categoryTitle;
+    if (q.contains('takviye')) {
+      return HealthProductGroup.supplement.categoryTitle;
     }
+    if (q.contains('vitamin')) return HealthProductGroup.vitamin.categoryTitle;
+    if (q.contains('sağlık') || q.contains('saglik')) return 'Sağlık';
     if (q.contains('taşıma') || q.contains('tasima') || q.contains('kafes')) {
       return 'Taşıma';
     }
     if (q.contains('mini')) return 'Mini Irk';
-    if (q.contains('mama') || q.contains('yem')) return 'Mama';
+    if (q.contains('yetişkin') ||
+        q.contains('yetiskin') ||
+        q.contains('mama') ||
+        q.contains('yem')) {
+      return 'Yetişkin';
+    }
     return null;
   }
 
@@ -158,8 +133,28 @@ class _PetMarketScreenState extends State<PetMarketScreen> {
     );
   }
 
+  int _homeRank(MarketProductData product) {
+    final raw = product.preferredRank.replaceAll(RegExp(r'[^0-9]'), '');
+    final rank = int.tryParse(raw);
+    if (rank != null && rank > 0) return rank;
+    return 9999;
+  }
+
   List<MarketProductData> _mergedProducts(List<MarketProductData> remote) {
-    return remote.take(6).toList();
+    final items = [...remote];
+    items.sort((a, b) {
+      final rank = _homeRank(a).compareTo(_homeRank(b));
+      if (rank != 0) return rank;
+      final aCreated = a.createdAt;
+      final bCreated = b.createdAt;
+      if (aCreated != null && bCreated != null) {
+        return bCreated.compareTo(aCreated);
+      }
+      if (aCreated != null) return -1;
+      if (bCreated != null) return 1;
+      return 0;
+    });
+    return items;
   }
 
   String get _sectionTitle {
@@ -173,7 +168,15 @@ class _PetMarketScreenState extends State<PetMarketScreen> {
     return StreamBuilder<List<MarketProductData>>(
       stream: ProductRepository.instance.watchMarketProducts(
         mainCategory: selectedMainCategory,
-        subCategory: selectedSubCategory,
+        subCategory: selectedSubCategory.trim().isEmpty
+            ? null
+            : selectedSubCategory,
+      ),
+      initialData: ProductRepository.instance.cachedMarketProducts(
+        mainCategory: selectedMainCategory,
+        subCategory: selectedSubCategory.trim().isEmpty
+            ? null
+            : selectedSubCategory,
       ),
       builder: (context, snapshot) {
         final products = _mergedProducts(snapshot.data ?? const []);
@@ -405,7 +408,7 @@ class _PetMarketScreenState extends State<PetMarketScreen> {
       onTap: () {
         setState(() {
           selectedMainCategory = menu.id;
-          selectedSubCategory = _defaultSubCategoryFor(menu.id);
+          selectedSubCategory = '';
         });
       },
       child: AnimatedContainer(
@@ -486,34 +489,115 @@ class _PetMarketScreenState extends State<PetMarketScreen> {
   }
 
   Widget _buildCategories() {
-    const gap = 6.0;
-    const visibleCount = 6;
-    final icons = _categoryIcons;
-    final contentWidth =
-        AppPageFrame.width - (AppPageFrame.contentHorizontalPadding * 2);
-    final itemWidth = (contentWidth - gap * (visibleCount - 1)) / visibleCount;
+    final repo = CategoryRepository.instance;
+    return StreamBuilder<List<AdminMainCategory>>(
+      stream: repo.watchAll(),
+      initialData: repo.ready ? repo.cached : null,
+      builder: (context, categorySnap) {
+        if (!categorySnap.hasData) {
+          return const SizedBox(height: 118);
+        }
+        return StreamBuilder<List<AppProductAdvantage>>(
+          stream: ProductAdvantageRepository.instance.watchAll(activeOnly: true),
+          initialData: ProductAdvantageRepository.instance.cached,
+          builder: (context, snapshot) {
+            final catalog = snapshot.data ?? const <AppProductAdvantage>[];
+            final icons = _iconsFromCategories(
+              categorySnap.data,
+              catalog,
+            );
+            if (icons.isEmpty) return const SizedBox(height: 118);
+            return _categoryRow(icons);
+          },
+        );
+      },
+    );
+  }
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      physics: icons.length > visibleCount
-          ? const BouncingScrollPhysics()
-          : const NeverScrollableScrollPhysics(),
-      child: Row(
-        children: [
-          for (int i = 0; i < icons.length; i++) ...[
-            if (i > 0) const SizedBox(width: gap),
-            SizedBox(width: itemWidth, child: _buildCategoryItem(icons[i])),
+  List<_CategoryIcon> _iconsFromCategories(
+    List<AdminMainCategory>? mains,
+    List<AppProductAdvantage> catalog,
+  ) {
+    AdminMainCategory? main;
+    if (mains != null) {
+      for (final item in mains) {
+        if (item.id == selectedMainCategory) {
+          main = item;
+          break;
+        }
+      }
+    }
+    final subs = main?.subcategories ?? const <AdminSubCategory>[];
+    return [
+      for (final sub in subs)
+        if (sub.title.trim().isNotEmpty)
+          _CategoryIcon(
+            sub.title.trim(),
+            categoryIconPath(
+              mainId: selectedMainCategory,
+              title: sub.title,
+              imageUrl: sub.imageUrl,
+              catalog: catalog,
+            ),
+          ),
+    ];
+  }
+
+  Widget _categoryRow(List<_CategoryIcon> icons) {
+    const gap = 6.0;
+    const columns = 6;
+    final rows = <List<_CategoryIcon>>[
+      for (var start = 0; start < icons.length; start += columns)
+        icons.sublist(start, (start + columns).clamp(0, icons.length)),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final itemWidth =
+            (constraints.maxWidth - gap * (columns - 1)) / columns;
+        return Column(
+          children: [
+            for (var row = 0; row < rows.length; row++) ...[
+              if (row > 0) const SizedBox(height: 8),
+              Row(
+                children: [
+                  for (var i = 0; i < rows[row].length; i++) ...[
+                    if (i > 0) const SizedBox(width: gap),
+                    rows[row].length == columns
+                        ? Expanded(
+                            child: _buildCategoryItem(rows[row][i]),
+                          )
+                        : SizedBox(
+                            width: itemWidth,
+                            child: _buildCategoryItem(rows[row][i]),
+                          ),
+                  ],
+                ],
+              ),
+            ],
           ],
-        ],
-      ),
+        );
+      },
     );
   }
 
   Widget _buildCategoryItem(_CategoryIcon category) {
     final selected = selectedSubCategory == category.title;
 
+    final isBrands = category.title.trim().toLowerCase() == 'markalar';
     return GestureDetector(
-      onTap: () => setState(() => selectedSubCategory = category.title),
+      onTap: () {
+        if (isBrands) {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const BrandsScreen()),
+          );
+          return;
+        }
+        setState(() {
+          selectedSubCategory =
+              selectedSubCategory == category.title ? '' : category.title;
+        });
+      },
       child: Column(
         children: [
           AnimatedContainer(
@@ -529,10 +613,10 @@ class _PetMarketScreenState extends State<PetMarketScreen> {
                 width: selected ? 0.8 : 1,
               ),
             ),
-            child: Image.asset(
+            child: buildProductImage(
               category.imagePath,
               fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) => const Icon(
+              errorWidget: const Icon(
                 Icons.category_outlined,
                 color: AppColors.success,
                 size: 20,
@@ -582,6 +666,9 @@ class _PetMarketScreenState extends State<PetMarketScreen> {
               MaterialPageRoute(
                 builder: (_) => PetMarketProductsScreen(
                   initialMainCategory: selectedMainCategory,
+                  initialSubCategory: selectedSubCategory.trim().isEmpty
+                      ? null
+                      : selectedSubCategory,
                 ),
               ),
             );
@@ -607,19 +694,7 @@ class _PetMarketScreenState extends State<PetMarketScreen> {
 
   Widget _buildProductGrid(List<MarketProductData> products) {
     if (products.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 16),
-        child: Center(
-          child: Text(
-            'Bu kategoride ürün bulunamadı.',
-            style: TextStyle(
-              color: AppColors.subText,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      );
+      return marketProductsPlaceholder(isEmpty: true);
     }
 
     const columns = 3;

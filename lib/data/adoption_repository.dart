@@ -26,6 +26,7 @@ class AdoptionListing {
     this.indoorOnly = false,
     this.status = AdoptionStatuses.pending,
     this.rejectReason = '',
+    this.active = true,
     this.createdAt,
   });
 
@@ -51,6 +52,7 @@ class AdoptionListing {
   final bool indoorOnly;
   final String status;
   final String rejectReason;
+  final bool active;
   final DateTime? createdAt;
 
   String get coverImage =>
@@ -115,6 +117,9 @@ class AdoptionListing {
           (data[AdoptionListingFields.status] as String?) ??
           AdoptionStatuses.pending,
       rejectReason: (data[AdoptionListingFields.rejectReason] as String?) ?? '',
+      active: data.containsKey(AdoptionListingFields.active)
+          ? data[AdoptionListingFields.active] == true
+          : true,
       createdAt: created is Timestamp ? created.toDate() : null,
     );
   }
@@ -141,6 +146,7 @@ class AdoptionListing {
     AdoptionListingFields.indoorOnly: indoorOnly,
     AdoptionListingFields.status: AdoptionStatuses.pending,
     AdoptionListingFields.rejectReason: '',
+    AdoptionListingFields.active: active,
     AdoptionListingFields.createdAt: FieldValue.serverTimestamp(),
     AdoptionListingFields.updatedAt: FieldValue.serverTimestamp(),
   };
@@ -162,7 +168,10 @@ class AdoptionRepository {
         )
         .snapshots()
         .map((snap) {
-          final list = snap.docs.map(AdoptionListing.fromDoc).toList()
+          final list = snap.docs
+              .map(AdoptionListing.fromDoc)
+              .where((item) => item.active)
+              .toList()
             ..sort((a, b) {
               final left = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
               final right =
@@ -241,6 +250,13 @@ class AdoptionRepository {
         await FirebaseStorage.instance.refFromURL(trimmed).delete();
       } catch (_) {}
     }
+  }
+
+  Future<void> setActive({required String id, required bool active}) {
+    return _col.doc(id).set({
+      AdoptionListingFields.active: active,
+      AdoptionListingFields.updatedAt: FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
   }
 
   Future<void> setStatus({

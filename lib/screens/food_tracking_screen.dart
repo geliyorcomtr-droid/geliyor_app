@@ -25,7 +25,44 @@ import 'package:geliyor_app/widgets/month_feeding_table.dart';
 import 'package:geliyor_app/widgets/standard_puppy_feeding_table.dart';
 
 class FoodTrackingScreen extends StatefulWidget {
-  const FoodTrackingScreen({super.key});
+  const FoodTrackingScreen({super.key, this.asSheet = false});
+
+  /// Akıllı Plan → Manuel Takip yarım sayfası.
+  final bool asSheet;
+
+  /// Siparişten otomatik takip ile aynı çerçeve yüksekliği.
+  static const double sheetFrameHeight = 312;
+
+  static Future<void> showSheet(BuildContext context) {
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        final media = MediaQuery.of(sheetContext);
+        return Align(
+          alignment: Alignment.bottomCenter,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: AppPageFrame.width,
+              maxHeight: media.size.height * 0.72,
+            ),
+            child: Material(
+              color: AppColors.surface,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(28),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: SizedBox(
+                height: sheetFrameHeight + media.padding.bottom,
+                child: const FoodTrackingScreen(asSheet: true),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   @override
   State<FoodTrackingScreen> createState() => _FoodTrackingScreenState();
@@ -44,7 +81,7 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
   static const int _maxKg = 19;
 
   /// Akıllı Plan → Mama Takibi / Hangi Mama rengi.
-  static const Color _accent = Color(0xFF8B5CF6);
+  static const Color _accent = AppColors.primary;
 
   Color get _soft => _accent.withValues(alpha: 0.12);
   Color get _line => _accent.withValues(alpha: 0.45);
@@ -208,6 +245,10 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
                 grams: KittenFeedingGuide.dailyGramsFor(
                       weightLabel: _guidePet?.weight,
                       months: row,
+                      bodyType: _guidePet?.bodyType,
+                      activityLevel: _guidePet?.activityLevel,
+                      neutered: _guidePet?.neutered,
+                      extraFood: _guidePet?.extraFood,
                     ) ??
                     0,
               ),
@@ -244,6 +285,8 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
         highlighted: _feedingRow,
         bodyType: _guidePet?.bodyType,
         activityLevel: _guidePet?.activityLevel,
+        neutered: _guidePet?.neutered,
+        extraFood: _guidePet?.extraFood,
       ),
     ];
   }
@@ -322,6 +365,7 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.asSheet) return _buildSheet(context);
     return Scaffold(
       backgroundColor: AppColors.background,
       body: AppPageFrame.standard(
@@ -405,6 +449,258 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
     );
   }
 
+  Widget _buildSheet(BuildContext context) {
+    final bottom = MediaQuery.of(context).padding.bottom;
+    return Stack(
+      children: [
+        Padding(
+          padding: EdgeInsets.fromLTRB(16, 8, 16, 12 + bottom),
+          child: ListenableBuilder(
+            listenable: PetStore.instance,
+            builder: (context, _) {
+              return Column(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: _accent.withValues(alpha: 0.28),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Mama Takibini Başlat',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: _accent,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      child: _trackingReady
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _sheetPetType(),
+                                const SizedBox(height: 8),
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(child: _sheetKg()),
+                                    const SizedBox(width: 8),
+                                    Expanded(child: _sheetDate()),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                _buildEstimateCard(compact: true),
+                              ],
+                            )
+                          : _needPetCard(
+                              text:
+                                  'Takip için önce bir dost ekleyin. Kilo, yaş ve aktivite hesaba katılır.',
+                              buttonLabel: 'Yeni Dost Ekle',
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => const AddPetScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ),
+                  if (_trackingReady) ...[
+                    const SizedBox(height: 10),
+                    AppPressableButton(
+                      onTap: _startTracking,
+                      width: double.infinity,
+                      height: 42,
+                      backgroundColor: _buttonFill,
+                      pressedBackgroundColor: _accent,
+                      foregroundColor: AppColors.surface,
+                      pressedForegroundColor: AppColors.surface,
+                      borderColor: _buttonFill,
+                      pressedBorderColor: _accent,
+                      builder: (pressed) => const Text(
+                        'Takibi Başlat',
+                        style: TextStyle(
+                          color: AppColors.surface,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              );
+            },
+          ),
+        ),
+        Positioned(
+          top: 10,
+          right: 10,
+          child: GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            behavior: HitTestBehavior.opaque,
+            child: Container(
+              width: 36,
+              height: 36,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.border),
+              ),
+              child: const Icon(
+                Icons.close_rounded,
+                color: AppColors.text,
+                size: 20,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _sheetLabel(String text) {
+    return Text(
+      text,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: const TextStyle(
+        color: _accent,
+        fontSize: 11,
+        fontWeight: FontWeight.w800,
+        height: 1.1,
+      ),
+    );
+  }
+
+  Widget _sheetPetType() {
+    final pets = PetStore.instance.pets;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sheetLabel('Mama türü'),
+        const SizedBox(height: 6),
+        SizedBox(
+          height: 42,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: pets.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 6),
+            itemBuilder: (context, index) {
+              final pet = pets[index];
+              final selected = _selectedPetName == pet.name;
+              return GestureDetector(
+                onTap: () => setState(() {
+                  _selectedPetName = pet.name;
+                  _applyPetProfile(pet);
+                }),
+                child: Container(
+                  height: 42,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: selected ? _accent : AppColors.surface,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: selected ? _accent : _lineSoft),
+                  ),
+                  child: Text(
+                    '${pet.name} · ${pet.species}',
+                    style: TextStyle(
+                      color: selected ? AppColors.surface : AppColors.text,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _sheetKg() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sheetLabel('Ne kadar mama aldınız?'),
+        const SizedBox(height: 6),
+        _buildWeightDropdown(
+          value: '$_weightKg kg',
+          placeholder: 'Kilo seç',
+          height: 42,
+          onTap: () => _openSelectSheet(
+            title: 'Mama kilosu',
+            options: [
+              for (var kg = _minKg; kg <= _maxKg; kg++) '$kg kg',
+            ],
+            selected: '$_weightKg kg',
+            onSelect: (value) {
+              final parsed = int.tryParse(value.replaceAll(' kg', ''));
+              if (parsed != null) {
+                setState(() => _weightKg = parsed.clamp(_minKg, _maxKg));
+              }
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _sheetDate() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sheetLabel('Ne zaman aldınız?'),
+        const SizedBox(height: 6),
+        GestureDetector(
+          onTap: _pickDate,
+          child: Container(
+            height: 42,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: _lineSoft),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.calendar_month_rounded,
+                  color: _accent,
+                  size: 16,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    _formatDate(_purchaseDate),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.text,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildHeader() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -435,9 +731,20 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
   }
 
   Widget _buildBanner() {
-    return const AppBannerSlot(
-      placement: BannerPlacement.foodTracking,
-      fallbackAssets: ['assets/images/mama_takibi_banner.png'],
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(21),
+        child: const AppBannerSlot(
+          placement: BannerPlacement.foodTracking,
+          fallbackAssets: ['assets/images/mama_takibi_banner.png'],
+        ),
+      ),
     );
   }
 
@@ -643,6 +950,7 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
     required String? value,
     required String placeholder,
     required VoidCallback onTap,
+    double height = 36,
   }) {
     return Material(
       color: Colors.transparent,
@@ -650,7 +958,7 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
         onTap: onTap,
         borderRadius: BorderRadius.circular(999),
         child: Ink(
-          height: 36,
+          height: height,
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 14),
           decoration: BoxDecoration(
@@ -860,7 +1168,7 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
     );
   }
 
-  Widget _buildEstimateCard() {
+  Widget _buildEstimateCard({bool compact = false}) {
     final row = _feedingRow;
     final pet = _guidePet;
     final remaining = (_remainingRatio * 100).round();
@@ -886,6 +1194,62 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
                     '${_bagKg.toStringAsFixed(0)} kg mama yaklaşık $_estimatedDays gün yeter.'
               : 'Dostun bilgileriyle günlük tüketim hesaplanamadı.'
         : 'Tahmin dostun boyutu, kilosu ve aktivitesine göre hesaplanır.';
+
+    if (compact) {
+      final endLabel = daily > 0
+          ? '${_estimatedDays} gün yeter'
+          : 'Hesaplanamadı';
+      return SizedBox(
+        height: 42,
+        width: double.infinity,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: _soft,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: _line),
+          ),
+          child: Row(
+            children: [
+              const Text(
+                'Tahmini bitiş',
+                style: TextStyle(
+                  color: AppColors.subText,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  height: 1,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _formatDate(_estimatedEnd),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: _accent,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                    height: 1,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                endLabel,
+                style: const TextStyle(
+                  color: AppColors.text,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  height: 1,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Container(
       padding: const EdgeInsets.all(12),

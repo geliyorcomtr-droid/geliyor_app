@@ -13,6 +13,8 @@ const {setGlobalOptions} = require("firebase-functions/v2");
 const logger = require("firebase-functions/logger");
 
 const {handleBirfaturaRequest, ensureBirfaturaSettings} = require("./birfatura");
+const softtr = require("./softtr");
+const {backfillStorageCacheControl} = require("./storage_cache");
 
 initializeApp();
 setGlobalOptions({region: "europe-west1"});
@@ -649,12 +651,16 @@ async function incrementProductStocks(qtyByProduct, {orderId = ""} = {}) {
         continue;
       }
       const current = Math.floor(Number(row.snap.get("stock")) || 0);
+      const next = current + row.qty;
       tx.update(row.ref, {
-        stock: current + row.qty,
+        stock: next,
+        softtrPendingStock: next,
+        softtrPendingSource: "order",
         updatedAt: FieldValue.serverTimestamp(),
       });
     }
   });
+  await pushSofttrStock(Array.from(qtyByProduct.keys()), {orderId});
 }
 
 async function restoreOrderCoupon(data) {
@@ -671,6 +677,7 @@ async function restoreOrderCoupon(data) {
 
 async function applyOrderStock(orderRef, {restore = false, force = false} = {}) {
   const firestore = db();
+  const productIds = [];
   await firestore.runTransaction(async (tx) => {
     const orderSnap = await tx.get(orderRef);
     if (!orderSnap.exists) return;
@@ -691,6 +698,7 @@ async function applyOrderStock(orderRef, {restore = false, force = false} = {}) 
     const productReads = [];
     for (const [productId, qty] of qtyByProduct.entries()) {
       if (!productId || qty <= 0) continue;
+      productIds.push(productId);
       const ref = firestore.collection("products").doc(productId);
       productReads.push({id: productId, qty, ref, snap: await tx.get(ref)});
     }
@@ -706,8 +714,11 @@ async function applyOrderStock(orderRef, {restore = false, force = false} = {}) 
       }
       const current = Math.floor(Number(row.snap.get("stock")) || 0);
       if (restore) {
+        const restored = current + row.qty;
         tx.update(row.ref, {
-          stock: current + row.qty,
+          stock: restored,
+          softtrPendingStock: restored,
+          softtrPendingSource: "order",
           updatedAt: FieldValue.serverTimestamp(),
         });
         continue;
@@ -716,6 +727,8 @@ async function applyOrderStock(orderRef, {restore = false, force = false} = {}) 
       deltas[row.id] = current - next;
       tx.update(row.ref, {
         stock: next,
+        softtrPendingStock: next,
+        softtrPendingSource: "order",
         updatedAt: FieldValue.serverTimestamp(),
       });
     }
@@ -729,6 +742,18 @@ async function applyOrderStock(orderRef, {restore = false, force = false} = {}) 
       stockDeltas: deltas,
     });
   });
+  await pushSofttrStock(productIds, {orderId: orderRef.id});
+}
+
+async function pushSofttrStock(productIds, {orderId = ""} = {}) {
+  try {
+    await softtr.pushProductIds(productIds);
+  } catch (error) {
+    logger.error("Softtr stock push failed", {
+      orderId,
+      error: String(error),
+    });
+  }
 }
 
 async function reconcilePendingOrderStock() {
@@ -1359,6 +1384,12 @@ function daysUntil(fromYmd, toYmd) {
   return Math.round((to.getTime() - from.getTime()) / 86400000);
 }
 
+function ymdAddDays(ymd, days) {
+  const base = new Date(`${ymd}T00:00:00+03:00`);
+  base.setTime(base.getTime() + Number(days || 0) * 86400000);
+  return istanbulYmd(base);
+}
+
 function couponDiscountLabel(coupon) {
   const value = Number(coupon?.value || 0);
   if (String(coupon?.type || "") === "percent") return `%${Math.round(value)}`;
@@ -1448,31 +1479,37 @@ exports.checkFoodReminders = onSchedule(
 
         if (hour >= 7 && food.enabled === true) {
           const foodAllowed = prefs.allEnabled && prefs.preferences.reminders !== false;
+          const endDate = String(food.estimatedEndDate || "");
+          const daysBefore = Math.max(0, Number(food.daysBefore || 0));
+          const reminderDate = /^\d{4}-\d{2}-\d{2}$/.test(endDate)
+            ? ymdAddDays(endDate, -daysBefore)
+            : "";
+          const isEndDay = endDate === today;
+          const isReminderDay = reminderDate === today && reminderDate <= endDate;
           if (
             foodAllowed &&
-            String(food.reminderDate || "") <= today &&
+            /^\d{4}-\d{2}-\d{2}$/.test(endDate) &&
+            endDate >= today &&
+            (isEndDay || isReminderDay) &&
             food.sentFor !== today
           ) {
-            const endDate = String(food.estimatedEndDate || "");
-            const remaining = endDate
-              ? Math.max(0, daysUntil(today, endDate))
-              : Number(food.remainingDays || 0);
+            const remaining = Math.max(0, daysUntil(today, endDate));
             const foodTitle = String(food.foodTitle || "mama").trim() || "mama";
-            let body = remaining <= 0
-              ? `${petName} için ${foodTitle} stoğu bitmek üzere. Yeni paket için Pet Market’e göz atın.`
-              : `${petName} için ${foodTitle} yaklaşık ${remaining} gün içinde bitecek.`;
+            let body = isEndDay
+              ? `${petName} için ${foodTitle} bugün bitiyor.`
+              : `${petName} için ${foodTitle} hatırlatması. Mama bitişine ${remaining} gün var.`;
             const notifyData = {
               type: "food_reminder",
               remainingDays: String(remaining),
             };
-            if (mode === "automatic" && couponId) {
+            if (!isEndDay && mode === "automatic" && couponId) {
               const granted = await grantCouponToUser(doc.id, couponId);
               if (granted) {
                 body += ` Size özel ${granted.code} kuponu tanımlandı (${granted.label}).`;
                 notifyData.couponId = granted.id;
                 notifyData.couponCode = granted.code;
               }
-            } else if (mode === "manual") {
+            } else if (!isEndDay && mode === "manual") {
               await enqueueFoodCouponJob({
                 uid: doc.id,
                 customerName: String(data.display_name || "").trim(),
@@ -1537,17 +1574,25 @@ exports.checkFoodReminders = onSchedule(
           let changed = false;
           for (let i = 0; i < items.length; i++) {
             const item = items[i] || {};
-            if (String(item.reminderDate || "") > today) continue;
+            if (item.itemEnabled === false) continue;
+            const due = String(item.nextDueDate || "");
+            const reminder = String(item.reminderDate || "");
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(due) || due < today) continue;
+            const isDueDay = due === today;
+            const isReminderDay = /^\d{4}-\d{2}-\d{2}$/.test(reminder) &&
+              reminder !== "9999-12-31" &&
+              reminder === today &&
+              reminder <= due;
+            if (!isDueDay && !isReminderDay) continue;
             if (item.sentFor === today) continue;
             const title = String(item.title || "Sağlık kaydı").trim() || "Sağlık kaydı";
-            const due = String(item.nextDueDate || "");
-            const daysLeft = due ? Math.max(0, daysUntil(today, due)) : 0;
-            const when = daysLeft <= 0
-              ? "bugün / geçti"
-              : `${daysLeft} gün içinde`;
+            const daysLeft = Math.max(0, daysUntil(today, due));
+            const body = isDueDay
+              ? `${petName} için ${title} bugün. Aşı ve kontrol günü.`
+              : `${petName} için ${title} hatırlatması. İşlem gününe ${daysLeft} gün var.`;
             const ok = await notifyUser(doc.id, {
               title: "Sağlık hatırlatması",
-              body: `${petName} için ${title} tarihi yaklaşıyor (${when}). Aşı Takvimi’nden kontrol edin.`,
+              body,
               category: "reminder",
               data: {
                 type: "health_reminder",
@@ -1603,6 +1648,110 @@ exports.getBirfaturaConfig = onCall({
   await assertAdmin(request.auth.uid);
   return ensureBirfaturaSettings();
 });
+
+exports.getSofttrSettings = onCall({
+  region: "europe-west1",
+  cors: true,
+  invoker: "public",
+}, async (request) => {
+  if (!request.auth || !request.auth.uid) {
+    throw new HttpsError("unauthenticated", "Giris yapin.");
+  }
+  await assertAdmin(request.auth.uid);
+  const snap = await db().doc(softtr.SETTINGS_PATH).get();
+  return softtr.publicSettings(snap.data() || {});
+});
+
+exports.saveSofttrSettings = onCall({
+  region: "europe-west1",
+  cors: true,
+  invoker: "public",
+}, async (request) => {
+  if (!request.auth || !request.auth.uid) {
+    throw new HttpsError("unauthenticated", "Giris yapin.");
+  }
+  await assertAdmin(request.auth.uid);
+  try {
+    return await softtr.saveSettings(request.data || {});
+  } catch (error) {
+    throw new HttpsError("internal", String(error.message || error));
+  }
+});
+
+exports.syncSofttrStockNow = onCall({
+  region: "europe-west1",
+  cors: true,
+  invoker: "public",
+  timeoutSeconds: 120,
+}, async (request) => {
+  if (!request.auth || !request.auth.uid) {
+    throw new HttpsError("unauthenticated", "Giris yapin.");
+  }
+  await assertAdmin(request.auth.uid);
+  try {
+    return await softtr.syncFromSofttr();
+  } catch (error) {
+    logger.error("Softtr manual sync failed", {error: String(error)});
+    throw new HttpsError("failed-precondition", String(error.message || error));
+  }
+});
+
+exports.pushSofttrProductStock = onCall({
+  region: "europe-west1",
+  cors: true,
+  invoker: "public",
+}, async (request) => {
+  if (!request.auth || !request.auth.uid) {
+    throw new HttpsError("unauthenticated", "Giris yapin.");
+  }
+  await assertAdmin(request.auth.uid);
+  try {
+    return await softtr.pushProductById(request.data?.productId);
+  } catch (error) {
+    throw new HttpsError("failed-precondition", String(error.message || error));
+  }
+});
+
+exports.syncSofttrStock = onSchedule(
+    {
+      schedule: "every 5 minutes",
+      region: "europe-west1",
+      timeZone: "Europe/Istanbul",
+      timeoutSeconds: 120,
+    },
+    async () => {
+      const settings = await softtr.readSettings();
+      if (!settings.enabled) {
+        logger.info("Softtr sync skipped (disabled)");
+        return;
+      }
+      try {
+        await softtr.syncFromSofttr();
+      } catch (error) {
+        logger.error("Softtr scheduled sync failed", {error: String(error)});
+        await db().doc(softtr.SETTINGS_PATH).set({
+          lastError: String(error.message || error).slice(0, 240),
+          lastSyncAt: FieldValue.serverTimestamp(),
+        }, {merge: true});
+      }
+    },
+);
+
+exports.backfillStorageCacheControl = onSchedule(
+    {
+      schedule: "every 1 minutes",
+      region: "europe-west1",
+      timeZone: "Europe/Istanbul",
+      timeoutSeconds: 540,
+    },
+    async () => {
+      try {
+        await backfillStorageCacheControl();
+      } catch (error) {
+        logger.error("Storage cache backfill failed", {error: String(error)});
+      }
+    },
+);
 
 exports.assignUserCoupon = onCall(callOpts(), async (request) => {
   if (!request.auth || !request.auth.uid) {
@@ -1730,6 +1879,13 @@ exports.saveOrderGifts = onCall(callOpts(), async (request) => {
   }
   if (String(snap.get("userId") || "") !== request.auth.uid) {
     throw new HttpsError("permission-denied", "Bu siparis size ait degil.");
+  }
+  const existing = snap.get("gifts");
+  if (Array.isArray(existing) && existing.length > 0) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Bu siparis icin hediye secimi tamamlandi.",
+    );
   }
   await orderRef.set({
     gifts,

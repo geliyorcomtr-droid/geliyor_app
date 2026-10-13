@@ -109,7 +109,7 @@ const defaultCampaigns = <AppCampaign>[
     title: 'İndirimli Mamalar',
     subtitle: 'Seçili mamalarda avantajlı fiyatlar',
     assetPath: 'assets/images/petmarket_mama.png',
-    subCategory: 'Mama',
+    subCategory: 'Yetişkin',
     order: 4,
   ),
   AppCampaign(

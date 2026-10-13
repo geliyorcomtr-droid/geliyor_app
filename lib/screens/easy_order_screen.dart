@@ -129,9 +129,20 @@ class _EasyOrderScreenState extends State<EasyOrderScreen> {
   }
 
   Widget _buildBanner() {
-    return const AppBannerSlot(
-      placement: BannerPlacement.easyOrder,
-      fallbackAssets: ['assets/images/kolay_siparis_banner.png'],
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(21),
+        child: const AppBannerSlot(
+          placement: BannerPlacement.easyOrder,
+          fallbackAssets: ['assets/images/kolay_siparis_banner.png'],
+        ),
+      ),
     );
   }
 

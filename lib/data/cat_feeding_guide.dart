@@ -179,14 +179,18 @@ abstract final class CatFeedingGuide {
   }
 
   static List<CatFeedingRow> get liveRows {
-    if (gramsOverride.isEmpty) return rows;
-    return [
+    final list = [
       for (final row in rows)
         CatFeedingRow(
           catKg: row.catKg,
           baseGrams: gramsOverride[row.catKgLabel] ?? row.baseGrams,
         ),
     ];
+    final plus = gramsOverride['10+ kg'] ?? rows.last.baseGrams;
+    if (plus > 0) {
+      list.add(CatFeedingRow(catKg: 10.5, baseGrams: plus));
+    }
+    return list;
   }
 
   static CatFeedingRow lookup(double catKg) {

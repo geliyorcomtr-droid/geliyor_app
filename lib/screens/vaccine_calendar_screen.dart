@@ -1,7 +1,11 @@
 ﻿import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:geliyor_app/data/banner_repository.dart';
+import 'package:geliyor_app/data/firestore_collections.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
+import 'package:geliyor_app/utils/product_image.dart';
 import 'package:geliyor_app/state/health_calendar_store.dart';
 import 'package:geliyor_app/state/notification_settings_store.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
@@ -92,7 +96,7 @@ class _VaccineCalendarScreenState extends State<VaccineCalendarScreen> {
       ),
       _UpcomingItem(
         icon: Icons.bug_report_outlined,
-        color: const Color(0xFF8B5CF6),
+        color: AppColors.primary,
         title: 'İç Parazit',
         frequency: '3 Ayda Bir',
         category: _ItemCategory.parasite,
@@ -101,7 +105,7 @@ class _VaccineCalendarScreenState extends State<VaccineCalendarScreen> {
       ),
       _UpcomingItem(
         icon: Icons.shield_outlined,
-        color: const Color(0xFF00A859),
+        color: AppColors.primary,
         title: 'Dış Parazit',
         frequency: 'Her Ay',
         category: _ItemCategory.parasite,
@@ -110,7 +114,7 @@ class _VaccineCalendarScreenState extends State<VaccineCalendarScreen> {
       ),
       _UpcomingItem(
         icon: Icons.vaccines_outlined,
-        color: const Color(0xFFFF6600),
+        color: AppColors.primary,
         title: 'Kuduz Aşısı',
         frequency: 'Yılda Bir',
         category: _ItemCategory.vaccine,
@@ -128,7 +132,7 @@ class _VaccineCalendarScreenState extends State<VaccineCalendarScreen> {
       ),
       _UpcomingItem(
         icon: Icons.mood_outlined,
-        color: const Color(0xFF8B5CF6),
+        color: AppColors.primary,
         title: 'Diş Kontrolü',
         frequency: 'Yılda Bir',
         category: _ItemCategory.checkup,
@@ -137,7 +141,7 @@ class _VaccineCalendarScreenState extends State<VaccineCalendarScreen> {
       ),
       _UpcomingItem(
         icon: Icons.monitor_weight_outlined,
-        color: const Color(0xFFFF6600),
+        color: AppColors.primary,
         title: 'Kilo Kontrolü',
         frequency: '3 Ayda Bir',
         category: _ItemCategory.checkup,
@@ -146,7 +150,7 @@ class _VaccineCalendarScreenState extends State<VaccineCalendarScreen> {
       ),
       _UpcomingItem(
         icon: Icons.bloodtype_outlined,
-        color: const Color(0xFFE60000),
+        color: AppColors.primary,
         title: 'Kan Tahlili',
         frequency: 'Yılda Bir (7+ yaşta 6 ayda bir)',
         category: _ItemCategory.checkup,
@@ -155,7 +159,7 @@ class _VaccineCalendarScreenState extends State<VaccineCalendarScreen> {
       ),
       _UpcomingItem(
         icon: Icons.vaccines_outlined,
-        color: const Color(0xFFE60000),
+        color: AppColors.primary,
         title: 'Lösemi Aşısı',
         frequency: 'Yılda Bir (Gerekiyorsa)',
         category: _ItemCategory.vaccine,
@@ -172,7 +176,7 @@ class _VaccineCalendarScreenState extends State<VaccineCalendarScreen> {
       ),
       _UpcomingItem(
         icon: Icons.health_and_safety_outlined,
-        color: const Color(0xFF00A859),
+        color: AppColors.primary,
         title: 'Düzenli kontroller',
         frequency: 'Erken teşhis, sağlıklı yaşam',
         category: _ItemCategory.info,
@@ -180,7 +184,7 @@ class _VaccineCalendarScreenState extends State<VaccineCalendarScreen> {
       ),
       _UpcomingItem(
         icon: Icons.event_available_outlined,
-        color: const Color(0xFFFF6600),
+        color: AppColors.primary,
         title: 'Aşı takvimi takibi',
         frequency: 'Doğru zamanda, doğru aşı',
         category: _ItemCategory.info,
@@ -188,7 +192,7 @@ class _VaccineCalendarScreenState extends State<VaccineCalendarScreen> {
       ),
       _UpcomingItem(
         icon: Icons.favorite_outline_rounded,
-        color: const Color(0xFFE60000),
+        color: AppColors.primary,
         title: 'Uzun ve mutlu yaşam',
         frequency: 'Sevginizle birlikte sağlıklı yarınlar',
         category: _ItemCategory.info,
@@ -436,41 +440,78 @@ class _VaccineCalendarScreenState extends State<VaccineCalendarScreen> {
   }
 
   Widget _buildBanner() {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.border, width: 1.3),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Image.asset(
-        'assets/images/asi_takvimi_banner.png',
-        width: double.infinity,
-        fit: BoxFit.fitWidth,
-        alignment: Alignment.center,
-        errorBuilder: (context, error, stackTrace) {
-          return Container(
-            height: 88,
-            color: AppColors.selected,
-            alignment: Alignment.center,
-            child: const Icon(
-              Icons.health_and_safety_rounded,
-              color: AppColors.primary,
-              size: 32,
-            ),
-          );
-        },
-      ),
+    const fallback = 'assets/images/asi_takvimi_banner.png';
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection(FirestoreCollections.banners)
+          .snapshots(),
+      builder: (context, snapshot) {
+        var path = fallback;
+        var hidden = false;
+        final docs = snapshot.data?.docs;
+        if (docs != null) {
+          final deleted = <String>{};
+          for (final doc in docs) {
+            if (doc.id != BannerRepository.seededDocId) continue;
+            final raw = doc.data()['deletedIds'];
+            if (raw is Iterable) {
+              deleted.addAll(raw.map((item) => item.toString()));
+            }
+          }
+          final live = [
+            for (final doc in docs)
+              if (!doc.id.startsWith('_')) AppBanner.fromDoc(doc),
+          ].where((banner) {
+            return banner.active &&
+                banner.placement == BannerPlacement.vaccine.id &&
+                banner.imageUrl.trim().isNotEmpty;
+          }).toList();
+          final picked = AppBanner.latestLive(live);
+          if (picked != null) {
+            path = picked.imageUrl;
+          } else if (deleted.contains('vaccine')) {
+            hidden = true;
+          }
+        }
+        if (hidden) return const SizedBox.shrink();
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            const framePad = 3.0;
+            final width = constraints.maxWidth - framePad * 2;
+            final height = width * 165 / 361;
+            return Container(
+              padding: const EdgeInsets.all(framePad),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.25),
+                ),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(21),
+                child: SizedBox(
+                  width: width,
+                  height: height,
+                  child: buildProductImage(
+                    path,
+                    fit: BoxFit.fill,
+                    width: width,
+                    height: height,
+                    cacheWidth: 1024,
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
   Widget _buildTabs() {
-    final selectedTabColor =
-        Color.lerp(AppColors.primary, Colors.white, 0.35) ??
-            AppColors.primaryLight;
     return SizedBox(
-      height: 30,
+      height: 36,
       child: Row(
         children: [
           for (int index = 0; index < _tabs.length; index++) ...[
@@ -482,12 +523,12 @@ class _VaccineCalendarScreenState extends State<VaccineCalendarScreen> {
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: _selectedTab == index
-                        ? selectedTabColor
+                        ? AppColors.primary
                         : AppColors.surface,
                     borderRadius: BorderRadius.circular(999),
                     border: Border.all(
                       color: _selectedTab == index
-                          ? selectedTabColor
+                          ? AppColors.primary
                           : AppColors.border,
                     ),
                   ),
@@ -498,8 +539,8 @@ class _VaccineCalendarScreenState extends State<VaccineCalendarScreen> {
                       color: _selectedTab == index
                           ? AppColors.surface
                           : AppColors.text,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
                 ),
@@ -507,21 +548,71 @@ class _VaccineCalendarScreenState extends State<VaccineCalendarScreen> {
             ),
           ],
           const SizedBox(width: 6),
-          SizedBox(
-            width: 42,
-            height: 30,
-            child: FittedBox(
-              fit: BoxFit.contain,
-              child: Switch(
-                value: _calendarEnabled,
-                onChanged: _setCalendarEnabled,
-                activeThumbColor: AppColors.surface,
-                activeTrackColor: AppColors.primaryLight,
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              child: _calendarLockChip(),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _calendarLockChip() {
+    final enabled = _calendarEnabled;
+    return GestureDetector(
+      onTap: () => _setCalendarEnabled(!enabled),
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        decoration: BoxDecoration(
+          color: enabled ? AppColors.selected : AppColors.surface,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: enabled ? AppColors.primary : AppColors.border,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              height: 16,
+              width: 28,
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                color: enabled ? AppColors.primary : AppColors.border,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: AnimatedAlign(
+                duration: const Duration(milliseconds: 180),
+                alignment:
+                    enabled ? Alignment.centerRight : Alignment.centerLeft,
+                child: Container(
+                  width: 12,
+                  height: 12,
+                  decoration: const BoxDecoration(
+                    color: AppColors.surface,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              enabled ? 'Aktif' : 'Pasif',
+              style: TextStyle(
+                color: enabled ? AppColors.primary : AppColors.subText,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -581,8 +672,8 @@ class _VaccineCalendarScreenState extends State<VaccineCalendarScreen> {
               children: [
                 Text(
                   dayText,
-                  style: TextStyle(
-                    color: item.color,
+                  style: const TextStyle(
+                    color: AppColors.statNumber,
                     fontSize: 15,
                     fontWeight: FontWeight.w900,
                     height: 1,
@@ -593,8 +684,8 @@ class _VaccineCalendarScreenState extends State<VaccineCalendarScreen> {
                   monthText,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: item.color,
+                  style: const TextStyle(
+                    color: AppColors.statNumber,
                     fontSize: 9,
                     fontWeight: FontWeight.w800,
                     height: 1,
@@ -739,21 +830,21 @@ class _VaccineCalendarScreenState extends State<VaccineCalendarScreen> {
                             decoration: BoxDecoration(
                               color: AppColors.surface,
                               borderRadius: BorderRadius.circular(999),
-                              border: Border.all(color: softBorder),
+                              border: Border.all(color: AppColors.statNumber),
                             ),
-                            child: Row(
+                            child: const Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
                                   Icons.notifications_active_rounded,
-                                  color: item.color,
+                                  color: AppColors.statNumber,
                                   size: 12,
                                 ),
-                                const SizedBox(width: 3),
+                                SizedBox(width: 3),
                                 Text(
                                   'Hatırlatıcı',
                                   style: TextStyle(
-                                    color: item.color,
+                                    color: AppColors.statNumber,
                                     fontSize: 10,
                                     fontWeight: FontWeight.w900,
                                   ),
@@ -988,20 +1079,30 @@ class _VaccineCalendarScreenState extends State<VaccineCalendarScreen> {
     final store = _notifyStore;
 
     return ListenableBuilder(
-      listenable: store,
+      listenable: Listenable.merge([
+        store,
+        HealthCalendarStore.instance,
+      ]),
       builder: (context, _) {
+        final serviceOn = HealthCalendarStore.instance.isEnabled(
+          _currentProcedure.title,
+        );
         return Column(
           children: [
+            _serviceActiveSwitch(
+              enabled: serviceOn,
+              onChanged: (value) {
+                HealthCalendarStore.instance.setServiceEnabled(
+                  _currentProcedure.title,
+                  value,
+                );
+              },
+            ),
+            const SizedBox(height: 6),
             Expanded(child: _buildCalendar()),
             const SizedBox(height: 8),
-            Flexible(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Bildirim: Kaç Gün Önce',
+            const Text(
+              'Bildirim: Kaç Gün Önce',
                       style: TextStyle(
                         color: AppColors.text,
                         fontSize: 11,
@@ -1083,13 +1184,72 @@ class _VaccineCalendarScreenState extends State<VaccineCalendarScreen> {
                           ),
                       ],
                     ),
-                  ],
-                ),
-              ),
-            ),
           ],
         );
       },
+    );
+  }
+
+  Widget _serviceActiveSwitch({
+    required bool enabled,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Align(
+      alignment: Alignment.centerRight,
+      child: GestureDetector(
+        onTap: () => onChanged(!enabled),
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          height: 32,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          decoration: BoxDecoration(
+            color: enabled ? AppColors.selected : AppColors.surface,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: enabled ? AppColors.primary : AppColors.border,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                height: 16,
+                width: 28,
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  color: enabled ? AppColors.primary : AppColors.border,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: AnimatedAlign(
+                  duration: const Duration(milliseconds: 180),
+                  alignment:
+                      enabled ? Alignment.centerRight : Alignment.centerLeft,
+                  child: Container(
+                    width: 12,
+                    height: 12,
+                    decoration: const BoxDecoration(
+                      color: AppColors.surface,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                enabled ? 'Aktif' : 'Pasif',
+                style: TextStyle(
+                  color: enabled ? AppColors.primary : AppColors.subText,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  height: 1,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -1208,14 +1368,19 @@ class _VaccineCalendarScreenState extends State<VaccineCalendarScreen> {
           ),
           const SizedBox(height: 4),
           Expanded(
-            child: GridView.builder(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final cells = startWeekday - 1 + daysInMonth;
+                final rows = (cells / 7).ceil().clamp(1, 6);
+                final extent = (constraints.maxHeight / rows) - 2;
+                return GridView.builder(
               physics: const NeverScrollableScrollPhysics(),
-              itemCount: startWeekday - 1 + daysInMonth,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              itemCount: cells,
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 7,
                 mainAxisSpacing: 2,
                 crossAxisSpacing: 2,
-                childAspectRatio: 1.1,
+                mainAxisExtent: extent < 16 ? 16 : extent,
               ),
               itemBuilder: (context, index) {
                 if (index < startWeekday - 1) {
@@ -1248,6 +1413,8 @@ class _VaccineCalendarScreenState extends State<VaccineCalendarScreen> {
                       ),
                     ),
                   ),
+                );
+              },
                 );
               },
             ),

@@ -9,8 +9,10 @@ import 'package:geliyor_app/state/auth_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/utils/compress_upload_image.dart';
+import 'package:geliyor_app/utils/storage_metadata.dart';
 import 'package:geliyor_app/utils/login_gate.dart';
 import 'package:geliyor_app/utils/product_image.dart';
+import 'package:geliyor_app/widgets/adoption_type_box.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
 import 'package:geliyor_app/widgets/app_pressable_button.dart';
@@ -29,6 +31,9 @@ class _AdoptionSubmitScreenState extends State<AdoptionSubmitScreen> {
   static const _maxPhotos = 6;
   static const _titleLimit = 60;
   static const _descriptionLimit = 500;
+  static const _cardActionHeight = 32.0;
+  static const _cardActionWidth = 72.0;
+  static const _cardActionGap = 6.0;
 
   final _formAnchor = GlobalKey();
   final _name = TextEditingController();
@@ -48,6 +53,7 @@ class _AdoptionSubmitScreenState extends State<AdoptionSubmitScreen> {
   final _existingVideos = <String>[];
   AdoptionListing? _editing;
   bool _saving = false;
+  String? _activeBusyId;
 
   int get _photoCount => _existingImages.length + _photos.length;
 
@@ -307,7 +313,7 @@ class _AdoptionSubmitScreenState extends State<AdoptionSubmitScreen> {
         );
         await ref.putData(
           prepared.bytes,
-          SettableMetadata(contentType: prepared.contentType),
+          storageImageMetadata(prepared.contentType),
         );
         imageUrls.add(await ref.getDownloadURL());
       }
@@ -369,6 +375,27 @@ class _AdoptionSubmitScreenState extends State<AdoptionSubmitScreen> {
       ).showSnackBar(SnackBar(content: Text('Gönderilemedi: $error')));
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _setListingActive(AdoptionListing listing, bool active) async {
+    final uid = AuthStore.instance.uid ?? '';
+    if (uid.isEmpty || listing.userId != uid || _activeBusyId == listing.id) {
+      return;
+    }
+    setState(() => _activeBusyId = listing.id);
+    try {
+      await AdoptionRepository.instance.setActive(
+        id: listing.id,
+        active: active,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('İlan durumu güncellenemedi: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _activeBusyId = null);
     }
   }
 
@@ -637,29 +664,19 @@ class _AdoptionSubmitScreenState extends State<AdoptionSubmitScreen> {
               height: 118,
               child: Row(
                 children: [
-                  Expanded(
-                    child: _typeCard(
-                      id: AdoptionCategories.adopt,
-                      icon: Icons.home_rounded,
-                      color: AppColors.warning,
+                  for (var i = 0; i < AdoptionCategories.values.length; i++) ...[
+                    if (i > 0) const SizedBox(width: 8),
+                    Expanded(
+                      child: AdoptionTypeBox(
+                        categoryId: AdoptionCategories.values[i],
+                        selected: _category == AdoptionCategories.values[i],
+                        showCheck: true,
+                        onTap: () => setState(
+                          () => _category = AdoptionCategories.values[i],
+                        ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _typeCard(
-                      id: AdoptionCategories.lost,
-                      icon: Icons.search_rounded,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _typeCard(
-                      id: AdoptionCategories.found,
-                      icon: Icons.pets_rounded,
-                      color: AppColors.success,
-                    ),
-                  ),
+                  ],
                 ],
               ),
             ),
@@ -979,12 +996,11 @@ class _AdoptionSubmitScreenState extends State<AdoptionSubmitScreen> {
   }
 
   Widget _mineCard(AdoptionListing item) {
-    return GestureDetector(
-      onTap: () {
-        setState(() => _loadListing(item));
-        _scrollToForm();
-      },
-      child: Container(
+    final live = item.active && item.status == AdoptionStatuses.approved;
+    final statusLabel = item.active
+        ? AdoptionStatuses.label(item.status)
+        : 'Pasif';
+    return Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
@@ -1026,45 +1042,133 @@ class _AdoptionSubmitScreenState extends State<AdoptionSubmitScreen> {
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.name.isEmpty ? 'İlan' : item.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w800),
-                  ),
-                  Text(
-                    '${item.categoryLabel} · ${AdoptionStatuses.label(item.status)}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: item.status == AdoptionStatuses.approved
-                          ? AppColors.success
-                          : item.status == AdoptionStatuses.rejected
-                          ? AppColors.error
-                          : AppColors.warning,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  setState(() => _loadListing(item));
+                  _scrollToForm();
+                },
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.name.isEmpty ? 'İlan' : item.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
-                  ),
-                ],
+                    Text(
+                      item.categoryLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.subText,
+                      ),
+                    ),
+                    Text(
+                      statusLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: !item.active
+                            ? AppColors.subText
+                            : live
+                            ? AppColors.success
+                            : item.status == AdoptionStatuses.rejected
+                            ? AppColors.error
+                            : AppColors.warning,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
+            _activeToggle(item),
+            const SizedBox(width: _cardActionGap),
             AppPressableButton.soft(
               onTap: () {
                 setState(() => _loadListing(item));
                 _scrollToForm();
               },
-              height: 32,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+              width: _cardActionWidth,
+              height: _cardActionHeight,
+              padding: EdgeInsets.zero,
               child: const Text('Düzenle', style: TextStyle(fontSize: 12)),
             ),
-            IconButton(
-              onPressed: () => _deleteListing(item),
-              tooltip: 'İlanı sil',
-              icon: const Icon(
-                Icons.delete_outline_rounded,
-                color: AppColors.error,
+            const SizedBox(width: _cardActionGap),
+            AppPressableButton(
+              onTap: () => _deleteListing(item),
+              width: _cardActionHeight,
+              height: _cardActionHeight,
+              padding: EdgeInsets.zero,
+              backgroundColor: AppColors.surface,
+              pressedBackgroundColor: AppColors.selected,
+              foregroundColor: AppColors.error,
+              pressedForegroundColor: AppColors.error,
+              borderColor: AppColors.border,
+              pressedBorderColor: AppColors.error,
+              child: const Icon(Icons.delete_outline_rounded, size: 18),
+            ),
+          ],
+        ),
+    );
+  }
+
+  Widget _activeToggle(AdoptionListing item) {
+    final on = item.active;
+    final busy = _activeBusyId == item.id;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: busy ? null : () => _setListingActive(item, !on),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        width: _cardActionWidth,
+        height: _cardActionHeight,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: on ? AppColors.selected : AppColors.surface,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: on ? AppColors.primary : AppColors.border,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              height: 16,
+              width: 28,
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                color: on ? AppColors.primary : AppColors.border,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: AnimatedAlign(
+                duration: const Duration(milliseconds: 180),
+                alignment: on ? Alignment.centerRight : Alignment.centerLeft,
+                child: Container(
+                  width: 12,
+                  height: 12,
+                  decoration: const BoxDecoration(
+                    color: AppColors.surface,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 3),
+            Text(
+              on ? 'Aktif' : 'Pasif',
+              style: TextStyle(
+                color: on ? AppColors.primary : AppColors.subText,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                height: 1,
               ),
             ),
           ],
@@ -1097,86 +1201,6 @@ class _AdoptionSubmitScreenState extends State<AdoptionSubmitScreen> {
         const SizedBox(width: 8),
         Expanded(child: Text(title, style: AppTextStyles.sectionHeader)),
       ],
-    );
-  }
-
-  Widget _typeCard({
-    required String id,
-    required IconData icon,
-    required Color color,
-  }) {
-    final selected = _category == id;
-    return GestureDetector(
-      onTap: () => setState(() => _category = id),
-      child: Container(
-        height: 118,
-        padding: const EdgeInsets.all(3),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: selected ? color : color.withValues(alpha: 0.22),
-            width: selected ? 1.6 : 1,
-          ),
-        ),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.10),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            children: [
-              Expanded(
-                child: FittedBox(
-                  fit: BoxFit.contain,
-                  child: Icon(icon, color: color, size: 48),
-                ),
-              ),
-              const SizedBox(height: 2),
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  AdoptionCategories.label(id),
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    height: 1.1,
-                  ),
-                ),
-              ),
-              Text(
-                AdoptionCategories.subtitle(id),
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: AppColors.subText,
-                  fontSize: 8.5,
-                  fontWeight: FontWeight.w600,
-                  height: 1.1,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: color,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Icon(
-                  selected ? Icons.check_rounded : Icons.circle_outlined,
-                  size: 12,
-                  color: AppColors.surface,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 

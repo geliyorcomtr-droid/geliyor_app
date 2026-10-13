@@ -1,5 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
+import 'package:geliyor_app/utils/product_image.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
@@ -275,16 +276,14 @@ class FilterSubpageLayout extends StatelessWidget {
           : Padding(
               padding: const EdgeInsets.all(7),
               child: item.imagePath != null
-                  ? Image.asset(
+                  ? buildProductImage(
                       item.imagePath!,
                       fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Icon(
-                          item.icon ?? Icons.pets_rounded,
-                          color: item.iconColor ?? accent,
-                          size: 24,
-                        );
-                      },
+                      errorWidget: Icon(
+                        item.icon ?? Icons.pets_rounded,
+                        color: item.iconColor ?? accent,
+                        size: 24,
+                      ),
                     )
                   : Icon(
                       item.icon ?? Icons.pets_rounded,

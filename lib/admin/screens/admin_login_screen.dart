@@ -70,9 +70,9 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  Color(0xFFE8F3FF),
-                  Color(0xFFF5F3FF),
-                  Color(0xFFFFF7ED),
+                  AppColors.selected,
+                  AppColors.background,
+                  AppColors.selected,
                 ],
               ),
             ),
@@ -212,7 +212,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                             width: double.infinity,
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFFFF1F2),
+                              color: AppColors.selected,
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
                                 color: AppColors.error.withValues(alpha: 0.35),

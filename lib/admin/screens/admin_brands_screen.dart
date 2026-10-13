@@ -5,6 +5,7 @@ import 'package:geliyor_app/data/brand_feeding_guide.dart';
 import 'package:geliyor_app/data/brand_repository.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/utils/compress_upload_image.dart';
+import 'package:geliyor_app/utils/storage_metadata.dart';
 import 'package:geliyor_app/utils/product_image.dart';
 
 class AdminBrandsScreen extends StatefulWidget {
@@ -238,7 +239,7 @@ class _AdminBrandsScreenState extends State<AdminBrandsScreen> {
       );
       await reference.putData(
         prepared.bytes,
-        SettableMetadata(contentType: prepared.contentType),
+        storageImageMetadata(prepared.contentType),
       );
       return reference.getDownloadURL();
     } catch (error) {

@@ -34,10 +34,12 @@ class AppBannerSlot extends StatelessWidget {
           return SizedBox(height: placement.height);
         }
         if (remote.isEmpty) return const SizedBox.shrink();
+        final ordered = [...remote]
+          ..sort((a, b) => a.order.compareTo(b.order));
         ImageWarmup.precache(
           context,
           [
-            for (final banner in remote) ...[
+            for (final banner in ordered) ...[
               banner.displayImage,
               banner.imageUrl,
             ],
@@ -45,7 +47,7 @@ class AppBannerSlot extends StatelessWidget {
           cacheWidth: bannerCachePx,
         );
         return AppBannerSlider(
-          banners: remote,
+          banners: ordered,
           height: placement.height,
           radius: placement.boxRadius,
           autoPlay: autoPlay,
@@ -75,6 +77,8 @@ class AppBannerStrip extends StatefulWidget {
 }
 
 class _AppBannerStripState extends State<AppBannerStrip> {
+  static final Map<String, String> _remembered = {};
+
   StreamSubscription<({List<AppBanner> banners, bool fromCache})>? _sub;
   String? _path;
   var _ready = false;
@@ -104,27 +108,30 @@ class _AppBannerStripState extends State<AppBannerStrip> {
   Future<void> _start() async {
     await _sub?.cancel();
     _sub = null;
-    if (mounted) {
+    final remembered = _remembered[widget.placement.id];
+    if (mounted && remembered != null && remembered.isNotEmpty) {
       setState(() {
-        _ready = false;
-        _path = null;
-        _stamp = 0;
+        _ready = true;
+        _path = remembered;
       });
     }
+    try {
+      final cached = await BannerRepository.instance.fetchActiveFromCache(
+        placement: widget.placement.id,
+      );
+      _apply(cached, fromServer: false);
+    } catch (_) {}
     try {
       final banners = await BannerRepository.instance.fetchActiveFromServer(
         placement: widget.placement.id,
       );
       _apply(banners, fromServer: true);
-    } catch (_) {
-      if (mounted) setState(() => _ready = true);
-    }
+    } catch (_) {}
     if (!mounted) return;
     _sub = BannerRepository.instance
         .watchActiveMeta(placement: widget.placement.id)
         .listen((meta) {
-          if (meta.fromCache) return;
-          _apply(meta.banners, fromServer: true);
+          _apply(meta.banners, fromServer: !meta.fromCache);
         });
   }
 
@@ -144,33 +151,36 @@ class _AppBannerStripState extends State<AppBannerStrip> {
           })
           .toList();
     }
-    final next = AppBanner.liveNetworkPath(list);
     final live = AppBanner.latestLive(list);
+    final next = AppBanner.liveNetworkPath(list);
     final nextStamp = live == null
         ? 0
         : AppBanner.storageUploadStamp(live.imageUrl);
     if (_stamp > 0 && nextStamp > 0 && nextStamp < _stamp) {
       return;
     }
-    final path = next.isNotEmpty
-        ? next
+    final asset = live != null && live.assetPath.trim().isNotEmpty
+        ? live.assetPath.trim()
         : widget.fallbackAsset.trim();
-    if (path.isEmpty && !fromServer) return;
-    if (_path == path && _ready) return;
-    final previous = _path;
-    if (previous != null && previous != path) {
-      final provider = productImageProvider(previous, cacheWidth: bannerCachePx);
-      if (provider != null) {
-        imageCache.evict(provider);
+    final path = next.isNotEmpty ? next : asset;
+    if (path.isEmpty) {
+      if (_path != null) {
+        if (!_ready) setState(() => _ready = true);
+        return;
       }
+      if (!fromServer && !_ready) return;
+      setState(() => _ready = true);
+      return;
     }
+    if (_path == path && _ready) return;
     if (path.isNotEmpty) {
       ImageWarmup.precache(context, [path], cacheWidth: bannerCachePx);
     }
     setState(() {
       _ready = true;
-      _path = path.isEmpty ? null : path;
+      _path = path;
       if (nextStamp > 0) _stamp = nextStamp;
+      _remembered[widget.placement.id] = path;
     });
   }
 
@@ -184,9 +194,7 @@ class _AppBannerStripState extends State<AppBannerStrip> {
       height: widget.placement.height,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(widget.placement.boxRadius),
-        child: SizedBox.expand(
-          child: KeyedSubtree(
-            key: ValueKey(_path),
+          child: SizedBox.expand(
             child: buildProductImage(
               _path!,
               fit: BoxFit.cover,
@@ -197,7 +205,6 @@ class _AppBannerStripState extends State<AppBannerStrip> {
               cacheWidth: bannerCachePx,
             ),
           ),
-        ),
       ),
     );
     if (widget.onTap == null) return strip;
@@ -308,80 +315,80 @@ class _AppBannerSliderState extends State<AppBannerSlider> {
     if (banners.isEmpty) return const SizedBox.shrink();
     final index = _index.clamp(0, banners.length - 1);
 
-    return Column(
-      children: [
-        SizedBox(
-          height: widget.height,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(widget.radius),
-                child: PageView.builder(
-                  controller: _controller,
-                  itemCount: banners.length,
-                  onPageChanged: (i) {
-                    setState(() => _index = i);
-                    _startAutoPlay();
-                  },
-                  itemBuilder: (context, pageIndex) {
-                    final banner = banners[pageIndex];
-                    final path = banner.displayImage;
-                    final useContain = path.contains('banner_geliyor');
-                    final image = buildProductImage(
-                      path,
-                      fit: useContain ? BoxFit.contain : BoxFit.cover,
-                      width: double.infinity,
-                      height: double.infinity,
-                      alignment: Alignment.center,
-                      filterQuality: FilterQuality.medium,
-                      cacheWidth: bannerCachePx,
-                      errorWidget: _fallback(),
+    return SizedBox(
+      height: widget.height,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(widget.radius),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            PageView.builder(
+              controller: _controller,
+              itemCount: banners.length,
+              onPageChanged: (i) {
+                setState(() => _index = i);
+                _startAutoPlay();
+              },
+              itemBuilder: (context, pageIndex) {
+                final banner = banners[pageIndex];
+                final path = banner.displayImage;
+                final useContain = path.contains('banner_geliyor');
+                final image = buildProductImage(
+                  path,
+                  fit: useContain ? BoxFit.contain : BoxFit.cover,
+                  width: double.infinity,
+                  height: double.infinity,
+                  alignment: Alignment.center,
+                  filterQuality: FilterQuality.medium,
+                  cacheWidth: bannerCachePx,
+                  errorWidget: _fallback(),
+                );
+                if (!widget.openOnTap) return image;
+                return GestureDetector(
+                  onTap: () => BannerImagePreview.show(context, banner),
+                  child: image,
+                );
+              },
+            ),
+            if (banners.length > 1) ...[
+              Positioned(
+                left: 8,
+                child: _arrow(Icons.chevron_left_rounded, () {
+                  _goTo((index - 1 + banners.length) % banners.length);
+                }),
+              ),
+              Positioned(
+                right: 8,
+                child: _arrow(Icons.chevron_right_rounded, () {
+                  _goTo((index + 1) % banners.length);
+                }),
+              ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 8,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(banners.length, (dotIndex) {
+                    final active = dotIndex == index;
+                    return Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 3),
+                      width: 7,
+                      height: 7,
+                      decoration: BoxDecoration(
+                        color: active
+                            ? AppColors.surface
+                            : AppColors.surface.withValues(alpha: 0.5),
+                        shape: BoxShape.circle,
+                      ),
                     );
-                    if (!widget.openOnTap) return image;
-                    return GestureDetector(
-                      onTap: () => BannerImagePreview.show(context, banner),
-                      child: image,
-                    );
-                  },
+                  }),
                 ),
               ),
-              if (banners.length > 1) ...[
-                Positioned(
-                  left: 8,
-                  child: _arrow(Icons.chevron_left_rounded, () {
-                    _goTo((index - 1 + banners.length) % banners.length);
-                  }),
-                ),
-                Positioned(
-                  right: 8,
-                  child: _arrow(Icons.chevron_right_rounded, () {
-                    _goTo((index + 1) % banners.length);
-                  }),
-                ),
-              ],
             ],
-          ),
+          ],
         ),
-        if (banners.length > 1) ...[
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(banners.length, (dotIndex) {
-              final active = dotIndex == index;
-              return Container(
-                margin: const EdgeInsets.symmetric(horizontal: 3),
-                width: 7,
-                height: 7,
-                decoration: BoxDecoration(
-                  color: active ? AppColors.primary : AppColors.border,
-                  shape: BoxShape.circle,
-                ),
-              );
-            }),
-          ),
-        ],
-      ],
+      ),
     );
   }
 

@@ -25,10 +25,10 @@ class HealthScreen extends StatefulWidget {
 }
 
 class _HealthScreenState extends State<HealthScreen> {
-  static const Color _asi = Color(0xFFFF6600);
-  static const Color _ilac = Color(0xFF00A859);
-  static const Color _mama = Color(0xFF9B4DCA);
-  static const Color _acil = Color(0xFFE60000);
+  static const Color _asi = AppColors.primary;
+  static const Color _ilac = AppColors.primary;
+  static const Color _mama = AppColors.primary;
+  static const Color _acil = AppColors.primary;
 
   static const _monthNames = [
     'Ocak',
@@ -88,7 +88,7 @@ class _HealthScreenState extends State<HealthScreen> {
       ),
       _HealthProcedure(
         icon: Icons.shield_outlined,
-        color: const Color(0xFF00A859),
+        color: AppColors.primary,
         title: 'Dış Parazit',
         frequency: 'Her Ay',
         intervalMonths: 1,
@@ -96,7 +96,7 @@ class _HealthScreenState extends State<HealthScreen> {
       ),
       _HealthProcedure(
         icon: Icons.bug_report_outlined,
-        color: const Color(0xFF8B5CF6),
+        color: AppColors.primary,
         title: 'İç Parazit',
         frequency: '3 Ayda Bir',
         intervalMonths: 3,
@@ -336,9 +336,11 @@ class _HealthScreenState extends State<HealthScreen> {
   }
 
   Widget _buildTopBanner() {
-    return const AppBannerSlot(
-      placement: BannerPlacement.healthTop,
-      fallbackAssets: ['assets/images/saglik_banner.png'],
+    return _framedBanner(
+      const AppBannerSlot(
+        placement: BannerPlacement.healthTop,
+        fallbackAssets: ['assets/images/saglik_banner.png'],
+      ),
     );
   }
 
@@ -445,9 +447,26 @@ class _HealthScreenState extends State<HealthScreen> {
   }
 
   Widget _buildBottomBanner() {
-    return const AppBannerSlot(
-      placement: BannerPlacement.healthBottom,
-      fallbackAssets: ['assets/images/saglik_alt_banner.png'],
+    return _framedBanner(
+      const AppBannerSlot(
+        placement: BannerPlacement.healthBottom,
+        fallbackAssets: ['assets/images/saglik_alt_banner.png'],
+      ),
+    );
+  }
+
+  Widget _framedBanner(Widget banner) {
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(21),
+        child: banner,
+      ),
     );
   }
 
@@ -521,7 +540,7 @@ class _HealthScreenState extends State<HealthScreen> {
             border: Border.all(color: color.withValues(alpha: 0.25)),
           ),
           child: Container(
-            padding: const EdgeInsets.fromLTRB(6, 10, 6, 8),
+            padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(16),
@@ -529,22 +548,32 @@ class _HealthScreenState extends State<HealthScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                ColorFiltered(
-                  colorFilter: const ColorFilter.matrix(<double>[
-                    1, 0, 0, 0, 0,
-                    0, 1, 0, 0, 0,
-                    0, 0, 1, 0, 0,
-                    -1, -1, -1, 3, 0,
-                  ]),
-                  child: Image.asset(
-                    iconPath,
-                    width: 34,
-                    height: 34,
-                    fit: BoxFit.contain,
-                    filterQuality: FilterQuality.high,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Icon(Icons.pets_rounded, color: color, size: 34);
-                    },
+                Container(
+                  width: 46,
+                  height: 46,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: color),
+                  ),
+                  child: ColorFiltered(
+                    colorFilter: const ColorFilter.matrix(<double>[
+                      1, 0, 0, 0, 0,
+                      0, 1, 0, 0, 0,
+                      0, 0, 1, 0, 0,
+                      -1, -1, -1, 3, 0,
+                    ]),
+                    child: Image.asset(
+                      iconPath,
+                      width: 34,
+                      height: 34,
+                      fit: BoxFit.contain,
+                      filterQuality: FilterQuality.high,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Icon(Icons.pets_rounded, color: color, size: 34);
+                      },
+                    ),
                   ),
                 ),
                 Text(
@@ -558,8 +587,9 @@ class _HealthScreenState extends State<HealthScreen> {
                   ),
                 ),
                 Container(
-                  width: 22,
-                  height: 22,
+                  width: 18,
+                  height: 18,
+                  alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: color,
                     shape: BoxShape.circle,
@@ -567,7 +597,7 @@ class _HealthScreenState extends State<HealthScreen> {
                   child: const Icon(
                     Icons.chevron_right_rounded,
                     color: AppColors.surface,
-                    size: 16,
+                    size: 10,
                   ),
                 ),
               ],
@@ -710,8 +740,8 @@ class _HealthScreenState extends State<HealthScreen> {
               children: [
                 Text(
                   '${due.day}',
-                  style: TextStyle(
-                    color: item.color,
+                  style: const TextStyle(
+                    color: AppColors.statNumber,
                     fontSize: 15,
                     fontWeight: FontWeight.w900,
                     height: 1,
@@ -722,8 +752,8 @@ class _HealthScreenState extends State<HealthScreen> {
                   _monthShort[due.month - 1],
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: item.color,
+                  style: const TextStyle(
+                    color: AppColors.statNumber,
                     fontSize: 9,
                     fontWeight: FontWeight.w800,
                     height: 1,
@@ -852,21 +882,21 @@ class _HealthScreenState extends State<HealthScreen> {
                           decoration: BoxDecoration(
                             color: AppColors.surface,
                             borderRadius: BorderRadius.circular(999),
-                            border: Border.all(color: softBorder),
+                            border: Border.all(color: AppColors.statNumber),
                           ),
-                          child: Row(
+                          child: const Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
                                 Icons.notifications_active_rounded,
-                                color: item.color,
+                                color: AppColors.statNumber,
                                 size: 12,
                               ),
-                              const SizedBox(width: 3),
+                              SizedBox(width: 3),
                               Text(
                                 'Hatırlatıcı',
                                 style: TextStyle(
-                                  color: item.color,
+                                  color: AppColors.statNumber,
                                   fontSize: 10,
                                   fontWeight: FontWeight.w900,
                                 ),
@@ -907,7 +937,7 @@ class _HealthScreenState extends State<HealthScreen> {
                 Text(
                   '${done.day}',
                   style: const TextStyle(
-                    color: AppColors.success,
+                    color: AppColors.statNumber,
                     fontSize: 15,
                     fontWeight: FontWeight.w900,
                     height: 1,
@@ -919,7 +949,7 @@ class _HealthScreenState extends State<HealthScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: AppColors.success,
+                    color: AppColors.statNumber,
                     fontSize: 9,
                     fontWeight: FontWeight.w800,
                     height: 1,
@@ -1035,21 +1065,21 @@ class _HealthScreenState extends State<HealthScreen> {
                         decoration: BoxDecoration(
                           color: AppColors.surface,
                           borderRadius: BorderRadius.circular(999),
-                          border: Border.all(color: softBorder),
+                          border: Border.all(color: AppColors.statNumber),
                         ),
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
                               Icons.bookmark_rounded,
-                              color: AppColors.success,
+                              color: AppColors.statNumber,
                               size: 12,
                             ),
                             SizedBox(width: 3),
                             Text(
                               'Tamamlandı',
                               style: TextStyle(
-                                color: AppColors.success,
+                                color: AppColors.statNumber,
                                 fontSize: 10,
                                 fontWeight: FontWeight.w900,
                               ),

@@ -1,9 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:geliyor_app/data/feeding_factors.dart';
 import 'package:geliyor_app/data/kitten_feeding_guide.dart';
 
 void main() {
   setUp(() {
     KittenFeedingGuide.gramsOverride = const {};
+    KittenFeedingGuide.factors = FeedingFactors.defaults;
   });
 
   test('kitten grams follow Excel kg × age cells', () {
@@ -45,6 +47,20 @@ void main() {
     expect(
       KittenFeedingGuide.dailyGramsFor(weightLabel: '0,5 kg', months: 1),
       22,
+    );
+  });
+
+  test('çarpanlar baz × kısır × vücut × aktivite × ek besin', () {
+    expect(
+      KittenFeedingGuide.dailyGramsFor(
+        weightLabel: '2 kg',
+        months: 4,
+        neutered: 'Evet',
+        bodyType: 'Zayıf',
+        activityLevel: 'Düşük',
+        extraFood: 'Yaş mama',
+      ),
+      49,
     );
   });
 }

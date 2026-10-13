@@ -1,4 +1,6 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'package:geliyor_app/data/firestore_collections.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
 import 'package:geliyor_app/screens/orders_screen.dart';
@@ -11,6 +13,7 @@ import 'package:geliyor_app/screens/privacy_security_screen.dart';
 import 'package:geliyor_app/screens/logout_success_screen.dart';
 import 'package:geliyor_app/screens/personal_info_screen.dart';
 import 'package:geliyor_app/screens/adoption_submit_screen.dart';
+import 'package:geliyor_app/screens/gift_select_screen.dart';
 import 'package:geliyor_app/services/user_profile_sync.dart';
 import 'package:geliyor_app/state/auth_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
@@ -21,7 +24,6 @@ import 'package:geliyor_app/widgets/app_page_frame.dart';
 class AccountScreen extends StatelessWidget {
   const AccountScreen({super.key});
 
-  static const int _points = 1250;
   static const int _nextTierPoints = 1500;
 
   @override
@@ -45,7 +47,26 @@ class AccountScreen extends StatelessWidget {
             children: [
               ListenableBuilder(
                 listenable: AuthStore.instance,
-                builder: (context, _) => _buildProfileCard(),
+                builder: (context, _) {
+                  final uid = AuthStore.instance.uid;
+                  if (uid == null || uid.isEmpty) {
+                    return _buildProfileCard(0);
+                  }
+                  return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                    stream: FirebaseFirestore.instance
+                        .collection(FirestoreCollections.users)
+                        .doc(uid)
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      final points =
+                          (snapshot.data?.data()?[UserFields.dostPoints]
+                                  as num?)
+                              ?.round() ??
+                          0;
+                      return _buildProfileCard(points);
+                    },
+                  );
+                },
               ),
               const SizedBox(height: 12),
               _buildMenuCard(
@@ -100,6 +121,11 @@ class AccountScreen extends StatelessWidget {
                     opensAdoption: true,
                   ),
                   _MenuItem(
+                    icon: Icons.card_giftcard_outlined,
+                    label: 'Hediye Seç',
+                    opensGift: true,
+                  ),
+                  _MenuItem(
                     icon: Icons.verified_user_outlined,
                     label: 'Gizlilik & Güvenlik',
                     opensPrivacySecurity: true,
@@ -141,9 +167,9 @@ class AccountScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildProfileCard() {
-    final progress = _points / _nextTierPoints;
-    final remaining = _nextTierPoints - _points;
+  Widget _buildProfileCard(int points) {
+    final progress = (points / _nextTierPoints).clamp(0.0, 1.0);
+    final remaining = (_nextTierPoints - points).clamp(0, _nextTierPoints);
     final auth = AuthStore.instance;
     final displayName = auth.fullName.trim().isEmpty
         ? 'Can Dostu'
@@ -288,7 +314,7 @@ class AccountScreen extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        '$_points',
+                        '$points',
                         style: const TextStyle(
                           color: AppColors.primary,
                           fontSize: 22,
@@ -328,7 +354,7 @@ class AccountScreen extends StatelessWidget {
                 ),
               ),
               Text(
-                '$_points / $_nextTierPoints',
+                '$points / $_nextTierPoints',
                 style: const TextStyle(
                   color: AppColors.subText,
                   fontSize: 9,
@@ -459,6 +485,14 @@ class AccountScreen extends StatelessWidget {
                   ),
                 );
               }
+            : item.opensGift
+            ? () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const GiftSelectScreen(),
+                  ),
+                );
+              }
             : item.opensPrivacySecurity
             ? () {
                 Navigator.of(context).push(
@@ -531,6 +565,7 @@ class _MenuItem {
     this.opensOrders = false,
     this.opensHelpSupport = false,
     this.opensAdoption = false,
+    this.opensGift = false,
     this.opensPrivacySecurity = false,
     this.opensLogout = false,
   });
@@ -546,6 +581,7 @@ class _MenuItem {
   final bool opensOrders;
   final bool opensHelpSupport;
   final bool opensAdoption;
+  final bool opensGift;
   final bool opensPrivacySecurity;
   final bool opensLogout;
 }

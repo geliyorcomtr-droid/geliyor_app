@@ -10,11 +10,17 @@ class AppColors {
   static const Color surface = Color(0xFFFFFFFF);
   static const Color selected = Color(0xFFE8F3FF);
   static const Color border = Color(0xFFD6E8FF);
-  static const Color success = Color(0xFF22C55E);
-  static const Color warning = Color(0xFFF59E0B);
-  static const Color error = Color(0xFFEF4444);
+  static const Color success = Color(0xFF1E90FF);
+  static const Color warning = Color(0xFF1E90FF);
+  static const Color error = Color(0xFF1E90FF);
   static const Color text = Color(0xFF1F2937);
   static const Color subText = Color(0xFF6B7280);
+
+  /// Ürün indirim rozeti ve satış fiyatı — eski turuncu.
+  static const Color discount = Color(0xFFF59E0B);
+
+  /// Ürün detay yan kart rakamları (puan, protein, gün yeter).
+  static const Color statNumber = Color(0xFFFA8202);
 
   /// Eski isimler (geçiş uyumu)
   static const Color white = surface;
@@ -24,5 +30,5 @@ class AppColors {
   static const Color textGray = subText;
 
   /// Hangi Mama hizmet rengi
-  static const Color violet = Color(0xFF8B5CF6);
+  static const Color violet = Color(0xFF1E90FF);
 }

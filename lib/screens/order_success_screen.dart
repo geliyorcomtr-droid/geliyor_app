@@ -7,6 +7,7 @@ import 'package:geliyor_app/screens/home_screen.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/utils/courier_fee.dart';
 import 'package:geliyor_app/utils/order_no.dart';
+import 'package:geliyor_app/utils/subscription_discount.dart';
 import 'package:geliyor_app/widgets/app_back_button.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
@@ -22,6 +23,7 @@ class OrderSuccessScreen extends StatelessWidget {
     this.paymentMethod = 'Kapıda Nakit',
     this.couponTitle = '',
     this.couponDiscount = 0,
+    this.subscriptionDiscount = 0,
     this.orderId = '',
   });
 
@@ -32,6 +34,7 @@ class OrderSuccessScreen extends StatelessWidget {
   final String paymentMethod;
   final String couponTitle;
   final double couponDiscount;
+  final double subscriptionDiscount;
   final String orderId;
 
   bool get _isBankTransfer => paymentMethod == 'Havale / EFT';
@@ -87,8 +90,9 @@ class OrderSuccessScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final payableTotal =
-        CourierFee.payableTotal(cartTotal) - couponDiscount;
+    final payableTotal = CourierFee.payableTotal(cartTotal) -
+        couponDiscount -
+        subscriptionDiscount;
     final totalText = _formatPrice(payableTotal < 0 ? 0 : payableTotal);
 
     return Scaffold(
@@ -233,7 +237,7 @@ class OrderSuccessScreen extends StatelessWidget {
                         vertical: 3,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFE8F9EE),
+                        color: AppColors.selected,
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: const Text(
@@ -609,6 +613,15 @@ class OrderSuccessScreen extends StatelessWidget {
                   valueColor: AppColors.primary,
                 ),
               ],
+              if (subscriptionDiscount > 0) ...[
+                const SizedBox(height: 10),
+                _detailRow(
+                  icon: Icons.autorenew_rounded,
+                  label: SubscriptionDiscount.name,
+                  value: '-${_formatPrice(subscriptionDiscount)}',
+                  valueColor: AppColors.primary,
+                ),
+              ],
               const SizedBox(height: 10),
               _detailRow(
                 icon: Icons.payments_outlined,
@@ -716,7 +729,7 @@ class OrderSuccessScreen extends StatelessWidget {
           Icon(Icons.card_giftcard_rounded, size: 20),
           SizedBox(width: 8),
           Text(
-            'Dostun için Hediye Seç',
+            'Ne Severiz',
             style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900),
           ),
         ],

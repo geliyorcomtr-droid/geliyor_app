@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:geliyor_app/data/adoption_repository.dart';
 import 'package:geliyor_app/data/banner_repository.dart';
@@ -25,21 +26,33 @@ class AdoptionScreen extends StatefulWidget {
 }
 
 class _AdoptionScreenState extends State<AdoptionScreen> {
-  static const _categories = <({String id, IconData icon, Color color})>[
+  static const _adoptFill = Color(0xFFFFF3E0);
+  static const _foundColor = Color(0xFF34D399);
+  static const _foundFill = Color(0xFFE6F9F0);
+
+  static const _categories = <({
+    String id,
+    IconData icon,
+    Color color,
+    Color fill,
+  })>[
     (
       id: AdoptionCategories.adopt,
       icon: Icons.home_rounded,
-      color: AppColors.warning,
+      color: AppColors.discount,
+      fill: _adoptFill,
     ),
     (
       id: AdoptionCategories.lost,
       icon: Icons.search_rounded,
       color: AppColors.primary,
+      fill: AppColors.selected,
     ),
     (
       id: AdoptionCategories.found,
       icon: Icons.pets_rounded,
-      color: AppColors.success,
+      color: _foundColor,
+      fill: _foundFill,
     ),
   ];
 
@@ -98,9 +111,22 @@ class _AdoptionScreenState extends State<AdoptionScreen> {
                 12,
               ),
               children: [
-                const AppBannerStrip(
-                  placement: BannerPlacement.adoption,
-                  fallbackAsset: 'assets/images/sahiplendirme_banner.jpg',
+                Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.25),
+                    ),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(21),
+                    child: const AppBannerStrip(
+                      placement: BannerPlacement.adoption,
+                      fallbackAsset: 'assets/images/sahiplendirme_banner.jpg',
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 _buildCategoryRow(all),
@@ -146,6 +172,14 @@ class _AdoptionScreenState extends State<AdoptionScreen> {
     );
   }
 
+  BannerPlacement _boxPlacement(String category) {
+    return switch (category) {
+      AdoptionCategories.lost => BannerPlacement.adoptionBoxLost,
+      AdoptionCategories.found => BannerPlacement.adoptionBoxFound,
+      _ => BannerPlacement.adoptionBoxAdopt,
+    };
+  }
+
   Widget _buildCategoryRow(List<AdoptionListing> all) {
     return SizedBox(
       height: 118,
@@ -158,6 +192,8 @@ class _AdoptionScreenState extends State<AdoptionScreen> {
                 id: _categories[i].id,
                 icon: _categories[i].icon,
                 color: _categories[i].color,
+                fill: _categories[i].fill,
+                placement: _boxPlacement(_categories[i].id),
                 count: all
                     .where((item) => item.category == _categories[i].id)
                     .length,
@@ -307,6 +343,8 @@ class _CategoryCard extends StatelessWidget {
     required this.id,
     required this.icon,
     required this.color,
+    required this.fill,
+    required this.placement,
     required this.count,
     required this.selected,
     required this.onTap,
@@ -315,13 +353,24 @@ class _CategoryCard extends StatelessWidget {
   final String id;
   final IconData icon;
   final Color color;
+  final Color fill;
+  final BannerPlacement placement;
   final int count;
   final bool selected;
   final VoidCallback onTap;
 
+  String get _fallbackAsset => placement.id == BannerPlacement.adoptionBoxAdopt.id
+      ? 'assets/images/sahiplendirme_kutu.jpg'
+      : '';
+
+  String get _seededId => placement.id == BannerPlacement.adoptionBoxAdopt.id
+      ? 'adoption-box-adopt'
+      : '';
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Container(
         height: 118,
@@ -334,66 +383,145 @@ class _CategoryCard extends StatelessWidget {
             width: selected ? 1.6 : 1,
           ),
         ),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.10),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            children: [
-              Expanded(
-                child: FittedBox(
-                  fit: BoxFit.contain,
-                  child: Icon(icon, color: color, size: 48),
-                ),
-              ),
-              const SizedBox(height: 2),
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  AdoptionCategories.label(id),
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    height: 1.1,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: FirebaseFirestore.instance
+                .collection(FirestoreCollections.banners)
+                .snapshots(),
+            builder: (context, snapshot) {
+              final image = _boxImage(snapshot.data?.docs);
+              if (image == null) return _iconBody();
+              return Stack(
+                fit: StackFit.expand,
+                children: [
+                  ColoredBox(
+                    color: AppColors.surface,
+                    child: buildProductImage(
+                      image,
+                      fit: BoxFit.contain,
+                      cacheWidth: 512,
+                    ),
                   ),
-                ),
+                  Positioned(
+                    top: 4,
+                    right: 4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: color,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        '$count',
+                        style: const TextStyle(
+                          color: AppColors.surface,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          height: 1.1,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  String? _boxImage(List<QueryDocumentSnapshot<Map<String, dynamic>>>? docs) {
+    final fallback = _fallbackAsset;
+    if (docs == null) return fallback.isEmpty ? null : fallback;
+    final deleted = <String>{};
+    for (final doc in docs) {
+      if (doc.id != BannerRepository.seededDocId) continue;
+      final raw = doc.data()['deletedIds'];
+      if (raw is Iterable) {
+        deleted.addAll(raw.map((item) => item.toString()));
+      }
+    }
+    final forSlot = [
+      for (final doc in docs)
+        if (!doc.id.startsWith('_')) AppBanner.fromDoc(doc),
+    ].where((banner) => banner.placement == placement.id).toList();
+    final visible = forSlot
+        .where(
+          (banner) => banner.active && banner.displayImage.trim().isNotEmpty,
+        )
+        .toList();
+    final picked = AppBanner.latestLive(visible);
+    if (picked != null && picked.displayImage.trim().isNotEmpty) {
+      return picked.displayImage;
+    }
+    if (forSlot.isNotEmpty) return null;
+    if (_seededId.isNotEmpty && deleted.contains(_seededId)) return null;
+    return fallback.isEmpty ? null : fallback;
+  }
+
+  Widget _iconBody() {
+    return ColoredBox(
+      color: fill,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
+        child: Column(
+          children: [
+            Expanded(
+              child: FittedBox(
+                fit: BoxFit.contain,
+                child: Icon(icon, color: color, size: 48),
               ),
-              Text(
-                AdoptionCategories.subtitle(id),
+            ),
+            const SizedBox(height: 2),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                AdoptionCategories.label(id),
                 textAlign: TextAlign.center,
                 maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: AppColors.subText,
-                  fontSize: 8.5,
-                  fontWeight: FontWeight.w600,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
                   height: 1.1,
                 ),
               ),
-              const SizedBox(height: 4),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: color,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  '$count',
-                  style: const TextStyle(
-                    color: AppColors.surface,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    height: 1.1,
-                  ),
+            ),
+            Text(
+              AdoptionCategories.subtitle(id),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppColors.subText,
+                fontSize: 8.5,
+                fontWeight: FontWeight.w600,
+                height: 1.1,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                '$count',
+                style: const TextStyle(
+                  color: AppColors.surface,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  height: 1.1,
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

@@ -113,6 +113,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
           : 'Detay',
       totalValue: order.total,
       gifts: order.gifts,
+      paymentMethod: order.paymentMethod,
+      addressLabel: order.addressLabel,
       lines: [
         for (final item in order.items)
           _OrderLine(
@@ -635,7 +637,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
               height: 40,
               width: double.infinity,
               child: const Text(
-                'Hediye seç',
+                'Ne Severiz',
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
               ),
             ),
@@ -644,13 +646,17 @@ class _OrdersScreenState extends State<OrdersScreen> {
           _buildDetailInfoTile(
             icon: Icons.location_on_outlined,
             title: 'Teslimat Adresi',
-            value: 'Ev Adresim • İstanbul',
+            value: order.addressLabel.trim().isEmpty
+                ? 'Adres kaydı yok'
+                : order.addressLabel,
           ),
           const SizedBox(height: 8),
           _buildDetailInfoTile(
-            icon: Icons.credit_card_rounded,
+            icon: _paymentIcon(order.paymentMethod),
             title: 'Ödeme',
-            value: 'Banka / Kredi Kartı •••• 4242',
+            value: order.paymentMethod.trim().isEmpty
+                ? 'Ödeme yöntemi kaydı yok'
+                : order.paymentMethod,
           ),
           const SizedBox(height: 8),
           _buildDetailInfoTile(
@@ -692,6 +698,18 @@ class _OrdersScreenState extends State<OrdersScreen> {
         ],
       ),
     );
+  }
+
+  IconData _paymentIcon(String method) {
+    final value = method.toLowerCase();
+    if (value.contains('nakit')) return Icons.payments_outlined;
+    if (value.contains('havale') || value.contains('eft')) {
+      return Icons.account_balance_outlined;
+    }
+    if (value.contains('pos') || value.contains('kart')) {
+      return Icons.credit_card_outlined;
+    }
+    return Icons.payments_outlined;
   }
 
   Widget _buildOrderLineDetail(_OrderLine line) {
@@ -1091,8 +1109,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
       _OrderStatus.delivered => const _StatusStyle(
         label: 'Teslim Edildi',
         color: AppColors.success,
-        badgeBackground: Color(0xFFEAF9EF),
-        bannerColor: Color(0xFFF0FBF4),
+        badgeBackground: AppColors.selected,
+        bannerColor: AppColors.background,
         badgeIcon: Icons.check_circle_rounded,
         bannerIcon: Icons.check_circle_outline_rounded,
       ),
@@ -1100,15 +1118,15 @@ class _OrdersScreenState extends State<OrdersScreen> {
         label: 'Kuryede',
         color: AppColors.primary,
         badgeBackground: AppColors.selected,
-        bannerColor: Color(0xFFF2F8FF),
+        bannerColor: AppColors.background,
         badgeIcon: Icons.delivery_dining_rounded,
         bannerIcon: Icons.info_outline_rounded,
       ),
       _OrderStatus.preparing => const _StatusStyle(
         label: 'Hazırlanıyor',
         color: AppColors.warning,
-        badgeBackground: Color(0xFFFFF7E8),
-        bannerColor: Color(0xFFFFFAF0),
+        badgeBackground: AppColors.selected,
+        bannerColor: AppColors.background,
         badgeIcon: Icons.schedule_rounded,
         bannerIcon: Icons.schedule_rounded,
       ),
@@ -1135,6 +1153,8 @@ class _OrderItem {
     required this.lines,
     this.totalValue = 0,
     this.gifts = const [],
+    this.paymentMethod = '',
+    this.addressLabel = '',
   });
 
   final String id;
@@ -1146,6 +1166,8 @@ class _OrderItem {
   final String actionLabel;
   final List<_OrderLine> lines;
   final List<String> gifts;
+  final String paymentMethod;
+  final String addressLabel;
 
   List<String> get images => lines.map((line) => line.imagePath).toList();
 }

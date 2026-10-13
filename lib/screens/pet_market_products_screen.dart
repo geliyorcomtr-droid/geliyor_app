@@ -10,6 +10,7 @@ import 'package:geliyor_app/state/cart_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/utils/product_image.dart';
+import 'package:geliyor_app/utils/market_product_helpers.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
 import 'package:geliyor_app/widgets/app_pressable_button.dart';
@@ -154,7 +155,7 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
 
   String _defaultSubCategoryFor(String mainCategory) {
     if (mainCategory == 'smart') return 'Akıllı Pet';
-    return 'Mama';
+    return 'Yetişkin';
   }
 
   void _applySortSelection(String value) {
@@ -167,7 +168,7 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
         _mainCategory = 'dog';
         _subCategory = _defaultSubCategoryFor('dog');
       case 'Popüler Mamalar':
-        _subCategory = 'Mama';
+        _subCategory = 'Yetişkin';
       case 'Popüler Kum ve Bakım':
         _mainCategory = 'cat';
         _subCategory = 'Kum';
@@ -183,7 +184,7 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
       return switch (_sortBy) {
         'En Çok Satan Kedi Ürünleri' => 'Kedi',
         'En Çok Satan Köpek Ürünleri' => 'Köpek',
-        'Popüler Mamalar' => 'Mama',
+        'Popüler Mamalar' => 'Yetişkin',
         'Popüler Kum ve Bakım' => 'Kum',
         'Haftanın Yıldızları' => 'Yıldız',
         'Yeni Favoriler' => 'Yeni',
@@ -226,8 +227,7 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
   void initState() {
     super.initState();
     _mainCategory = widget.initialMainCategory;
-    _subCategory =
-        widget.initialSubCategory ?? _defaultSubCategoryFor(_mainCategory);
+    _subCategory = widget.initialSubCategory ?? '';
     _selectedFeature = widget.initialFeature;
     _selectedAdvantageId = widget.initialAdvantageId;
     _catalogFilter = widget.initialCatalogFilter;
@@ -420,7 +420,8 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
   }
 
   bool get _relaxCategoryFilter {
-    return _searchQuery.isNotEmpty ||
+    return _mainCategory.trim().isEmpty ||
+        _searchQuery.isNotEmpty ||
         _selectedFeature != null ||
         (_selectedAdvantageId != null &&
             _selectedAdvantageId!.trim().isNotEmpty) ||
@@ -431,6 +432,11 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
   Widget build(BuildContext context) {
     return StreamBuilder<List<MarketProductData>>(
       stream: ProductRepository.instance.watchMarketProducts(
+        mainCategory: _relaxCategoryFilter ? null : _mainCategory,
+        subCategory: _relaxCategoryFilter ? null : _subCategory,
+        searchQuery: _searchQuery.isEmpty ? null : _searchQuery,
+      ),
+      initialData: ProductRepository.instance.cachedMarketProducts(
         mainCategory: _relaxCategoryFilter ? null : _mainCategory,
         subCategory: _relaxCategoryFilter ? null : _subCategory,
         searchQuery: _searchQuery.isEmpty ? null : _searchQuery,
@@ -519,20 +525,8 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
             12,
           ),
           sliver: products.isEmpty
-              ? const SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(vertical: 24),
-                    child: Center(
-                      child: Text(
-                        'Bu kategoride ürün bulunamadı.',
-                        style: TextStyle(
-                          color: AppColors.subText,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
+              ? SliverToBoxAdapter(
+                  child: marketProductsPlaceholder(isEmpty: true),
                 )
               : SliverGrid(
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -685,7 +679,7 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
       onTap: () {
         setState(() {
           _mainCategory = category.id;
-          _subCategory = _defaultSubCategoryFor(category.id);
+          _subCategory = '';
           _selectedBrand = null;
           _selectedWeight = null;
           _selectedAgeGroup = null;

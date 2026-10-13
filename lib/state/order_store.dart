@@ -76,15 +76,8 @@ class OrderStore extends ChangeNotifier {
       '${_lastOrderAt.day.toString().padLeft(2, '0')}.'
       '${_lastOrderAt.month.toString().padLeft(2, '0')}.'
       '${_lastOrderAt.year}';
-  List<LastOrderItem> get lastOrderItems {
-    _lastOrderItems = _lastOrderItems
-        .where((item) {
-          final path = item.imagePath.trim().toLowerCase();
-          return path.startsWith('http://') || path.startsWith('https://');
-        })
-        .toList(growable: false);
-    return List.unmodifiable(_lastOrderItems);
-  }
+  List<LastOrderItem> get lastOrderItems =>
+      List.unmodifiable(_lastOrderItems);
 
   bool get hasLastOrder => _lastOrderItems.isNotEmpty;
 

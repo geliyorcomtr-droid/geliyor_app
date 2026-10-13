@@ -3,6 +3,7 @@ import 'package:geliyor_app/data/food_tracking_choices.dart';
 import 'package:geliyor_app/data/pet_consumption.dart';
 import 'package:geliyor_app/data/pet_life_stage.dart';
 import 'package:geliyor_app/state/food_tracking_store.dart';
+import 'package:geliyor_app/state/notification_settings_store.dart';
 import 'package:geliyor_app/state/order_store.dart';
 import 'package:geliyor_app/state/pet_store.dart';
 
@@ -82,6 +83,14 @@ abstract final class FoodRemainingEstimator {
       );
     }
 
+    if (!NotificationSettingsStore.instance.orderFoodTrackingEnabled) {
+      return null;
+    }
+    return estimateFromLastOrder();
+  }
+
+  /// Son siparişteki paket ve dost verisiyle kaç gün yeteceği.
+  static FoodRemainingEstimate? estimateFromLastOrder() {
     final orderMatch = _lastDryFoodWithPet();
     if (orderMatch == null) return null;
     final food = orderMatch.$1;

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:geliyor_app/admin/category_repository.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/utils/compress_upload_image.dart';
+import 'package:geliyor_app/utils/storage_metadata.dart';
 
 class AdminCategoriesScreen extends StatefulWidget {
   const AdminCategoriesScreen({super.key});
@@ -260,7 +261,7 @@ class _AdminCategoriesScreenState extends State<AdminCategoriesScreen> {
                   TextField(
                     controller: title,
                     decoration: const InputDecoration(
-                      labelText: 'Başlık (ör. Mama)',
+                      labelText: 'Başlık (ör. Yetişkin)',
                       border: OutlineInputBorder(),
                     ),
                   ),
@@ -375,7 +376,7 @@ class _AdminCategoriesScreenState extends State<AdminCategoriesScreen> {
       );
       await ref.putData(
         prepared.bytes,
-        SettableMetadata(contentType: prepared.contentType),
+        storageImageMetadata(prepared.contentType),
       );
       return await ref.getDownloadURL();
     } catch (e) {
@@ -457,7 +458,7 @@ class _AdminCategoriesScreenState extends State<AdminCategoriesScreen> {
                   icon: const Icon(Icons.add),
                   label: const Text('Ana Kategori Ekle'),
                   style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF17A2B8),
+                    backgroundColor: AppColors.primary,
                   ),
                 ),
               ],

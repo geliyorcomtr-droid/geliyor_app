@@ -1,5 +1,10 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geliyor_app/data/firestore_collections.dart';
+import 'package:geliyor_app/data/health_product_groups.dart';
+import 'package:geliyor_app/data/pet_life_stage.dart';
+import 'package:geliyor_app/data/product_repository.dart';
 
 class AdminSubCategory {
   const AdminSubCategory({
@@ -112,7 +117,7 @@ const defaultAdminCategories = <AdminMainCategory>[
     subcategories: [
       AdminSubCategory(
         id: 'cat-mama',
-        title: 'Mama',
+        title: 'Yetişkin',
         subtitle: 'Yetişkin kedi mamaları ve ürünleri',
         order: 0,
       ),
@@ -147,16 +152,28 @@ const defaultAdminCategories = <AdminMainCategory>[
         order: 5,
       ),
       AdminSubCategory(
-        id: 'cat-saglik',
-        title: 'Sağlık',
-        subtitle: 'Vitamin ve sağlık destekleri',
-        order: 6,
+        id: 'cat-vitamin',
+        title: HealthProductGroup.vitaminTitle,
+        subtitle: 'Bağışıklık ve enerji desteği',
+        order: 7,
+      ),
+      AdminSubCategory(
+        id: 'cat-takviye',
+        title: HealthProductGroup.supplementTitle,
+        subtitle: 'Ek besin ve destek ürünleri',
+        order: 8,
+      ),
+      AdminSubCategory(
+        id: 'cat-malt',
+        title: HealthProductGroup.maltTitle,
+        subtitle: 'Tüy yumağı ve sindirim',
+        order: 9,
       ),
       AdminSubCategory(
         id: 'cat-tasima',
         title: 'Taşıma',
         subtitle: 'Taşıma çantası ve ekipmanları',
-        order: 7,
+        order: 10,
       ),
     ],
   ),
@@ -167,7 +184,7 @@ const defaultAdminCategories = <AdminMainCategory>[
     subcategories: [
       AdminSubCategory(
         id: 'dog-mama',
-        title: 'Mama',
+        title: 'Yetişkin',
         subtitle: 'Yetişkin köpek mamaları ve ürünleri',
         order: 0,
       ),
@@ -274,11 +291,25 @@ class CategoryRepository {
     FirestoreCollections.categories,
   );
 
+  List<AdminMainCategory> _cached = const [];
+  bool _ready = false;
+  StreamSubscription<List<AdminMainCategory>>? _watch;
+
+  bool get ready => _ready;
+  List<AdminMainCategory> get cached => _cached;
+
+  /// Uygulama açılır açılmaz dinler; pet market eski ikona düşmeden güncel görseli kullanır.
+  void startListening() {
+    _watch ??= watchAll().listen((_) {});
+  }
+
   Stream<List<AdminMainCategory>> watchAll() {
-    return _col
-        .orderBy(CategoryFields.order)
-        .snapshots()
-        .map((snap) => snap.docs.map(AdminMainCategory.fromDoc).toList());
+    return _col.orderBy(CategoryFields.order).snapshots().map((snap) {
+      final items = snap.docs.map(AdminMainCategory.fromDoc).toList();
+      _cached = List<AdminMainCategory>.unmodifiable(items);
+      _ready = true;
+      return _cached;
+    });
   }
 
   Future<List<AdminMainCategory>> fetchAll() async {
@@ -294,6 +325,7 @@ class CategoryRepository {
         batch.set(_col.doc(cat.id), cat.toMap());
       }
       await batch.commit();
+      await ProductRepository.instance.migrateMamaCategoryToYetiskin();
       return;
     }
 
@@ -306,20 +338,56 @@ class CategoryRepository {
         await saveMain(cat);
         continue;
       }
-      final knownIds = current.subcategories.map((sub) => sub.id).toSet();
+      var subs = [...current.subcategories];
+      var changed = false;
+
+      if (cat.id == 'cat' || cat.id == 'dog') {
+        for (var i = 0; i < subs.length; i++) {
+          final title = PetLifeStage.normalizeTitle(subs[i].title);
+          final isAdultSlot =
+              subs[i].id == '${cat.id}-mama' || title == 'mama';
+          if (isAdultSlot && subs[i].title.trim() != PetLifeStage.catAdult) {
+            subs[i] = subs[i].copyWith(title: PetLifeStage.catAdult);
+            changed = true;
+          }
+        }
+      }
+
+      final defaultOrderById = {
+        for (final sub in cat.subcategories) sub.id: sub.order,
+      };
+      final defaultOrderByTitle = {
+        for (final sub in cat.subcategories)
+          PetLifeStage.normalizeTitle(sub.title): sub.order,
+      };
+      for (var i = 0; i < subs.length; i++) {
+        final order = defaultOrderById[subs[i].id] ??
+            defaultOrderByTitle[PetLifeStage.normalizeTitle(subs[i].title)];
+        if (order != null && subs[i].order != order) {
+          subs[i] = subs[i].copyWith(order: order);
+          changed = true;
+        }
+      }
+      subs.sort((a, b) => a.order.compareTo(b.order));
+
+      final knownIds = subs.map((sub) => sub.id).toSet();
       final knownTitles = {
-        for (final sub in current.subcategories)
-          sub.title.trim().toLowerCase(),
+        for (final sub in subs) PetLifeStage.normalizeTitle(sub.title),
       };
       final missing = [
         for (final sub in cat.subcategories)
           if (!knownIds.contains(sub.id) &&
-              !knownTitles.contains(sub.title.trim().toLowerCase()))
+              !knownTitles.contains(PetLifeStage.normalizeTitle(sub.title)))
             sub,
       ];
-      if (missing.isEmpty) continue;
-      await saveSubs(cat.id, [...current.subcategories, ...missing]);
+      if (missing.isNotEmpty) {
+        subs = [...subs, ...missing];
+        changed = true;
+      }
+      if (changed) await saveSubs(cat.id, subs);
     }
+
+    await ProductRepository.instance.migrateMamaCategoryToYetiskin();
   }
 
   Future<void> saveMain(AdminMainCategory category) async {

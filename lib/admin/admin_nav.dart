@@ -19,6 +19,10 @@ enum AdminPage {
   bankTransfer,
   adoption,
   foodTracking,
+  softtrStock,
+  reporting,
+  hangiMama,
+  welcomeSplash,
 }
 
 class AdminNavChild {
@@ -108,8 +112,21 @@ const adminNavItems = <AdminNavItem>[
       AdminNavChild(page: AdminPage.brands, label: 'Markalar'),
       AdminNavChild(page: AdminPage.categories, label: 'Kategoriler'),
       AdminNavChild(page: AdminPage.trustBadges, label: 'Güven Rozetleri'),
-      AdminNavChild(page: AdminPage.advantages, label: 'Ürün Özellikleri'),
+      AdminNavChild(page: AdminPage.advantages, label: 'Öne Çıkan Özellikler'),
+      AdminNavChild(page: AdminPage.softtrStock, label: 'Softtr stok / fiyat'),
     ],
+  ),
+  AdminNavItem(
+    page: AdminPage.hangiMama,
+    label: 'Hangi Mama',
+    icon: Icons.restaurant_rounded,
+    accent: AdminAccents.hangiMama,
+  ),
+  AdminNavItem(
+    page: AdminPage.reporting,
+    label: 'Raporlama',
+    icon: Icons.analytics_rounded,
+    accent: AdminAccents.reporting,
   ),
   AdminNavItem(
     page: AdminPage.foodTracking,
@@ -145,6 +162,11 @@ const adminNavItems = <AdminNavItem>[
     icon: Icons.image_rounded,
     accent: AdminAccents.banners,
     children: [
+      AdminNavChild(
+        page: AdminPage.banners,
+        label: 'Karşılama görseli',
+        bannerGroup: 'welcome_splash',
+      ),
       AdminNavChild(
         page: AdminPage.banners,
         label: 'Tüm sayfalar',
@@ -187,6 +209,16 @@ const adminNavItems = <AdminNavItem>[
       ),
       AdminNavChild(
         page: AdminPage.banners,
+        label: 'Hangi Mama',
+        bannerGroup: 'hangi_mama',
+      ),
+      AdminNavChild(
+        page: AdminPage.banners,
+        label: 'Hediye Seç',
+        bannerGroup: 'gift_select',
+      ),
+      AdminNavChild(
+        page: AdminPage.banners,
         label: 'Mama Takibi',
         bannerGroup: 'food_tracking',
       ),
@@ -222,8 +254,13 @@ const adminNavItems = <AdminNavItem>[
       ),
       AdminNavChild(
         page: AdminPage.banners,
-        label: 'İlaç & Tedavi',
+        label: 'İlaç ve Tedavi',
         bannerGroup: 'medicine',
+      ),
+      AdminNavChild(
+        page: AdminPage.banners,
+        label: 'Özel Sağlık Mamaları',
+        bannerGroup: 'special_foods',
       ),
       AdminNavChild(
         page: AdminPage.banners,
@@ -321,13 +358,17 @@ String adminPageTitle(
     AdminPage.brands => 'Markalar',
     AdminPage.categories => 'Kategoriler',
     AdminPage.trustBadges => 'Güven Rozetleri',
-    AdminPage.advantages => 'Ürün Özellikleri',
+    AdminPage.advantages => 'Öne Çıkan Özellikler',
+    AdminPage.softtrStock => 'Softtr stok / fiyat',
+    AdminPage.reporting => 'Raporlama',
     AdminPage.foodTracking => 'Mama Tüketim Takibi',
+    AdminPage.hangiMama => 'Hangi Mama',
     AdminPage.members => 'Üyeler',
     AdminPage.campaigns => 'Kampanyalar',
     AdminPage.coupons => 'Kuponlar',
     AdminPage.broadcasts => 'Duyurular',
     AdminPage.banners => 'Sayfa bannerları',
+    AdminPage.welcomeSplash => 'Karşılama görseli',
     AdminPage.knowledge => switch (knowledgeGroup) {
       'questions' => 'Öne Çıkan Sorular',
       'articles' => 'Makaleler',

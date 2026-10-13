@@ -5,84 +5,84 @@ import 'package:geliyor_app/widgets/market_product_card.dart';
 const petMarketCatFeatures = [
   MarketProductFeature(
     icon: Icons.health_and_safety_outlined,
-    iconColor: AppColors.success,
-    bgColor: Color(0xFFE8F9EE),
+    iconColor: AppColors.primary,
+    bgColor: AppColors.selected,
   ),
   MarketProductFeature(
     icon: Icons.water_drop_outlined,
-    iconColor: Color(0xFF8B5CF6),
-    bgColor: Color(0xFFF3E8FF),
+    iconColor: AppColors.primary,
+    bgColor: AppColors.selected,
   ),
   MarketProductFeature(
     icon: Icons.fitness_center_rounded,
-    iconColor: Color(0xFFF97316),
-    bgColor: Color(0xFFFFF1E6),
+    iconColor: AppColors.primary,
+    bgColor: AppColors.selected,
   ),
   MarketProductFeature(
     icon: Icons.eco_rounded,
-    iconColor: AppColors.success,
-    bgColor: Color(0xFFE8F9EE),
+    iconColor: AppColors.primary,
+    bgColor: AppColors.selected,
   ),
   MarketProductFeature(
     icon: Icons.favorite_rounded,
-    iconColor: AppColors.error,
-    bgColor: Color(0xFFFEE2E2),
+    iconColor: AppColors.primary,
+    bgColor: AppColors.selected,
   ),
 ];
 
 const petMarketDogFeatures = [
   MarketProductFeature(
     icon: Icons.pets_rounded,
-    iconColor: AppColors.success,
-    bgColor: Color(0xFFE8F9EE),
+    iconColor: AppColors.primary,
+    bgColor: AppColors.selected,
   ),
   MarketProductFeature(
     icon: Icons.spa_outlined,
-    iconColor: Color(0xFF8B5CF6),
-    bgColor: Color(0xFFF3E8FF),
+    iconColor: AppColors.primary,
+    bgColor: AppColors.selected,
   ),
   MarketProductFeature(
     icon: Icons.fitness_center_rounded,
-    iconColor: Color(0xFFF97316),
-    bgColor: Color(0xFFFFF1E6),
+    iconColor: AppColors.primary,
+    bgColor: AppColors.selected,
   ),
   MarketProductFeature(
     icon: Icons.eco_rounded,
-    iconColor: AppColors.success,
-    bgColor: Color(0xFFE8F9EE),
+    iconColor: AppColors.primary,
+    bgColor: AppColors.selected,
   ),
   MarketProductFeature(
     icon: Icons.shield_outlined,
-    iconColor: AppColors.warning,
-    bgColor: Color(0xFFFFF8EC),
+    iconColor: AppColors.primary,
+    bgColor: AppColors.selected,
   ),
 ];
 
 const petMarketSmartFeatures = [
   MarketProductFeature(
     icon: Icons.schedule_rounded,
-    iconColor: AppColors.success,
-    bgColor: Color(0xFFE8F9EE),
+    iconColor: AppColors.primary,
+    bgColor: AppColors.selected,
   ),
   MarketProductFeature(
     icon: Icons.phone_android_rounded,
-    iconColor: Color(0xFF8B5CF6),
-    bgColor: Color(0xFFF3E8FF),
+    iconColor: AppColors.primary,
+    bgColor: AppColors.selected,
   ),
   MarketProductFeature(
     icon: Icons.wifi_rounded,
-    iconColor: Color(0xFFF97316),
-    bgColor: Color(0xFFFFF1E6),
+    iconColor: AppColors.primary,
+    bgColor: AppColors.selected,
   ),
   MarketProductFeature(
     icon: Icons.notifications_active_outlined,
-    iconColor: AppColors.success,
-    bgColor: Color(0xFFE8F9EE),
+    iconColor: AppColors.primary,
+    bgColor: AppColors.selected,
   ),
   MarketProductFeature(
     icon: Icons.battery_charging_full_rounded,
-    iconColor: AppColors.warning,
-    bgColor: Color(0xFFFFF8EC),
+    iconColor: AppColors.primary,
+    bgColor: AppColors.selected,
   ),
 ];
 
@@ -111,16 +111,18 @@ const petMarketMainCategories = [
 
 const petMarketSubCategories = <String, List<PetMarketSubCategory>>{
   'cat': [
-    PetMarketSubCategory('Mama', Icons.rice_bowl_rounded),
+    PetMarketSubCategory('Yetişkin', Icons.rice_bowl_rounded),
     PetMarketSubCategory('Yavru', Icons.child_care_outlined),
     PetMarketSubCategory('Ödül', Icons.cookie_outlined),
     PetMarketSubCategory('Bakım', Icons.spa_outlined),
     PetMarketSubCategory('Oyuncak', Icons.sports_baseball_outlined),
-    PetMarketSubCategory('Sağlık', Icons.favorite_outline_rounded),
+    PetMarketSubCategory('Vitamin', Icons.medication_outlined),
+    PetMarketSubCategory('Takviye Gıdalar', Icons.health_and_safety_outlined),
+    PetMarketSubCategory('Maltlar', Icons.spa_outlined),
     PetMarketSubCategory('Taşıma', Icons.shopping_bag_outlined),
   ],
   'dog': [
-    PetMarketSubCategory('Mama', Icons.rice_bowl_rounded),
+    PetMarketSubCategory('Yetişkin', Icons.rice_bowl_rounded),
     PetMarketSubCategory('Yavru', Icons.child_care_outlined),
     PetMarketSubCategory('Mini Irk', Icons.pets_outlined),
     PetMarketSubCategory('Mini Irk Yavru', Icons.pets_rounded),

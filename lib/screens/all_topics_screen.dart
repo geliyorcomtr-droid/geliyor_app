@@ -2,7 +2,9 @@
 
 import 'package:flutter/material.dart';
 import 'package:geliyor_app/data/banner_repository.dart';
+import 'package:geliyor_app/data/knowledge_advantage_icons.dart';
 import 'package:geliyor_app/data/knowledge_content_repository.dart';
+import 'package:geliyor_app/data/product_advantage_repository.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/screens/featured_questions_screen.dart';
 import 'package:geliyor_app/utils/product_image.dart';
@@ -29,6 +31,7 @@ class _AllTopicsScreenState extends State<AllTopicsScreen> {
   void initState() {
     super.initState();
     unawaited(KnowledgeContentRepository.instance.ensureDefaults());
+    unawaited(ProductAdvantageRepository.instance.ensureDefaults());
   }
 
   @override
@@ -134,61 +137,69 @@ class _AllTopicsScreenState extends State<AllTopicsScreen> {
   }
 
   Widget _buildTopicsGrid() {
-    return StreamBuilder<List<AppKnowledgeTopic>>(
-      stream: KnowledgeContentRepository.instance.watchActiveTopics(),
-      builder: (context, snapshot) {
-        final q = _query.trim().toLowerCase();
-        final topics = (snapshot.data ?? AppKnowledgeTopic.defaults()).where((
-          item,
-        ) {
-          if (q.isEmpty) return true;
-          return item.title.toLowerCase().contains(q) ||
-              item.subtitle.toLowerCase().contains(q);
-        }).toList();
-        if (topics.isEmpty) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 24),
-            child: Center(
-              child: Text(
-                'Konu bulunamadı',
-                style: TextStyle(color: AppColors.subText),
-              ),
-            ),
-          );
-        }
-        const columns = 4;
-        final rows = (topics.length / columns).ceil();
-        return Column(
-          children: [
-            for (int row = 0; row < rows; row++) ...[
-              if (row > 0) const SizedBox(height: 10),
-              SizedBox(
-                height: 92,
-                child: Row(
-                  children: [
-                    for (int col = 0; col < columns; col++) ...[
-                      if (col > 0) const SizedBox(width: 8),
-                      Expanded(
-                        child: () {
-                          final index = row * columns + col;
-                          if (index >= topics.length) {
-                            return const SizedBox.shrink();
-                          }
-                          return _buildTopicItem(topics[index]);
-                        }(),
-                      ),
-                    ],
-                  ],
+    return StreamBuilder<List<AppProductAdvantage>>(
+      stream: ProductAdvantageRepository.instance.watchAll(activeOnly: true),
+      builder: (context, advantageSnap) {
+        final catalog = advantageSnap.data ?? const <AppProductAdvantage>[];
+        return StreamBuilder<List<AppKnowledgeTopic>>(
+          stream: KnowledgeContentRepository.instance.watchActiveTopics(),
+          builder: (context, snapshot) {
+            final q = _query.trim().toLowerCase();
+            final topics =
+                (snapshot.data ?? AppKnowledgeTopic.defaults()).where((item) {
+              if (q.isEmpty) return true;
+              return item.title.toLowerCase().contains(q) ||
+                  item.subtitle.toLowerCase().contains(q);
+            }).toList();
+            if (topics.isEmpty) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(
+                  child: Text(
+                    'Konu bulunamadı',
+                    style: TextStyle(color: AppColors.subText),
+                  ),
                 ),
-              ),
-            ],
-          ],
+              );
+            }
+            const columns = 4;
+            final rows = (topics.length / columns).ceil();
+            return Column(
+              children: [
+                for (int row = 0; row < rows; row++) ...[
+                  if (row > 0) const SizedBox(height: 10),
+                  SizedBox(
+                    height: 92,
+                    child: Row(
+                      children: [
+                        for (int col = 0; col < columns; col++) ...[
+                          if (col > 0) const SizedBox(width: 8),
+                          Expanded(
+                            child: () {
+                              final index = row * columns + col;
+                              if (index >= topics.length) {
+                                return const SizedBox.shrink();
+                              }
+                              return _buildTopicItem(topics[index], catalog);
+                            }(),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            );
+          },
         );
       },
     );
   }
 
-  Widget _buildTopicItem(AppKnowledgeTopic topic) {
+  Widget _buildTopicItem(
+    AppKnowledgeTopic topic,
+    List<AppProductAdvantage> catalog,
+  ) {
     return GestureDetector(
       onTap: () {
         Navigator.of(context).push(
@@ -216,7 +227,12 @@ class _AllTopicsScreenState extends State<AllTopicsScreen> {
             ),
             child: ClipOval(
               child: buildProductImage(
-                topic.displayIcon,
+                KnowledgeAdvantageIcons.forTopic(
+                  topicId: topic.id,
+                  advantageId: topic.advantageId,
+                  fallback: topic.displayIcon,
+                  catalog: catalog,
+                ),
                 fit: BoxFit.contain,
                 filterQuality: FilterQuality.high,
                 errorWidget: Icon(

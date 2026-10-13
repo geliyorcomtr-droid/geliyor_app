@@ -167,7 +167,7 @@ const defaultKnowledgeTopics = <DefaultKnowledgeTopic>[
     id: 'idrar',
     title: 'İdrar Yolu',
     subtitle: 'İdrar sağlığı',
-    assetPath: 'assets/images/app_ikonlar/idrar.png',
+    assetPath: '',
     colorValue: 0xFFDB2777,
     questionTopicId: 'idrar',
     order: 2,
@@ -410,7 +410,4 @@ const defaultKnowledgeQuestions = <DefaultKnowledgeQuestion>[
   DefaultKnowledgeQuestion(id: 'parazit-8', topicId: 'parazit', title: 'Doğal parazit önleme yöntemleri işe yarar mı?', views: '3,1B', order: 7),
 ];
 
-Color knowledgeColor(int value) {
-  if (value == 0) return AppColors.warning;
-  return Color(value);
-}
+Color knowledgeColor(int value) => AppColors.primary;

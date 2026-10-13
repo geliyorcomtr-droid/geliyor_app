@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:geliyor_app/data/banner_repository.dart';
 import 'package:geliyor_app/data/brand_repository.dart';
+import 'package:geliyor_app/data/product_repository.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/screens/easy_order_screen.dart';
 import 'package:geliyor_app/screens/filter_screen.dart';
@@ -17,11 +18,15 @@ import 'package:geliyor_app/screens/pet_market_screen.dart';
 import 'package:geliyor_app/screens/smart_plan_screen.dart';
 import 'package:geliyor_app/services/food_remaining_estimator.dart';
 import 'package:geliyor_app/state/food_tracking_store.dart';
+import 'package:geliyor_app/state/notification_settings_store.dart';
 import 'package:geliyor_app/state/order_store.dart';
 import 'package:geliyor_app/state/pet_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:geliyor_app/theme/app_icons.dart';
 import 'package:geliyor_app/utils/advantage_search.dart';
+import 'package:geliyor_app/utils/product_image.dart';
 import 'package:geliyor_app/widgets/app_banner_slider.dart';
+import 'package:geliyor_app/widgets/brand_tile_image.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
@@ -54,7 +59,7 @@ class _HomeScreenState extends State<HomeScreen> {
     'muayene',
   ];
 
-  static const double _serviceCardHeight = 118;
+  static const double _serviceCardHeight = 132;
   static const double _serviceCardGap = 8;
   static const double _serviceCardRadius = 18;
 
@@ -65,6 +70,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     unawaited(BannerRepository.instance.restoreHomeDostEkleIfMeetPetLeaked());
+    ProductRepository.instance.ensureWarm();
   }
 
   @override
@@ -108,7 +114,7 @@ class _HomeScreenState extends State<HomeScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Column(
             children: [
-              const SizedBox(height: 12),
+              const SizedBox(height: 2),
               _buildBannerSlider(),
               const SizedBox(height: 12),
               _buildSearchRow(),
@@ -119,13 +125,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   OrderStore.instance,
                   FoodTrackingStore.instance,
                   BrandRepository.instance,
+                  NotificationSettingsStore.instance,
                 ]),
                 builder: (context, _) => _ovalFramedStrip(
                   color: AppColors.primary,
                   child: _buildSmartPlanCard(),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 7),
               _buildSpecialServices(),
               const SizedBox(height: 12),
               _ovalFramedStrip(
@@ -367,6 +374,7 @@ class _HomeScreenState extends State<HomeScreen> {
             fit: StackFit.expand,
             children: [
               AppBannerStrip(
+                key: const ValueKey('home-smart-plan'),
                 placement: BannerPlacement.homeSmartPlan,
                 fallbackAsset: 'assets/images/home_akilli_plan.jpg',
                 onTap: _openSmartPlan,
@@ -447,15 +455,22 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildSpecialServices() {
     return Column(
       children: [
-        const Row(
+        Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('Size Özel Hizmetler', style: AppTextStyles.sectionHeader),
-            SizedBox(width: 4),
-            Icon(Icons.pets_rounded, size: 15, color: AppColors.primary),
+            Text(
+              'Size Özel Hizmetler',
+              style: AppTextStyles.sectionHeader.copyWith(
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+                height: 1.1,
+              ),
+            ),
+            const SizedBox(width: 6),
+            const Icon(Icons.pets_rounded, size: 22, color: AppColors.primary),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 7),
         SizedBox(
           height: _serviceCardHeight,
           child: Row(
@@ -463,7 +478,8 @@ class _HomeScreenState extends State<HomeScreen> {
               _serviceCard(
                 title: 'Kolay\nSipariş',
                 icon: Icons.delivery_dining_rounded,
-                color: AppColors.success,
+                color: AppColors.primary,
+                iconColor: const Color(0xFF22C55E),
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const EasyOrderScreen()),
@@ -474,7 +490,8 @@ class _HomeScreenState extends State<HomeScreen> {
               _serviceCard(
                 title: 'Pet\nE-nabız',
                 icon: Icons.health_and_safety_rounded,
-                color: AppColors.error,
+                color: AppColors.primary,
+                iconColor: const Color(0xFFEF4444),
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const HealthScreen()),
@@ -485,7 +502,8 @@ class _HomeScreenState extends State<HomeScreen> {
               _serviceCard(
                 title: 'Bilgi\nBankası',
                 icon: Icons.menu_book_rounded,
-                color: AppColors.warning,
+                color: AppColors.primary,
+                iconColor: const Color(0xFFF59E0B),
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
@@ -497,9 +515,10 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(width: _serviceCardGap),
               _serviceCard(
                 title: 'Hangi\nMama',
-                icon: Icons.restaurant_rounded,
-                imagePath: 'assets/images/son_ikonlar/hangi_mama.png',
-                color: AppColors.violet,
+                icon: Icons.question_mark_rounded,
+                color: AppColors.primary,
+                iconColor: const Color(0xFF8B5CF6),
+                imagePath: AppIcons.mamaKabi,
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const HangiMamaScreen()),
@@ -517,6 +536,7 @@ class _HomeScreenState extends State<HomeScreen> {
     required String title,
     required IconData icon,
     required Color color,
+    Color? iconColor,
     String? imagePath,
     VoidCallback? onTap,
   }) {
@@ -528,50 +548,46 @@ class _HomeScreenState extends State<HomeScreen> {
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(_serviceCardRadius),
-            border: Border.all(color: color.withValues(alpha: 0.25)),
+            border: Border.all(color: color),
           ),
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(6, 10, 6, 8),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Stack(
+              fit: StackFit.expand,
               children: [
-                if (imagePath != null)
-                  Image.asset(
-                    imagePath,
-                    width: 34,
-                    height: 34,
-                    fit: BoxFit.contain,
-                    filterQuality: FilterQuality.high,
-                    errorBuilder: (context, error, stackTrace) =>
-                        Icon(icon, color: color, size: 34),
-                  )
-                else
-                  Icon(icon, color: color, size: 34),
-                Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    height: 1.15,
-                  ),
-                ),
-                Container(
-                  width: 22,
-                  height: 22,
-                  decoration: BoxDecoration(
-                    color: color,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.chevron_right_rounded,
-                    color: AppColors.surface,
-                    size: 16,
+                ColoredBox(color: color.withValues(alpha: 0.10)),
+                _serviceCardPaws(color),
+                _serviceSparkles(color),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Column(
+                    children: [
+                      const Spacer(),
+                      _serviceLogo(
+                        icon: icon,
+                        color: color,
+                        iconColor: iconColor ?? color,
+                        imagePath: imagePath,
+                      ),
+                      const Spacer(),
+                      Text(
+                        title,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: color,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                          height: 1.15,
+                        ),
+                      ),
+                      const Spacer(),
+                      Icon(
+                        Icons.arrow_forward_rounded,
+                        color: color,
+                        size: 22,
+                      ),
+                      const Spacer(),
+                    ],
                   ),
                 ),
               ],
@@ -582,6 +598,100 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _serviceSparkles(Color color) {
+    final line = color.withValues(alpha: 0.55);
+    Widget dash(double width, double angle) {
+      return Transform.rotate(
+        angle: angle,
+        child: Container(
+          width: width,
+          height: 1.7,
+          decoration: BoxDecoration(
+            color: line,
+            borderRadius: BorderRadius.circular(999),
+          ),
+        ),
+      );
+    }
+
+    return Positioned(
+      top: 8,
+      left: 7,
+      child: SizedBox(
+        width: 18,
+        height: 16,
+        child: Stack(
+          children: [
+            Positioned(left: 0, top: 8, child: dash(9, -0.75)),
+            Positioned(left: 5, top: 1, child: dash(7, -0.15)),
+            Positioned(left: 11, top: 6, child: dash(6, 0.55)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _serviceLogo({
+    required IconData icon,
+    required Color color,
+    required Color iconColor,
+    String? imagePath,
+  }) {
+    return Container(
+      width: 56,
+      height: 56,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        shape: BoxShape.circle,
+        border: Border.all(color: color),
+      ),
+      child: imagePath != null
+          ? Image.asset(
+              imagePath,
+              width: 36,
+              height: 36,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
+              errorBuilder: (context, error, stackTrace) =>
+                  Icon(icon, color: iconColor, size: 36),
+            )
+          : Icon(icon, color: iconColor, size: 36),
+    );
+  }
+
+  Widget _serviceCardPaws(Color color) {
+    const paws = <(double x, double y, double size, double rotation)>[
+      (0.16, 0.58, 22, -0.35),
+      (0.84, 0.62, 20, 0.45),
+    ];
+    final tint = color.withValues(alpha: 0.16);
+    return IgnorePointer(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return Stack(
+            children: [
+              for (final paw in paws)
+                Positioned(
+                  left: paw.$1 * constraints.maxWidth - paw.$3 / 2,
+                  top: paw.$2 * constraints.maxHeight - paw.$3 / 2,
+                  width: paw.$3,
+                  height: paw.$3,
+                  child: Transform.rotate(
+                    angle: paw.$4,
+                    child: Icon(
+                      Icons.pets_rounded,
+                      size: paw.$3,
+                      color: tint,
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
 
   Widget _ovalFramedStrip({
     required Color color,
@@ -605,6 +715,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildDostEkle() {
     return AppBannerStrip(
+      key: const ValueKey('home-dost-ekle'),
       placement: BannerPlacement.homeDostEkle,
       fallbackAsset: '',
       onTap: () {
@@ -617,6 +728,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildPetMarket() {
     return AppBannerStrip(
+      key: const ValueKey('home-pet-market'),
       placement: BannerPlacement.homePetMarket,
       fallbackAsset: '',
       onTap: () {
@@ -632,9 +744,14 @@ class _HomeScreenState extends State<HomeScreen> {
       listenable: BrandRepository.instance,
       builder: (context, _) {
         final brands = BrandRepository.instance.cached
-            .where((brand) => brand.active)
+            .where((brand) => brand.active && brand.hasImage)
             .toList();
         if (brands.isEmpty) return const SizedBox.shrink();
+        ImageWarmup.precache(
+          context,
+          brands.map((brand) => brand.displayImage),
+          cacheWidth: brandLogoCachePx,
+        );
         return LayoutBuilder(
           builder: (context, constraints) {
             const gap = _serviceCardGap;
@@ -664,39 +781,15 @@ class _HomeScreenState extends State<HomeScreen> {
   void _openBrand(AppBrand brand) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => PetMarketProductsScreen(initialBrand: brand.name),
+        builder: (_) => PetMarketProductsScreen(
+          initialMainCategory: '',
+          initialBrand: brand.name,
+        ),
       ),
     );
   }
 
   Widget _homeBrandCard(AppBrand brand) {
-    final fallback = Center(
-      child: Text(
-        brand.name,
-        textAlign: TextAlign.center,
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(
-          color: AppColors.primary,
-          fontSize: 11,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-    );
-    Widget image = fallback;
-    if (brand.imageUrl.isNotEmpty) {
-      image = Image.network(
-        brand.imageUrl,
-        fit: BoxFit.cover,
-        errorBuilder: (_, _, _) => fallback,
-      );
-    } else if (brand.assetPath.isNotEmpty) {
-      image = Image.asset(
-        brand.assetPath,
-        fit: BoxFit.cover,
-        errorBuilder: (_, _, _) => fallback,
-      );
-    }
     return GestureDetector(
       onTap: () => _openBrand(brand),
       child: Container(
@@ -708,7 +801,10 @@ class _HomeScreenState extends State<HomeScreen> {
         padding: const EdgeInsets.all(8),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
-          child: Transform.scale(scale: 1.08, child: image),
+          child: Transform.scale(
+            scale: 1.08,
+            child: BrandTileImage(brand: brand),
+          ),
         ),
       ),
     );
@@ -716,6 +812,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildAdoption() {
     return AppBannerStrip(
+      key: const ValueKey('home-sahiplendirme'),
       placement: BannerPlacement.homeSahiplendirme,
       fallbackAsset: 'assets/images/home_sahiplendirme.png',
       onTap: () {

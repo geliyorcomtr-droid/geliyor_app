@@ -8,8 +8,10 @@ import 'package:geliyor_app/data/banner_repository.dart';
 import 'package:geliyor_app/data/firestore_collections.dart';
 import 'package:geliyor_app/data/knowledge_article_repository.dart';
 import 'package:geliyor_app/data/product_repository.dart';
+import 'package:geliyor_app/data/welcome_splash_repository.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/utils/compress_upload_image.dart';
+import 'package:geliyor_app/utils/storage_metadata.dart';
 import 'package:geliyor_app/utils/product_image.dart';
 
 class AdminBannersScreen extends StatefulWidget {
@@ -24,19 +26,44 @@ class AdminBannersScreen extends StatefulWidget {
 class _AdminBannersScreenState extends State<AdminBannersScreen> {
   bool _seeding = true;
   bool _uploading = false;
-  late String _group = widget.initialGroup;
+  bool _moving = false;
+  final _search = TextEditingController();
+  final _expandedPageIds = <String>{};
 
-  bool _matches(BannerPlacement slot) {
-    if (slot.id.startsWith('home_ad_')) return false;
-    if (_group == 'all') return true;
-    if (_group == 'ads') return slot.pageId == 'home';
-    return slot.pageId == _group;
+  static const _hiddenPlacementPrefix = 'home_ad_';
+
+  List<BannerPlacement> get _visiblePlacements => BannerPlacement.values
+      .where((slot) => !slot.id.startsWith(_hiddenPlacementPrefix))
+      .toList();
+
+  List<(String pageId, String pageLabel)> get _pages {
+    final seen = <String>{};
+    return [
+      for (final slot in _visiblePlacements)
+        if (seen.add(slot.pageId)) (slot.pageId, slot.pageLabel),
+    ];
   }
+
+  List<BannerPlacement> _slotsForPage(String pageId) => _visiblePlacements
+      .where((slot) => slot.pageId == pageId)
+      .toList();
+
+  String _defaultSlot(String pageId) => _slotsForPage(pageId).first.id;
 
   @override
   void initState() {
     super.initState();
+    final group = widget.initialGroup.trim();
+    if (group.isNotEmpty && group != 'all' && group != 'ads') {
+      _expandedPageIds.add(group);
+    }
     _seed();
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
   }
 
   Future<void> _seed() async {
@@ -97,7 +124,7 @@ class _AdminBannersScreenState extends State<AdminBannersScreen> {
       );
       await reference.putData(
         prepared.bytes,
-        SettableMetadata(contentType: prepared.contentType),
+        storageImageMetadata(prepared.contentType),
       );
       return reference.getDownloadURL();
     } catch (error) {
@@ -192,7 +219,7 @@ class _AdminBannersScreenState extends State<AdminBannersScreen> {
                     DropdownButtonFormField<String>(
                       initialValue: selectedPlacement,
                       isExpanded: true,
-                      decoration: const InputDecoration(labelText: 'Bölüm'),
+                      decoration: const InputDecoration(labelText: 'Kategori'),
                       items: [
                         for (final item in BannerPlacement.values)
                           DropdownMenuItem(
@@ -323,8 +350,17 @@ class _AdminBannersScreenState extends State<AdminBannersScreen> {
                     if (slot.pageId == 'smart_plan') ...[
                       const SizedBox(height: 12),
                       Text(
-                        slot.id.contains('_inner_')
-                            ? 'Mama Tüketim Takibi kutusundaki sabit ürün görseli. Sipariş veya katalog değişince bu görsel değişmez.'
+                        slot.id == BannerPlacement.smartPlanAutoOrderStrip.id
+                            ? 'Abonelik şeridi. Ölçü 361×139 px. Görselin altındaki beyaz alanda “Aboneliğim” yazısı ve aç/kapa anahtarı uygulamada durur; tıklanınca sayfa açılmaz. Görseli değiştirebilir veya silebilirsiniz.'
+                            : slot.id ==
+                                  BannerPlacement.smartPlanReminderStrip.id
+                            ? 'Akıllı Planım sayfasındaki hatırlatma görseli. Ölçü 361×139 px. Alttaki beyaz kutuda anahtar ve gün seçimi uygulamada çalışır; buradan yalnızca görseli değiştirin.'
+                            : slot.id ==
+                                  BannerPlacement.smartPlanOrderTrackStrip.id
+                            ? 'Siparişten Otomatik Takip şeridi. Ölçü 361×139 px. Görselin herhangi bir yerine tıklanınca sipariş takip penceresi açılır. Görseli değiştirebilir veya silebilirsiniz.'
+                            : slot.id ==
+                                  BannerPlacement.smartPlanManualTrackStrip.id
+                            ? 'Manuel Takip şeridi. Ölçü 361×139 px. Görselin herhangi bir yerine tıklanınca mama takip sayfası açılır. Görseli değiştirebilir veya silebilirsiniz.'
                             : 'Kutuya tıklanınca bu görsel açılır; tekrar dokununca kapanır. Yazı paneli yok.',
                         style: const TextStyle(
                           color: AppColors.subText,
@@ -407,6 +443,84 @@ class _AdminBannersScreenState extends State<AdminBannersScreen> {
     }
   }
 
+  List<AppBanner> _bannersForPage(String pageId, List<AppBanner> all) {
+    final slots = _slotsForPage(pageId);
+    final rank = {for (var i = 0; i < slots.length; i++) slots[i].id: i};
+    final list = all.where((item) => rank.containsKey(item.placement)).toList();
+    list.sort((a, b) {
+      final bySlot = (rank[a.placement] ?? 0).compareTo(rank[b.placement] ?? 0);
+      if (bySlot != 0) return bySlot;
+      return a.order.compareTo(b.order);
+    });
+    return list;
+  }
+
+  bool _isExpanded(String pageId, List<AppBanner> items) {
+    if (_search.text.trim().isNotEmpty && items.isNotEmpty) return true;
+    return _expandedPageIds.contains(pageId);
+  }
+
+  void _togglePage(String pageId) {
+    setState(() {
+      if (_expandedPageIds.contains(pageId)) {
+        _expandedPageIds.remove(pageId);
+      } else {
+        _expandedPageIds.add(pageId);
+      }
+    });
+  }
+
+  Future<void> _move({
+    required List<AppBanner> catalog,
+    required String id,
+    required String placement,
+    String? beforeId,
+  }) async {
+    if (_moving) return;
+    setState(() => _moving = true);
+    try {
+      await BannerRepository.instance.moveBanner(
+        catalog: catalog,
+        id: id,
+        placement: placement,
+        beforeId: beforeId,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Taşınamadı: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _moving = false);
+    }
+  }
+
+  Future<void> _addToPage(String pageId, List<AppBanner> catalog) async {
+    final slots = _slotsForPage(pageId);
+    if (slots.isEmpty) return;
+    var slot = slots.first;
+    if (slots.length > 1) {
+      final picked = await showMenu<String>(
+        context: context,
+        position: const RelativeRect.fromLTRB(24, 80, 24, 0),
+        items: [
+          for (final item in slots)
+            PopupMenuItem(
+              value: item.id,
+              child: Text('${item.slotLabel.isEmpty ? item.title : item.slotLabel} · ${item.pxLabel}'),
+            ),
+        ],
+      );
+      if (picked == null) return;
+      slot = BannerPlacement.byId(picked);
+    }
+    if (!mounted) return;
+    await _edit(
+      placement: slot,
+      nextOrder: catalog.where((item) => item.placement == slot.id).length,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<AppBanner>>(
@@ -416,419 +530,831 @@ class _AdminBannersScreenState extends State<AdminBannersScreen> {
           return const Center(child: CircularProgressIndicator());
         }
         final banners = snapshot.data!;
-        final visibleSlots = BannerPlacement.values.where(_matches).toList();
-        final pageBoxes = <(String pageId, String pageLabel, List<BannerPlacement> slots)>[
-          for (final page in BannerPlacement.pages)
-            if (visibleSlots.any((slot) => slot.pageId == page.$1))
-              (
-                page.$1,
-                page.$2,
-                visibleSlots.where((slot) => slot.pageId == page.$1).toList(),
-              ),
-        ];
+        final query = _search.text.trim().toLowerCase();
         return ListView(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
           children: [
             const AdminPageHeader(
               title: 'Bannerlar',
               subtitle:
-                  'Her kutu bir uygulama sayfasına aittir. Banner ve reklamlar o sayfanın kutusunda durur; üstte ölçü (px) ve nereye ait olduğu yazar.',
+                  'Ana kategoriye tıklayınca o sayfanın banner görselleri açılır. '
+                  'Görseli sürükleyerek sırasını veya kategorisini değiştirin.',
             ),
             Wrap(
               spacing: 8,
               runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                _groupChip('all', 'Tüm sayfalar'),
-                for (final page in BannerPlacement.pages)
-                  _groupChip(page.$1, page.$2),
+                Text(
+                  'Toplam ${banners.length} banner',
+                  style: const TextStyle(
+                    color: AppColors.subText,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                SizedBox(
+                  width: 180,
+                  child: TextField(
+                    controller: _search,
+                    onChanged: (_) => setState(() {}),
+                    decoration: const InputDecoration(
+                      hintText: 'Ara',
+                      isDense: true,
+                      suffixIcon: Icon(Icons.search_rounded),
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
               ],
             ),
-            const SizedBox(height: 16),
-            for (final box in pageBoxes) ...[
-              _PageCategoryBox(
-                pageLabel: box.$2,
-                slotCount: box.$3.length,
-                note: box.$1 == 'smart_plan'
-                    ? 'Üstte 3 kutu, tıklanınca açılan ayrıntılar ve Mama Tüketim iç görselleri. İç görseller sabit kalır; yazı paneli yok.'
-                    : 'Bu kutudaki banner ve reklamlar yalnızca ${box.$2} sayfasına aittir.',
-                children: [
-                  for (final slot in box.$3) ...[
-                    _SectionBlock(
-                      placement: slot,
-                      banners: banners
-                          .where((item) => item.placement == slot.id)
-                          .toList(),
-                      onAdd: () => _edit(
-                        placement: slot,
-                        nextOrder: banners
-                            .where((b) => b.placement == slot.id)
-                            .length,
-                      ),
-                      onEdit: (banner) => _edit(
-                        existing: banner,
-                        placement: slot,
-                        nextOrder: banners.length,
-                      ),
-                      onToggle: (banner, value) =>
-                          _save(banner.copyWith(active: value)),
-                      onDelete: _delete,
-                    ),
-                    if (slot != box.$3.last) const SizedBox(height: 14),
-                  ],
-                ],
+            if (widget.initialGroup == 'all' ||
+                widget.initialGroup == 'welcome_splash')
+              _welcomeSplashBoard(),
+            if (widget.initialGroup != 'welcome_splash')
+              for (final page in _pages)
+              _categoryBoard(
+                pageId: page.$1,
+                pageLabel: page.$2,
+                banners: _bannersForPage(page.$1, banners).where((item) {
+                  if (query.isEmpty) return true;
+                  final slot = item.placementInfo;
+                  final hay =
+                      '${item.title} ${slot.pageLabel} ${slot.slotLabel} ${slot.title}'
+                          .toLowerCase();
+                  return hay.contains(query);
+                }).toList(),
+                catalog: banners,
               ),
-              const SizedBox(height: 18),
-            ],
           ],
         );
       },
     );
   }
 
-  Widget _groupChip(String value, String label) {
-    final selected = _group == value;
-    return FilterChip(
-      label: Text(label),
-      selected: selected,
-      onSelected: (_) => setState(() => _group = value),
-      selectedColor: AppColors.selected,
-      checkmarkColor: AppColors.primary,
-      labelStyle: TextStyle(
-        color: selected ? AppColors.primary : AppColors.text,
-        fontWeight: FontWeight.w800,
-      ),
-    );
-  }
-}
-
-class _PageCategoryBox extends StatelessWidget {
-  const _PageCategoryBox({
-    required this.pageLabel,
-    required this.slotCount,
-    required this.note,
-    required this.children,
-  });
-
-  final String pageLabel;
-  final int slotCount;
-  final String note;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  pageLabel,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.text,
+  Widget _welcomeSplashBoard() {
+    final query = _search.text.trim().toLowerCase();
+    const label = 'karşılama görseli';
+    if (query.isNotEmpty && !label.contains(query)) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: StreamBuilder<String>(
+        stream: WelcomeSplashRepository.instance.watchImageUrl(),
+        builder: (context, snapshot) {
+          final imageUrl = (snapshot.data ?? '').trim();
+          return Container(
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(12, 10, 8, 4),
+                  child: Text(
+                    'Karşılama',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                      color: AppColors.text,
+                    ),
                   ),
                 ),
-              ),
-              _SizeChip(label: '$slotCount bölüm'),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            note,
-            style: const TextStyle(
-              color: AppColors.subText,
-              fontWeight: FontWeight.w600,
-              fontSize: 12,
-            ),
-          ),
-          const SizedBox(height: 14),
-          ...children,
-        ],
-      ),
-    );
-  }
-}
-
-class _SectionBlock extends StatelessWidget {
-  const _SectionBlock({
-    required this.placement,
-    required this.banners,
-    required this.onAdd,
-    required this.onEdit,
-    required this.onToggle,
-    required this.onDelete,
-  });
-
-  final BannerPlacement placement;
-  final List<AppBanner> banners;
-  final VoidCallback onAdd;
-  final ValueChanged<AppBanner> onEdit;
-  final void Function(AppBanner banner, bool value) onToggle;
-  final ValueChanged<AppBanner> onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    return AdminPanel(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      placement.slotLabel.isEmpty
-                          ? placement.title
-                          : placement.slotLabel,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.text,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
+                InkWell(
+                  onTap: () => _editWelcomeSplash(imageUrl),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 4, 8, 10),
+                    child: Row(
                       children: [
-                        _SizeChip(label: placement.pxLabel),
-                        _SizeChip(label: placement.belongsLabel),
-                        if (placement.description.isNotEmpty)
-                          _SizeChip(label: placement.description),
-                        _SizeChip(label: '${banners.length} görsel'),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              FilledButton.icon(
-                onPressed: onAdd,
-                icon: const Icon(Icons.add_rounded, size: 18),
-                label: const Text('Ekle'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          if (banners.isEmpty)
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.background,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Text(
-                'Bu bölümde henüz banner yok. Önerilen yükleme boyutu: ${placement.sizeLabel}',
-                style: const TextStyle(
-                  color: AppColors.subText,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            )
-          else
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                for (final banner in banners)
-                  SizedBox(
-                    width: 260,
-                    child: Material(
-                      color: AppColors.background,
-                      borderRadius: BorderRadius.circular(16),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(16),
-                        onTap: () => onEdit(banner),
-                        child: Ink(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: AppColors.border),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              ClipRRect(
-                                borderRadius: const BorderRadius.vertical(
-                                  top: Radius.circular(16),
-                                ),
-                                child: AspectRatio(
-                                  aspectRatio:
-                                      placement.boxWidth / placement.height,
-                                  child: Stack(
-                                    fit: StackFit.expand,
-                                    children: [
-                                      buildProductImage(
-                                        banner.displayImage,
-                                        fit: BoxFit.cover,
-                                        width: double.infinity,
-                                        height: double.infinity,
-                                        filterQuality: FilterQuality.medium,
-                                        cacheWidth: 1080,
-                                      ),
-                                      Positioned(
-                                        left: 8,
-                                        right: 8,
-                                        bottom: 8,
-                                        child: Wrap(
-                                          spacing: 6,
-                                          runSpacing: 4,
-                                          children: [
-                                            _OverlayChip(
-                                              label: placement.pxLabel,
-                                            ),
-                                            _OverlayChip(
-                                              label: placement.belongsLabel,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: SizedBox(
+                            width: 92,
+                            height: 52,
+                            child: imageUrl.isEmpty
+                                ? const ColoredBox(
+                                    color: AppColors.background,
+                                    child: Icon(
+                                      Icons.image_outlined,
+                                      color: AppColors.subText,
+                                    ),
+                                  )
+                                : buildProductImage(
+                                    imageUrl,
+                                    fit: BoxFit.cover,
+                                    width: 92,
+                                    height: 52,
+                                    cacheWidth: 360,
                                   ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Karşılama görseli',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(fontWeight: FontWeight.w800),
+                              ),
+                              Text(
+                                '393 × 852 px',
+                                style: TextStyle(
+                                  color: AppColors.primary,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(
-                                  10,
-                                  8,
-                                  4,
-                                  8,
-                                ),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            banner.title,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w800,
-                                            ),
-                                          ),
-                                          Text(
-                                            '${placement.pxLabel} · ${placement.belongsLabel}',
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w700,
-                                              color: AppColors.primary,
-                                            ),
-                                          ),
-                                          Text(
-                                            [
-                                              banner.active ? 'Yayında' : 'Gizli',
-                                              if (banner.linkType ==
-                                                  BannerLinkType.product)
-                                                'Ürüne git',
-                                              if (banner.linkType ==
-                                                  BannerLinkType.article)
-                                                'Makaleye git',
-                                            ].join(' · '),
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w600,
-                                              color: banner.active
-                                                  ? AppColors.success
-                                                  : AppColors.subText,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    Switch(
-                                      value: banner.active,
-                                      onChanged: (value) =>
-                                          onToggle(banner, value),
-                                    ),
-                                    IconButton(
-                                      tooltip: 'Sil',
-                                      onPressed: () => onDelete(banner),
-                                      icon: const Icon(
-                                        Icons.delete_outline_rounded,
-                                        color: AppColors.error,
-                                      ),
-                                    ),
-                                  ],
+                              Text(
+                                'Açılış ekranı',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.subText,
                                 ),
                               ),
                             ],
                           ),
                         ),
-                      ),
+                        IconButton(
+                          tooltip: 'Düzenle',
+                          visualDensity: VisualDensity.compact,
+                          onPressed: () => _editWelcomeSplash(imageUrl),
+                          icon: const Icon(Icons.edit_outlined, size: 20),
+                        ),
+                        IconButton(
+                          tooltip: 'Sil',
+                          visualDensity: VisualDensity.compact,
+                          onPressed: imageUrl.isEmpty
+                              ? null
+                              : () => _deleteWelcomeSplash(imageUrl),
+                          icon: const Icon(
+                            Icons.delete_outline_rounded,
+                            size: 20,
+                            color: AppColors.error,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
+                ),
               ],
             ),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _editWelcomeSplash(String imageUrl) async {
+    var current = imageUrl.trim();
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialog) {
+          return AlertDialog(
+            title: const Text('Karşılama görseli'),
+            content: SizedBox(
+              width: 360,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'Ölçü 393×852 px. Görseli değiştirebilir veya silebilirsiniz.',
+                    style: TextStyle(
+                      color: AppColors.subText,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: Container(
+                      height: 280,
+                      color: AppColors.background,
+                      alignment: Alignment.center,
+                      child: current.isEmpty
+                          ? const Text(
+                              'Görsel yok',
+                              style: TextStyle(
+                                color: AppColors.subText,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            )
+                          : buildProductImage(
+                              current,
+                              fit: BoxFit.contain,
+                              width: double.infinity,
+                              height: 280,
+                              cacheWidth: 1179,
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: current.isEmpty
+                    ? null
+                    : () async {
+                        Navigator.pop(ctx);
+                        await _deleteWelcomeSplash(current);
+                      },
+                child: const Text('Sil'),
+              ),
+              FilledButton(
+                onPressed: _uploading
+                    ? null
+                    : () async {
+                        final next = await _uploadWelcomeSplash();
+                        if (next == null) return;
+                        setDialog(() => current = next);
+                      },
+                child: Text(current.isEmpty ? 'Yükle' : 'Değiştir'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Future<String?> _uploadWelcomeSplash() async {
+    final file = await FilePicker.pickFile(type: FileType.image);
+    if (file == null) return null;
+    setState(() => _uploading = true);
+    try {
+      final bytes = await file.readAsBytes();
+      final prepared = prepareUploadImage(
+        bytes,
+        file.name,
+        style: UploadImageStyle.screen,
+      );
+      final ref = FirebaseStorage.instance.ref(
+        'welcome_splash/${DateTime.now().microsecondsSinceEpoch}_${prepared.fileName}',
+      );
+      await ref.putData(
+        prepared.bytes,
+        storageImageMetadata(prepared.contentType),
+      );
+      final url = await ref.getDownloadURL();
+      final previous = WelcomeSplashRepository.instance.imageUrl.trim();
+      await WelcomeSplashRepository.instance.saveImageUrl(url);
+      if (previous.isNotEmpty && previous != url) {
+        await BannerRepository.deleteStorageUrl(previous);
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Karşılama görseli güncellendi (${prepared.kiloBytes} KB).')),
+        );
+      }
+      return url;
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Görsel yüklenemedi: $error')),
+        );
+      }
+      return null;
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  Future<void> _deleteWelcomeSplash(String imageUrl) async {
+    if (imageUrl.trim().isEmpty) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Karşılama görselini sil'),
+        content: const Text(
+          'Yüklenen görsel kaldırılsın mı? Uygulama varsayılan açılış ekranına döner.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Sil'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await WelcomeSplashRepository.instance.clearImage();
+    await BannerRepository.deleteStorageUrl(imageUrl);
+  }
+
+  Widget _emptySlotRow({
+    required BannerPlacement slot,
+    required List<AppBanner> catalog,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 8, 10),
+      child: Row(
+        children: [
+          Container(
+            width: 92,
+            height: 52,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: const Icon(
+              Icons.image_outlined,
+              color: AppColors.subText,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  slot.slotLabel.isEmpty ? slot.title : slot.slotLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+                Text(
+                  '${slot.pxLabel} · görsel eklenecek',
+                  style: const TextStyle(
+                    color: AppColors.subText,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: _moving || _uploading
+                ? null
+                : () => _edit(
+                    placement: slot,
+                    nextOrder: catalog
+                        .where((item) => item.placement == slot.id)
+                        .length,
+                  ),
+            child: const Text('Görsel ekle'),
+          ),
         ],
       ),
     );
   }
-}
 
-class _SizeChip extends StatelessWidget {
-  const _SizeChip({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: AppColors.selected,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: AppColors.primary,
-          fontSize: 12,
-          fontWeight: FontWeight.w800,
-        ),
+  Widget _categoryBoard({
+    required String pageId,
+    required String pageLabel,
+    required List<AppBanner> banners,
+    required List<AppBanner> catalog,
+  }) {
+    final slots = _slotsForPage(pageId);
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: DragTarget<String>(
+        onWillAcceptWithDetails: (details) =>
+            !_moving && details.data.trim().isNotEmpty,
+        onAcceptWithDetails: (details) {
+          var currentPlacement = '';
+          for (final item in catalog) {
+            if (item.id == details.data) currentPlacement = item.placement;
+          }
+          if (currentPlacement.isNotEmpty &&
+              _slotsForPage(pageId).any((slot) => slot.id == currentPlacement)) {
+            return;
+          }
+          _move(
+            catalog: catalog,
+            id: details.data,
+            placement: _defaultSlot(pageId),
+          );
+        },
+        builder: (context, candidate, _) {
+          final hovering = candidate.isNotEmpty;
+          final expanded = _isExpanded(pageId, banners);
+          return AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
+            decoration: BoxDecoration(
+              color: hovering ? AppColors.selected : AppColors.surface,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: hovering ? AppColors.primary : AppColors.border,
+                width: hovering ? 2 : 1,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => _togglePage(pageId),
+                    borderRadius: BorderRadius.circular(18),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+                      child: Row(
+                        children: [
+                          Icon(
+                            expanded
+                                ? Icons.expand_less_rounded
+                                : Icons.expand_more_rounded,
+                            color: AppColors.primary,
+                            size: 22,
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              pageLabel,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 15,
+                                color: AppColors.text,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            '${banners.length}',
+                            style: const TextStyle(
+                              color: AppColors.subText,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          TextButton.icon(
+                            onPressed: _moving || _uploading
+                                ? null
+                                : () => _addToPage(pageId, catalog),
+                            icon: const Icon(Icons.add_rounded, size: 18),
+                            label: const Text('Ekle'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.primary,
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          ),
+                          if (expanded)
+                            Text(
+                              hovering ? 'Bırakın' : 'Buraya sürükleyin',
+                              style: TextStyle(
+                                color: hovering
+                                    ? AppColors.primary
+                                    : AppColors.subText,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                if (expanded) ...[
+                  if (banners.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(12, 0, 12, 14),
+                      child: Text(
+                        'Bu kategoride henüz banner yok.',
+                        style: TextStyle(
+                          color: AppColors.subText,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    )
+                  else ...[
+                    if (pageId == BannerPlacement.home.pageId)
+                      _homeTopBannerList(
+                        banners: [
+                          for (final item in banners)
+                            if (item.placement == BannerPlacement.home.id) item,
+                        ],
+                        catalog: catalog,
+                        slots: slots,
+                      ),
+                    for (var i = 0; i < banners.length; i++)
+                      if (pageId != BannerPlacement.home.pageId ||
+                          banners[i].placement != BannerPlacement.home.id)
+                        _bannerRow(
+                          banner: banners[i],
+                          catalog: catalog,
+                          slots: slots,
+                          showDivider: i > 0,
+                        ),
+                  ],
+                  if (pageId == BannerPlacement.adoption.pageId ||
+                      pageId == BannerPlacement.campaignDiscount.pageId ||
+                      pageId == BannerPlacement.emergency.pageId)
+                    for (final slot in slots)
+                      if (!banners.any((item) => item.placement == slot.id))
+                        _emptySlotRow(slot: slot, catalog: catalog),
+                ],
+              ],
+            ),
+          );
+        },
       ),
     );
   }
-}
 
-class _OverlayChip extends StatelessWidget {
-  const _OverlayChip({required this.label});
+  void _reorderHomeTop(
+    List<AppBanner> top,
+    List<AppBanner> catalog,
+    int oldIndex,
+    int newIndex,
+  ) {
+    if (_moving || top.isEmpty) return;
+    if (oldIndex < 0 || oldIndex >= top.length || oldIndex == newIndex) return;
+    final moving = top[oldIndex];
+    final next = [...top]..removeAt(oldIndex);
+    final beforeId = newIndex >= 0 && newIndex < next.length
+        ? next[newIndex].id
+        : null;
+    _move(
+      catalog: catalog,
+      id: moving.id,
+      placement: BannerPlacement.home.id,
+      beforeId: beforeId,
+    );
+  }
 
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 10,
-          fontWeight: FontWeight.w800,
+  Widget _homeTopBannerList({
+    required List<AppBanner> banners,
+    required List<AppBanner> catalog,
+    required List<BannerPlacement> slots,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Padding(
+          padding: EdgeInsets.fromLTRB(12, 0, 12, 4),
+          child: Text(
+            'Üst banner · tutamacı sürükleyerek sıralayın',
+            style: TextStyle(
+              color: AppColors.subText,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ),
+        if (banners.isEmpty)
+          const Padding(
+            padding: EdgeInsets.fromLTRB(12, 0, 12, 12),
+            child: Text(
+              'Üst banner yok.',
+              style: TextStyle(
+                color: AppColors.subText,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          )
+        else
+          ReorderableListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            buildDefaultDragHandles: false,
+            itemCount: banners.length,
+            onReorderItem: (oldIndex, newIndex) =>
+                _reorderHomeTop(banners, catalog, oldIndex, newIndex),
+            itemBuilder: (context, index) => _bannerRow(
+              key: ValueKey('home-top-${banners[index].id}'),
+              banner: banners[index],
+              catalog: catalog,
+              slots: slots,
+              showDivider: index > 0,
+              reorderIndex: index,
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _bannerRow({
+    Key? key,
+    required AppBanner banner,
+    required List<AppBanner> catalog,
+    required List<BannerPlacement> slots,
+    required bool showDivider,
+    int? reorderIndex,
+  }) {
+    final slot = banner.placementInfo;
+    final row = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      child: Row(
+        children: [
+          reorderIndex == null
+              ? const MouseRegion(
+                  cursor: SystemMouseCursors.grab,
+                  child: Icon(
+                    Icons.drag_indicator_rounded,
+                    color: AppColors.subText,
+                  ),
+                )
+              : ReorderableDragStartListener(
+                  index: reorderIndex,
+                  child: const MouseRegion(
+                    cursor: SystemMouseCursors.grab,
+                    child: Icon(
+                      Icons.drag_indicator_rounded,
+                      color: AppColors.primary,
+                      size: 28,
+                    ),
+                  ),
+                ),
+          const SizedBox(width: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: SizedBox(
+              width: 92,
+              height: 52,
+              child: buildProductImage(
+                banner.displayImage,
+                fit: BoxFit.cover,
+                width: 92,
+                height: 52,
+                filterQuality: FilterQuality.medium,
+                cacheWidth: 360,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  banner.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+                Text(
+                  slots.length > 1
+                      ? '${slot.slotLabel.isEmpty ? slot.title : slot.slotLabel} · ${slot.pxLabel}'
+                      : slot.pxLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  banner.active ? 'Yayında' : 'Gizli',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: banner.active ? AppColors.success : AppColors.subText,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: () => _save(banner.copyWith(active: !banner.active)),
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.zero,
+              visualDensity: VisualDensity.compact,
+            ),
+            child: Text(
+              banner.active ? 'Aktif' : 'Pasif',
+              style: TextStyle(
+                color: banner.active ? AppColors.success : AppColors.error,
+                fontWeight: FontWeight.w800,
+                fontSize: 12,
+              ),
+            ),
+          ),
+          PopupMenuButton<String>(
+            tooltip: 'Kategori değiştir',
+            enabled: !_moving,
+            onSelected: (placement) {
+              _move(
+                catalog: catalog,
+                id: banner.id,
+                placement: placement,
+              );
+            },
+            itemBuilder: (context) => [
+              for (final page in _pages)
+                for (final item in _slotsForPage(page.$1))
+                  if (item.id != banner.placement)
+                    PopupMenuItem(
+                      value: item.id,
+                      child: Text(
+                        _slotsForPage(page.$1).length > 1
+                            ? '${page.$2} · ${item.slotLabel.isEmpty ? item.title : item.slotLabel}'
+                            : page.$2,
+                      ),
+                    ),
+            ],
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              child: Text(
+                'Kategori',
+                style: TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: 'Düzenle',
+            visualDensity: VisualDensity.compact,
+            onPressed: () => _edit(
+              existing: banner,
+              placement: slot,
+              nextOrder: banner.order,
+            ),
+            icon: const Icon(Icons.edit_outlined, size: 20),
+          ),
+          IconButton(
+            tooltip: 'Sil',
+            visualDensity: VisualDensity.compact,
+            onPressed: () => _delete(banner),
+            icon: const Icon(
+              Icons.delete_outline_rounded,
+              size: 20,
+              color: AppColors.error,
+            ),
+          ),
+        ],
       ),
+    );
+
+    if (reorderIndex != null) {
+      return DecoratedBox(
+        key: key,
+        decoration: BoxDecoration(
+          border: Border(
+            top: showDivider
+                ? const BorderSide(color: AppColors.border)
+                : BorderSide.none,
+          ),
+        ),
+        child: row,
+      );
+    }
+
+    return DragTarget<String>(
+      key: key,
+      onWillAcceptWithDetails: (details) =>
+          !_moving && details.data != banner.id,
+      onAcceptWithDetails: (details) {
+        _move(
+          catalog: catalog,
+          id: details.data,
+          placement: banner.placement,
+          beforeId: banner.id,
+        );
+      },
+      builder: (context, candidate, _) {
+        final hovering = candidate.isNotEmpty;
+        return Draggable<String>(
+          data: banner.id,
+          maxSimultaneousDrags: _moving ? 0 : 1,
+          feedback: Material(
+            elevation: 8,
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(18),
+            child: SizedBox(
+              width: 240,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Text(
+                  banner.title,
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+            ),
+          ),
+          childWhenDragging: Opacity(opacity: 0.35, child: row),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: hovering ? AppColors.selected : null,
+              border: Border(
+                top: showDivider
+                    ? const BorderSide(color: AppColors.border)
+                    : BorderSide.none,
+              ),
+            ),
+            child: row,
+          ),
+        );
+      },
     );
   }
 }

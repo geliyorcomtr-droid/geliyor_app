@@ -60,6 +60,7 @@ class UserFields {
   static const lastOrder = 'last_order';
   static const notificationSettings = 'notification_settings';
   static const earnedCouponIds = 'earned_coupon_ids';
+  static const dostPoints = 'dost_points';
   static const foodReminder = 'food_reminder';
   static const healthCalendar = 'health_calendar';
 }
@@ -97,6 +98,7 @@ class FoodReminderFields {
   static const petName = 'petName';
   static const foodTitle = 'foodTitle';
   static const sentFor = 'sentFor';
+  static const cycleKey = 'cycleKey';
   static const updatedAt = 'updatedAt';
   static const autoOrderEnabled = 'autoOrderEnabled';
   static const autoOrderDate = 'autoOrderDate';
@@ -118,6 +120,8 @@ class HealthCalendarFields {
   static const nextDueDate = 'nextDueDate';
   static const reminderDate = 'reminderDate';
   static const sentFor = 'sentFor';
+  static const itemEnabled = 'itemEnabled';
+  static const disabledTitles = 'disabledTitles';
 }
 
 class FoodTrackingFields {
@@ -168,6 +172,7 @@ class ProductFields {
   static const sktYear = 'sktYear';
   static const unitPrice = 'unitPrice';
   static const oldPrice = 'oldPrice';
+  static const purchasePrice = 'purchasePrice';
   static const discountPercent = 'discountPercent';
   static const imageUrl = 'imageUrl';
   static const category = 'category';
@@ -175,21 +180,29 @@ class ProductFields {
   static const placements = 'placements';
   static const mainCategory = 'mainCategory';
   static const description = 'description';
+  static const ingredients = 'ingredients';
   static const active = 'active';
   static const stock = 'stock';
+  static const softtrMatched = 'softtrMatched';
+  static const softtrProductId = 'softtrProductId';
+  static const softtrSyncedAt = 'softtrSyncedAt';
+  static const softtrPendingStock = 'softtrPendingStock';
   static const features = 'features';
   static const technicalFeatures = 'technicalFeatures';
   static const trustBadgeIds = 'trustBadgeIds';
   static const productAdvantageIds = 'productAdvantageIds';
   static const productAdvantageValues = 'productAdvantageValues';
   static const proteinValue = 'proteinValue';
+  static const animalProteinValue = 'animalProteinValue';
   static const preferredRank = 'preferredRank';
   static const repurchaseRate = 'repurchaseRate';
   static const rating = 'rating';
   static const reviewCount = 'reviewCount';
   static const gallery = 'gallery';
+  static const boughtTogetherIds = 'boughtTogetherIds';
   static const seoTitle = 'seoTitle';
   static const metaDescription = 'metaDescription';
+  static const rewardPoints = 'rewardPoints';
   static const createdAt = 'createdAt';
   static const updatedAt = 'updatedAt';
 
@@ -210,11 +223,29 @@ class ProductFields {
 class ProductPlacements {
   ProductPlacements._();
 
-  /// Hediye Seç → Hediye Seçenekleri
+  /// Eski hediye işareti. Yeni kayıtlar kademe alanlarını kullanır.
   static const gift = 'gift';
 
-  /// Hediye Seç → Premium Hediyeler
+  /// Eski premium hediye işareti. ₺4.000+ kademesine denk gelir.
   static const giftPremium = 'gift_premium';
+
+  /// Hediye Seç → ₺1.000–1.999
+  static const giftTier1 = 'gift_tier_1';
+
+  /// Hediye Seç → ₺2.000–3.999
+  static const giftTier2 = 'gift_tier_2';
+
+  /// Hediye Seç → ₺4.000+
+  static const giftTier3 = 'gift_tier_3';
+
+  static const tierIds = [giftTier1, giftTier2, giftTier3];
+
+  static const tierLabels = ['₺1.000–1.999', '₺2.000–3.999', '₺4.000+'];
+
+  static const tierNames = ['Bronz', 'Altın', 'Premium'];
+
+  /// Kampanyalar → Puanlarını Ödüllere Dönüştür
+  static const pointReward = 'point_reward';
 }
 
 /// `orders/{id}` alanları
@@ -230,6 +261,8 @@ class OrderFields {
   static const couponCode = 'couponCode';
   static const couponTitle = 'couponTitle';
   static const couponDiscount = 'couponDiscount';
+  static const subscriptionTitle = 'subscriptionTitle';
+  static const subscriptionDiscount = 'subscriptionDiscount';
   static const gifts = 'gifts';
   static const items = 'items';
   static const orderNo = 'orderNo';
@@ -305,6 +338,7 @@ class BrandFields {
   static const feedingDogPuppy = 'feedingDogPuppy';
   static const feedingDogMiniPuppy = 'feedingDogMiniPuppy';
   static const updatedAt = 'updatedAt';
+  static const deletedIds = 'deletedIds';
 }
 
 /// `trust_badges/{id}` alanları
@@ -313,6 +347,7 @@ class TrustBadgeFields {
 
   static const name = 'name';
   static const imageUrl = 'imageUrl';
+  static const detailImageUrl = 'detailImageUrl';
   static const assetPath = 'assetPath';
   static const order = 'order';
   static const active = 'active';
@@ -324,13 +359,18 @@ class ProductAdvantageFields {
   ProductAdvantageFields._();
 
   static const name = 'name';
+  static const fullName = 'fullName';
   static const description = 'description';
   static const value = 'value';
   static const isStat = 'isStat';
   static const imageUrl = 'imageUrl';
+  static const detailImageUrl = 'detailImageUrl';
   static const assetPath = 'assetPath';
+  static const categoryId = 'categoryId';
   static const order = 'order';
   static const active = 'active';
+  static const removedIds = 'removedIds';
+  static const extras = 'extras';
   static const updatedAt = 'updatedAt';
 }
 
@@ -377,6 +417,7 @@ class KnowledgeTopicFields {
   static const assetPath = 'assetPath';
   static const colorValue = 'colorValue';
   static const questionTopicId = 'questionTopicId';
+  static const advantageId = 'advantageId';
   static const order = 'order';
   static const active = 'active';
   static const updatedAt = 'updatedAt';
@@ -453,6 +494,24 @@ class SettingsDocs {
   static const bankTransfer = 'bank_transfer';
   static const foodCoupon = 'food_coupon';
   static const feedingGuides = 'feeding_guides';
+  static const softtr = 'softtr';
+  static const hangiMama = 'hangi_mama';
+  static const welcomeSplash = 'welcome_splash';
+}
+
+class HangiMamaFields {
+  HangiMamaFields._();
+
+  static const advantageIds = 'advantageIds';
+  static const updatedAt = 'updatedAt';
+}
+
+/// `settings/welcome_splash` — uygulama açılış görseli
+class WelcomeSplashFields {
+  WelcomeSplashFields._();
+
+  static const imageUrl = 'imageUrl';
+  static const updatedAt = 'updatedAt';
 }
 
 /// `settings/feeding_guides` — 6 profil gram tablosu + kedi çarpanları
@@ -470,6 +529,7 @@ class FeedingGuideFields {
   static const miniPuppyFactors = 'miniPuppyFactors';
   static const adultDogFactors = 'adultDogFactors';
   static const puppyDogFactors = 'puppyDogFactors';
+  static const kittenFactors = 'kittenFactors';
   static const updatedAt = 'updatedAt';
 }
 
@@ -570,6 +630,7 @@ class AdoptionListingFields {
   static const indoorOnly = 'indoorOnly';
   static const status = 'status';
   static const rejectReason = 'rejectReason';
+  static const active = 'active';
   static const createdAt = 'createdAt';
   static const updatedAt = 'updatedAt';
 }

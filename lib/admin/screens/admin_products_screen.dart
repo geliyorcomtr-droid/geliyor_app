@@ -1,8 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:geliyor_app/admin/admin_models.dart';
 import 'package:geliyor_app/admin/admin_ui.dart';
+import 'package:geliyor_app/data/brand_repository.dart';
 import 'package:geliyor_app/data/firestore_collections.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/utils/product_image.dart';
@@ -27,6 +29,7 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
   final _search = TextEditingController();
   String _main = 'all';
   String _status = 'all';
+  String _brand = 'all';
   bool _lowStockOnly = false;
   String? _deletingId;
 
@@ -104,6 +107,41 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
         }, SetOptions(merge: true));
   }
 
+  Future<void> _setRewardPoints(AdminProduct product, int points) async {
+    final cost = points < 0 ? 0 : points;
+    final next = [
+      for (final id in product.placements)
+        if (id != ProductPlacements.pointReward) id,
+      if (cost > 0) ProductPlacements.pointReward,
+    ];
+    await FirebaseFirestore.instance
+        .collection(FirestoreCollections.products)
+        .doc(product.id)
+        .set({
+          ProductFields.placements: next,
+          ProductFields.rewardPoints: cost,
+          ProductFields.updatedAt: FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+  }
+
+  Future<void> _setGiftTier(AdminProduct product, String? tierId) async {
+    final next = [
+      for (final id in product.placements)
+        if (id != ProductPlacements.gift &&
+            id != ProductPlacements.giftPremium &&
+            !ProductPlacements.tierIds.contains(id))
+          id,
+      if (tierId != null && tierId.isNotEmpty) tierId,
+    ];
+    await FirebaseFirestore.instance
+        .collection(FirestoreCollections.products)
+        .doc(product.id)
+        .set({
+          ProductFields.placements: next,
+          ProductFields.updatedAt: FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+  }
+
   List<AdminProduct> _filter(List<AdminProduct> products) {
     var list = products;
     final query = _search.text.trim().toLowerCase();
@@ -116,6 +154,12 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
     }
     if (_main != 'all') {
       list = list.where((p) => p.mainCategory == _main).toList();
+    }
+    if (_brand != 'all') {
+      final selected = _brand.trim().toLowerCase();
+      list = list
+          .where((p) => p.brand.trim().toLowerCase() == selected)
+          .toList();
     }
     if (_status == 'active') {
       list = list.where((p) => p.active).toList();
@@ -145,47 +189,104 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
         }
         final all = snap.data!.docs.map(AdminProduct.fromDoc).toList()
           ..sort((a, b) => a.title.compareTo(b.title));
-        final products = _filter(all);
 
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-          children: [
-            AdminPageHeader(
-              title: 'Ürünler',
-              subtitle: 'Mama kataloğu, stok ve vitrin görünürlüğü.',
-              actions: [
-                FilledButton.icon(
-                  onPressed: widget.onAddProduct,
-                  icon: const Icon(Icons.add_rounded, size: 18),
-                  label: const Text('Yeni Ürün'),
-                ),
-              ],
-            ),
-            Row(
+        return StreamBuilder<List<AppBrand>>(
+          stream: BrandRepository.instance.watchAll(),
+          builder: (context, brandSnap) {
+            final catalogNames = [
+              for (final brand in brandSnap.data ?? const <AppBrand>[])
+                if (brand.name.trim().isNotEmpty) brand.name.trim(),
+            ];
+            final productNames = {
+              for (final product in all)
+                if (product.brand.trim().isNotEmpty) product.brand.trim(),
+            };
+            final brandNames = <String>{
+              ...catalogNames,
+              ...productNames,
+            }.toList()..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+            final brandValue = _brand == 'all'
+                ? 'all'
+                : brandNames.cast<String?>().firstWhere(
+                    (name) => name!.toLowerCase() == _brand.toLowerCase(),
+                    orElse: () => 'all',
+                  )!;
+            final products = _filter(all);
+
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: _search,
-                    onChanged: (_) => setState(() {}),
-                    decoration: InputDecoration(
-                      hintText: 'Ürün, marka veya kategori ara',
-                      prefixIcon: const Icon(Icons.search_rounded),
-                      isDense: true,
-                      filled: true,
-                      fillColor: AppColors.surface,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: AppColors.border),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: AppColors.border),
+                AdminPageHeader(
+                  title: 'Ürünler',
+                  subtitle: 'Mama kataloğu, stok ve vitrin görünürlüğü.',
+                  actions: [
+                    FilledButton.icon(
+                      onPressed: widget.onAddProduct,
+                      icon: const Icon(Icons.add_rounded, size: 18),
+                      label: const Text('Yeni Ürün'),
+                    ),
+                  ],
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _search,
+                        onChanged: (_) => setState(() {}),
+                        decoration: InputDecoration(
+                          hintText: 'Ürün, marka veya kategori ara',
+                          prefixIcon: const Icon(Icons.search_rounded),
+                          isDense: true,
+                          filled: true,
+                          fillColor: AppColors.surface,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: AppColors.border),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: AppColors.border),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                    const SizedBox(width: 10),
+                    SizedBox(
+                      width: 220,
+                      child: DropdownButtonFormField<String>(
+                        value: brandValue,
+                        isExpanded: true,
+                        decoration: InputDecoration(
+                          labelText: 'Marka',
+                          isDense: true,
+                          filled: true,
+                          fillColor: AppColors.surface,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: AppColors.border),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: AppColors.border),
+                          ),
+                        ),
+                        items: [
+                          const DropdownMenuItem(
+                            value: 'all',
+                            child: Text('Tüm markalar'),
+                          ),
+                          for (final name in brandNames)
+                            DropdownMenuItem(
+                              value: name,
+                              child: Text(name, overflow: TextOverflow.ellipsis),
+                            ),
+                        ],
+                        onChanged: (value) =>
+                            setState(() => _brand = value ?? 'all'),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
             const SizedBox(height: 10),
             Wrap(
               spacing: 8,
@@ -254,6 +355,8 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
                 ),
               ),
           ],
+        );
+          },
         );
       },
     );
@@ -375,17 +478,64 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
             label: product.active ? 'Vitrinde' : 'Gizli',
             color: product.active ? AppColors.success : AppColors.subText,
           ),
-          if (product.showAsGift || product.showAsPremiumGift) ...[
-            const SizedBox(width: 8),
-            AdminStatusChip(
-              label: product.showAsGift && product.showAsPremiumGift
-                  ? 'Hediye + Premium'
-                  : product.showAsPremiumGift
-                  ? 'Premium hediye'
-                  : 'Hediye',
-              color: AppColors.primary,
+          const SizedBox(width: 8),
+          AdminStatusChip(
+            label: product.barcode.trim().isEmpty
+                ? 'Barkod yok'
+                : product.softtrMatched
+                    ? 'Softtr'
+                    : 'Softtr yok',
+            color: product.barcode.trim().isEmpty
+                ? AppColors.subText
+                : product.softtrMatched
+                    ? AppColors.primary
+                    : AppColors.warning,
+          ),
+          const SizedBox(width: 8),
+          PopupMenuButton<String>(
+            tooltip: 'Hediye kademesi',
+            onSelected: (value) => _setGiftTier(
+              product,
+              value == 'none' ? null : value,
             ),
-          ],
+            itemBuilder: (context) => [
+              for (var i = 0; i < ProductPlacements.tierIds.length; i++)
+                PopupMenuItem(
+                  value: ProductPlacements.tierIds[i],
+                  child: Row(
+                    children: [
+                      Icon(
+                        product.giftTier == i
+                            ? Icons.check_rounded
+                            : Icons.circle_outlined,
+                        size: 16,
+                        color: product.giftTier == i
+                            ? AppColors.primary
+                            : AppColors.subText,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(ProductPlacements.tierNames[i]),
+                    ],
+                  ),
+                ),
+              if (product.giftTier != null)
+                const PopupMenuItem(
+                  value: 'none',
+                  child: Text('Hediye değil'),
+                ),
+            ],
+            child: AdminStatusChip(
+              label: 'Hediye',
+              color: product.giftTier == null
+                  ? AppColors.subText
+                  : AppColors.primary,
+            ),
+          ),
+          const SizedBox(width: 8),
+          _ProductPointField(
+            product: product,
+            onSave: (points) => _setRewardPoints(product, points),
+          ),
           IconButton(
             tooltip: 'Ürünü sil',
             onPressed: _deletingId == product.id
@@ -428,6 +578,108 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ProductPointField extends StatefulWidget {
+  const _ProductPointField({required this.product, required this.onSave});
+
+  final AdminProduct product;
+  final ValueChanged<int> onSave;
+
+  @override
+  State<_ProductPointField> createState() => _ProductPointFieldState();
+}
+
+class _ProductPointFieldState extends State<_ProductPointField> {
+  late final TextEditingController _controller;
+  late final FocusNode _focus;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: _text(widget.product.rewardPoints));
+    _focus = FocusNode()..addListener(_onFocus);
+  }
+
+  @override
+  void didUpdateWidget(covariant _ProductPointField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_focus.hasFocus) return;
+    final next = _text(widget.product.rewardPoints);
+    if (_controller.text != next) _controller.text = next;
+  }
+
+  @override
+  void dispose() {
+    _focus.removeListener(_onFocus);
+    _focus.dispose();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  String _text(int points) => points > 0 ? '$points' : '';
+
+  void _onFocus() {
+    if (!_focus.hasFocus) _commit();
+  }
+
+  void _commit() {
+    final value = int.tryParse(_controller.text.trim()) ?? 0;
+    if (value == widget.product.rewardPoints) return;
+    if (value <= 0 && !widget.product.isPointReward) return;
+    widget.onSave(value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final active = widget.product.isPointReward;
+    return SizedBox(
+      width: 84,
+      child: TextField(
+        controller: _controller,
+        focusNode: _focus,
+        keyboardType: TextInputType.number,
+        textInputAction: TextInputAction.done,
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        onSubmitted: (_) => _commit(),
+        style: TextStyle(
+          color: active ? AppColors.primary : AppColors.text,
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+        ),
+        decoration: InputDecoration(
+          isDense: true,
+          hintText: 'Puan',
+          hintStyle: const TextStyle(
+            color: AppColors.subText,
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          filled: true,
+          fillColor: active
+              ? AppColors.primary.withValues(alpha: 0.12)
+              : AppColors.surface,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(999),
+            borderSide: BorderSide(
+              color: active ? AppColors.primary : AppColors.border,
+            ),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(999),
+            borderSide: BorderSide(
+              color: active ? AppColors.primary : AppColors.border,
+            ),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(999),
+            borderSide: const BorderSide(color: AppColors.primary),
+          ),
+        ),
       ),
     );
   }

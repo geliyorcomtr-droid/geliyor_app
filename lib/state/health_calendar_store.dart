@@ -17,6 +17,7 @@ class HealthCalendarEntry {
     required this.nextDueDate,
     this.sentFor = '',
     this.reminderDate = '',
+    this.enabled = true,
   });
 
   final String title;
@@ -27,8 +28,13 @@ class HealthCalendarEntry {
   final DateTime nextDueDate;
   final String sentFor;
   final String reminderDate;
+  final bool enabled;
 
-  HealthCalendarEntry copyWith({String? sentFor, String? reminderDate}) {
+  HealthCalendarEntry copyWith({
+    String? sentFor,
+    String? reminderDate,
+    bool? enabled,
+  }) {
     return HealthCalendarEntry(
       title: title,
       category: category,
@@ -38,6 +44,7 @@ class HealthCalendarEntry {
       nextDueDate: nextDueDate,
       sentFor: sentFor ?? this.sentFor,
       reminderDate: reminderDate ?? this.reminderDate,
+      enabled: enabled ?? this.enabled,
     );
   }
 }
@@ -51,6 +58,7 @@ class HealthCalendarStore extends ChangeNotifier {
   static const timeHours = [9, 13, 17, 20];
 
   final Map<String, HealthCalendarEntry> _saved = {};
+  final Set<String> _disabled = {};
   bool _started = false;
   bool _loading = false;
   bool _hydrated = false;
@@ -60,6 +68,8 @@ class HealthCalendarStore extends ChangeNotifier {
       Map.unmodifiable(_saved);
 
   HealthCalendarEntry? entryFor(String title) => _saved[title];
+
+  bool isEnabled(String title) => !_disabled.contains(title.trim());
 
   static void start() {
     final store = instance;
@@ -80,11 +90,19 @@ class HealthCalendarStore extends ChangeNotifier {
   void applyRemote(Map<String, dynamic>? data) {
     _loading = true;
     _saved.clear();
+    _disabled.clear();
     if (data == null) {
       _hydrated = false;
       _loading = false;
       notifyListeners();
       return;
+    }
+    final disabledRaw = data[HealthCalendarFields.disabledTitles];
+    if (disabledRaw is Iterable) {
+      for (final title in disabledRaw) {
+        final name = title.toString().trim();
+        if (name.isNotEmpty) _disabled.add(name);
+      }
     }
     final items = UserDocPersist.asMapList(data[HealthCalendarFields.items]);
     for (final item in items) {
@@ -96,6 +114,9 @@ class HealthCalendarStore extends ChangeNotifier {
       if (title.isEmpty || last == null || next == null || interval <= 0) {
         continue;
       }
+      final enabled = item[HealthCalendarFields.itemEnabled] != false &&
+          !_disabled.contains(title);
+      if (!enabled) _disabled.add(title);
       _saved[title] = HealthCalendarEntry(
         title: title,
         category: (item[HealthCalendarFields.category] as String?) ?? 'vaccine',
@@ -105,6 +126,7 @@ class HealthCalendarStore extends ChangeNotifier {
         nextDueDate: next,
         sentFor: (item[HealthCalendarFields.sentFor] as String?) ?? '',
         reminderDate: (item[HealthCalendarFields.reminderDate] as String?) ?? '',
+        enabled: enabled,
       );
     }
     _hydrated = true;
@@ -132,6 +154,7 @@ class HealthCalendarStore extends ChangeNotifier {
     final last = DateTime(doneDate.year, doneDate.month, doneDate.day);
     final next = addMonths(last, intervalMonths);
     final prev = _saved[title];
+    final enabled = !_disabled.contains(title.trim());
     _saved[title] = HealthCalendarEntry(
       title: title,
       category: category,
@@ -141,7 +164,24 @@ class HealthCalendarStore extends ChangeNotifier {
       nextDueDate: next,
       sentFor: '',
       reminderDate: prev?.reminderDate ?? '',
+      enabled: enabled,
     );
+    notifyListeners();
+    await sync();
+  }
+
+  Future<void> setServiceEnabled(String title, bool enabled) async {
+    final name = title.trim();
+    if (name.isEmpty) return;
+    if (enabled) {
+      _disabled.remove(name);
+    } else {
+      _disabled.add(name);
+    }
+    final prev = _saved[name];
+    if (prev != null) {
+      _saved[name] = prev.copyWith(enabled: enabled);
+    }
     notifyListeners();
     await sync();
   }
@@ -150,10 +190,9 @@ class HealthCalendarStore extends ChangeNotifier {
     if (_loading) return;
     final uid = AuthStore.instance.uid;
     if (uid == null || uid.isEmpty) return;
-    if (!_hydrated && _saved.isEmpty) return;
+    if (!_hydrated && _saved.isEmpty && _disabled.isEmpty) return;
 
     final settings = NotificationSettingsStore.instance;
-    final today = _dateOnly(DateTime.now());
     final daysBefore = settings.healthReminderDaysBefore.clamp(0, 60);
     final timeHour = timeHours[settings.healthReminderTimeIndex.clamp(
       0,
@@ -172,16 +211,15 @@ class HealthCalendarStore extends ChangeNotifier {
       if (notifyAt.isAfter(entry.nextDueDate)) {
         notifyAt = _dateOnly(entry.nextDueDate);
       }
-      if (notifyAt.isBefore(today) &&
-          !_dateOnly(entry.nextDueDate).isBefore(today)) {
-        notifyAt = today;
-      }
-      final reminderDate = _ymd(notifyAt);
-      final sentFor =
-          entry.reminderDate == reminderDate ? entry.sentFor : '';
+      final serviceOn = !_disabled.contains(entry.title);
+      final reminderDate = serviceOn ? _ymd(notifyAt) : '9999-12-31';
+      final sentFor = serviceOn && entry.reminderDate == reminderDate
+          ? entry.sentFor
+          : '';
       _saved[entry.title] = entry.copyWith(
         reminderDate: reminderDate,
         sentFor: sentFor,
+        enabled: serviceOn,
       );
       items.add({
         HealthCalendarFields.title: entry.title,
@@ -192,6 +230,7 @@ class HealthCalendarStore extends ChangeNotifier {
         HealthCalendarFields.nextDueDate: _ymd(entry.nextDueDate),
         HealthCalendarFields.reminderDate: reminderDate,
         HealthCalendarFields.sentFor: sentFor,
+        HealthCalendarFields.itemEnabled: serviceOn,
       });
     }
 
@@ -201,6 +240,7 @@ class HealthCalendarStore extends ChangeNotifier {
         HealthCalendarFields.daysBefore: daysBefore,
         HealthCalendarFields.timeHour: timeHour,
         HealthCalendarFields.items: items,
+        HealthCalendarFields.disabledTitles: _disabled.toList(),
       },
     });
   }

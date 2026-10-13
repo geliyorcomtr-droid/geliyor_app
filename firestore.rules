@@ -22,6 +22,14 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == uid;
     }
 
+    function ownerTogglesListingActive() {
+      return signedIn()
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['active', 'updatedAt']);
+    }
+
     // Kullanıcı profili
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
@@ -151,7 +159,9 @@ service cloud.firestore {
     match /settings/{docId} {
       allow read: if isAdmin()
         || docId == 'bank_transfer'
-        || docId == 'feeding_guides';
+        || docId == 'feeding_guides'
+        || docId == 'hangi_mama'
+        || docId == 'welcome_splash';
       allow write: if isAdmin();
     }
 
@@ -183,6 +193,7 @@ service cloud.firestore {
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.status == 'pending';
       allow update: if isAdmin()
+        || ownerTogglesListingActive()
         || (signedIn()
             && resource.data.userId == request.auth.uid
             && request.resource.data.userId == request.auth.uid
