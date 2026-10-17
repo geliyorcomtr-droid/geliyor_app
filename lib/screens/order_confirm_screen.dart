@@ -47,6 +47,7 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
     AddressStore.instance.addListener(_onChanged);
     CouponStore.instance.addListener(_onChanged);
     CouponStore.instance.ensureLoaded();
+    unawaited(CouponStore.instance.refreshUsed());
     if (AuthStore.instance.uid != null &&
         !AddressStore.instance.hasDeliveryAddress) {
       unawaited(UserProfileSync.sync(force: true));
@@ -146,6 +147,14 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
             subscriptionDiscount: subscriptionDiscount,
             orderId: id,
           ),
+        ),
+      );
+    } on StateError catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.message),
+          behavior: SnackBarBehavior.floating,
         ),
       );
     } catch (_) {

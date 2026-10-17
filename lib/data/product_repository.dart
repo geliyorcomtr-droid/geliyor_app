@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geliyor_app/admin/admin_models.dart';
+import 'package:geliyor_app/data/bought_together.dart';
 import 'package:geliyor_app/data/firestore_collections.dart';
 import 'package:geliyor_app/data/health_product_groups.dart';
 import 'package:geliyor_app/data/pet_life_stage.dart';
@@ -294,6 +295,7 @@ class ProductRepository {
           if (url.trim().isNotEmpty) url.trim(),
       ],
       boughtTogetherIds: product.boughtTogetherIds,
+      stock: product.stock,
       ingredients: product.ingredients.trim().isNotEmpty
           ? product.ingredients.trim()
           : (ProductIngredients.looksLike(product.description)
@@ -427,6 +429,77 @@ class ProductRepository {
       return updated;
     } catch (_) {
       _bagDaysBackfill = null;
+      return 0;
+    }
+  }
+
+  /// Elle seçilmemiş ürünlere birlikte alınan 3 ürünü yazar.
+  static Future<int>? _boughtTogetherBackfill;
+
+  Future<int> backfillBoughtTogether() {
+    return _boughtTogetherBackfill ??= _runBoughtTogetherBackfill();
+  }
+
+  Future<int> _runBoughtTogetherBackfill() async {
+    try {
+      final snap = await _col.get();
+      final products = snap.docs.map(AdminProduct.fromDoc).toList();
+      final catalog = [
+        for (final product in products)
+          if (product.active)
+            TogetherCandidate(
+              id: product.id,
+              title: product.title,
+              brand: product.brand,
+              mainCategory: product.mainCategory,
+              category: product.category,
+              stock: product.stock,
+              active: product.active,
+            ),
+      ];
+      final byId = {for (final doc in snap.docs) doc.id: doc.reference};
+      var updated = 0;
+      WriteBatch? batch;
+      var ops = 0;
+
+      Future<void> commit() async {
+        final current = batch;
+        if (current == null || ops == 0) return;
+        await current.commit();
+        batch = null;
+        ops = 0;
+      }
+
+      for (final product in products) {
+        if (!product.active || product.boughtTogetherIds.isNotEmpty) continue;
+        final ids = BoughtTogetherSuggestions.idsFor(
+          source: TogetherCandidate(
+            id: product.id,
+            title: product.title,
+            brand: product.brand,
+            mainCategory: product.mainCategory,
+            category: product.category,
+            stock: product.stock,
+            active: product.active,
+          ),
+          catalog: catalog,
+        );
+        if (ids.isEmpty) continue;
+        final ref = byId[product.id];
+        if (ref == null) continue;
+        batch ??= FirebaseFirestore.instance.batch();
+        batch!.update(ref, {
+          ProductFields.boughtTogetherIds: ids,
+          ProductFields.updatedAt: FieldValue.serverTimestamp(),
+        });
+        ops++;
+        updated++;
+        if (ops >= 400) await commit();
+      }
+      await commit();
+      return updated;
+    } catch (_) {
+      _boughtTogetherBackfill = null;
       return 0;
     }
   }

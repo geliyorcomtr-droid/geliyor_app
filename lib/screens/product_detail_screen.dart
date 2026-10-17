@@ -1,4 +1,5 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:geliyor_app/data/bought_together.dart';
 import 'package:geliyor_app/data/product_advantage_repository.dart';
 import 'package:geliyor_app/data/product_bag_days.dart';
 import 'package:geliyor_app/data/product_repository.dart';
@@ -1305,21 +1306,24 @@ class ProductDetailScreen extends StatelessWidget {
   }
 
   Widget _buildTogetherBox(BuildContext context) {
-    final ids = [
-      for (final id in product?.boughtTogetherIds ?? const <String>[])
-        if (id.trim().isNotEmpty && id.trim() != product?.id) id.trim(),
+    final current = product;
+    final manualIds = [
+      for (final id in current?.boughtTogetherIds ?? const <String>[])
+        if (id.trim().isNotEmpty && id.trim() != current?.id) id.trim(),
     ];
-    if (ids.isEmpty) return const SizedBox.shrink();
     return StreamBuilder<List<MarketProductData>>(
       stream: ProductRepository.instance.watchActiveProducts(),
       initialData: ProductRepository.instance.cachedActiveProducts(),
       builder: (context, snapshot) {
         final catalog = snapshot.data ?? const <MarketProductData>[];
         final byId = {for (final item in catalog) item.id: item};
-        final items = <_RelatedProduct>[
-          for (final id in ids)
+        final resolvedManual = <_RelatedProduct>[
+          for (final id in manualIds)
             if (byId[id] != null) _relatedFrom(byId[id]!),
         ];
+        final items = resolvedManual.isNotEmpty
+            ? resolvedManual
+            : _suggestedTogether(current, catalog, byId);
         if (items.isEmpty) return const SizedBox.shrink();
         return Padding(
           padding: const EdgeInsets.only(top: _sectionGap),
@@ -1360,6 +1364,46 @@ class ProductDetailScreen extends StatelessWidget {
         );
       },
     );
+  }
+
+  List<_RelatedProduct> _suggestedTogether(
+    MarketProductData? current,
+    List<MarketProductData> catalog,
+    Map<String, MarketProductData> byId,
+  ) {
+    if (current == null) return const [];
+    String mainOf(MarketProductData item) {
+      return switch (item.petTag) {
+        'Köpek' => 'dog',
+        'Akıllı Pet' => 'smart',
+        'Kuş' => 'bird',
+        'Kemirgen' => 'rodent',
+        _ => 'cat',
+      };
+    }
+
+    TogetherCandidate candidateOf(MarketProductData item) {
+      return TogetherCandidate(
+        id: item.id,
+        title: item.title,
+        brand: item.brand,
+        mainCategory: mainOf(item),
+        category: item.categoryTitles.isNotEmpty
+            ? item.categoryTitles.first
+            : item.dietTag,
+        stock: item.stock,
+        active: true,
+      );
+    }
+
+    final ids = BoughtTogetherSuggestions.idsFor(
+      source: candidateOf(current),
+      catalog: [for (final item in catalog) candidateOf(item)],
+    );
+    return [
+      for (final id in ids)
+        if (byId[id] != null) _relatedFrom(byId[id]!),
+    ];
   }
 
   Widget _buildSimilarBox(BuildContext context) {

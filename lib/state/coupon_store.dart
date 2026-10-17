@@ -1,9 +1,11 @@
 import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:geliyor_app/data/coupon_repository.dart';
 import 'package:geliyor_app/data/firestore_collections.dart';
 import 'package:geliyor_app/data/user_doc_persist.dart';
+import 'package:geliyor_app/state/auth_store.dart';
 import 'package:geliyor_app/state/order_store.dart';
 import 'package:geliyor_app/utils/courier_fee.dart';
 
@@ -13,6 +15,7 @@ class CouponStore extends ChangeNotifier {
 
   final List<AppCoupon> _catalog = [];
   final List<String> _earnedIds = [];
+  final Set<String> _usedIds = {};
   AppCoupon? _selected;
   StreamSubscription<List<AppCoupon>>? _sub;
   bool _started = false;
@@ -29,6 +32,7 @@ class CouponStore extends ChangeNotifier {
   List<AppCoupon> get usableCoupons {
     final list = _catalog.where((coupon) {
       if (!coupon.active) return false;
+      if (coupon.singleUse && _usedIds.contains(coupon.id)) return false;
       if (_isWelcome(coupon) && _hasPriorOrder) return false;
       if (coupon.publicCoupon) return true;
       return _earnedIds.contains(coupon.id);
@@ -42,8 +46,12 @@ class CouponStore extends ChangeNotifier {
     return list;
   }
 
-  double discountFor(double subtotal) =>
-      _selected?.discountFor(subtotal) ?? 0;
+  double discountFor(double subtotal) {
+    final selected = _selected;
+    if (selected == null) return 0;
+    if (selected.singleUse && _usedIds.contains(selected.id)) return 0;
+    return selected.discountFor(subtotal);
+  }
 
   double payableTotal(double subtotal) {
     final courier = CourierFee.forSubtotal(subtotal);
@@ -63,6 +71,57 @@ class CouponStore extends ChangeNotifier {
       _syncSelected();
       notifyListeners();
     });
+    unawaited(refreshUsed());
+  }
+
+  /// Tek kullanımlık kupon, bu müşterinin iptal edilmemiş siparişinde varsa kapanır.
+  Future<void> refreshUsed() async {
+    final uid = AuthStore.instance.uid;
+    if (uid == null || uid.isEmpty) return;
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection(FirestoreCollections.orders)
+          .where(OrderFields.userId, isEqualTo: uid)
+          .get();
+      final ids = <String>{};
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        if (data[OrderFields.status] == OrderStatuses.cancelled) continue;
+        final id = (data[OrderFields.couponId] as String?)?.trim() ?? '';
+        if (id.isNotEmpty) ids.add(id);
+      }
+      _usedIds
+        ..clear()
+        ..addAll(ids);
+      _syncSelected();
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  /// `true` kullanılmış, `false` kullanılmamış, `null` kontrol edilemedi.
+  Future<bool?> redeemedSingleUse(String couponId) async {
+    final id = couponId.trim();
+    if (id.isEmpty) return false;
+    if (_usedIds.contains(id)) return true;
+    final uid = AuthStore.instance.uid;
+    if (uid == null || uid.isEmpty) return null;
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection(FirestoreCollections.orders)
+          .where(OrderFields.userId, isEqualTo: uid)
+          .get();
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        if (data[OrderFields.status] == OrderStatuses.cancelled) continue;
+        final used = (data[OrderFields.couponId] as String?)?.trim() ?? '';
+        if (used.isNotEmpty) _usedIds.add(used);
+      }
+      _syncSelected();
+      notifyListeners();
+      return _usedIds.contains(id);
+    } catch (_) {
+      return null;
+    }
   }
 
   void applyRemoteEarned(List<dynamic>? raw) {
@@ -85,6 +144,7 @@ class CouponStore extends ChangeNotifier {
 
   void clearLocal() {
     _earnedIds.clear();
+    _usedIds.clear();
     _selected = null;
     notifyListeners();
   }
@@ -116,6 +176,9 @@ class CouponStore extends ChangeNotifier {
     if (_isWelcome(match) && _hasPriorOrder) {
       return 'Hoş geldin kuponu yalnızca ilk siparişte geçerlidir.';
     }
+    if (match.singleUse && _usedIds.contains(match.id)) {
+      return 'Bu kupon daha önce kullanıldı.';
+    }
     if (!match.publicCoupon && !_earnedIds.contains(match.id)) {
       return 'Bu kupon hesabınıza tanımlı değil.';
     }
@@ -129,6 +192,9 @@ class CouponStore extends ChangeNotifier {
   String? applyCoupon(AppCoupon coupon, double subtotal) {
     if (_isWelcome(coupon) && _hasPriorOrder) {
       return 'Hoş geldin kuponu yalnızca ilk siparişte geçerlidir.';
+    }
+    if (coupon.singleUse && _usedIds.contains(coupon.id)) {
+      return 'Bu kupon daha önce kullanıldı.';
     }
     if (!coupon.publicCoupon && !_earnedIds.contains(coupon.id)) {
       return 'Bu kupon hesabınıza tanımlı değil.';
@@ -144,6 +210,15 @@ class CouponStore extends ChangeNotifier {
   void syncWelcome(double subtotal) {
     final welcome = _welcomeCoupon();
     if (_hasPriorOrder) {
+      if (_selected != null && _isWelcome(_selected!)) {
+        _selected = null;
+        notifyListeners();
+      }
+      return;
+    }
+    if (welcome != null &&
+        welcome.singleUse &&
+        _usedIds.contains(welcome.id)) {
       if (_selected != null && _isWelcome(_selected!)) {
         _selected = null;
         notifyListeners();
@@ -189,9 +264,8 @@ class CouponStore extends ChangeNotifier {
   Future<void> onOrderPlaced() async {
     final used = _selected;
     _selected = null;
-    if (used != null &&
-        used.singleUse &&
-        _earnedIds.contains(used.id)) {
+    if (used != null && used.singleUse) {
+      _usedIds.add(used.id);
       _earnedIds.remove(used.id);
       await UserDocPersist.merge({
         UserFields.earnedCouponIds: _earnedIds,
@@ -203,6 +277,10 @@ class CouponStore extends ChangeNotifier {
   void _syncSelected() {
     final current = _selected;
     if (current == null) return;
+    if (current.singleUse && _usedIds.contains(current.id)) {
+      _selected = null;
+      return;
+    }
     AppCoupon? fresh;
     for (final coupon in usableCoupons) {
       if (coupon.id == current.id) {

@@ -54,6 +54,7 @@ class MarketProductData {
     this.gallery = const [],
     this.boughtTogetherIds = const [],
     this.ingredients = '',
+    this.stock = 0,
     this.createdAt,
   });
 
@@ -86,6 +87,7 @@ class MarketProductData {
   final List<String> gallery;
   final List<String> boughtTogetherIds;
   final String ingredients;
+  final int stock;
   final DateTime? createdAt;
 
   /// Ana görsel + galeri; boş ve tekrarlayan adresler elenir.

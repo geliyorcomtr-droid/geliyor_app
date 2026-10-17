@@ -189,6 +189,9 @@ class _CatalogTab extends StatelessWidget {
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     title: const Text('Tek kullanımlık'),
+                    subtitle: const Text(
+                      'Bir müşteri bu kuponu yalnızca bir siparişte kullanabilir.',
+                    ),
                     value: singleUse,
                     onChanged: (v) => setDialog(() => singleUse = v),
                   ),

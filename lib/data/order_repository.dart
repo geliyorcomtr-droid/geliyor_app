@@ -34,6 +34,15 @@ class OrderRepository {
     await coupons.ensureLoaded();
     coupons.syncWelcome(cart.cartTotal);
     final coupon = coupons.selected;
+    if (coupon != null && coupon.singleUse) {
+      final redeemed = await coupons.redeemedSingleUse(coupon.id);
+      if (redeemed == null) {
+        throw StateError('Kupon doğrulanamadı. Lütfen tekrar deneyin.');
+      }
+      if (redeemed) {
+        throw StateError('Bu kupon daha önce kullanıldı.');
+      }
+    }
     final couponDiscount = coupons.discountFor(cart.cartTotal);
     final subscriptionDiscount = SubscriptionDiscount.amountFor(cart.cartTotal);
     final total = SubscriptionDiscount.payable(

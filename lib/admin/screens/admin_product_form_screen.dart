@@ -7,6 +7,7 @@ import 'package:geliyor_app/admin/admin_models.dart';
 import 'package:geliyor_app/admin/admin_theme.dart';
 import 'package:geliyor_app/admin/admin_ui.dart';
 import 'package:geliyor_app/admin/category_repository.dart';
+import 'package:geliyor_app/data/bought_together.dart';
 import 'package:geliyor_app/data/brand_repository.dart';
 import 'package:geliyor_app/data/firestore_collections.dart';
 import 'package:geliyor_app/data/health_product_groups.dart';
@@ -77,6 +78,7 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
   final _brandSearch = TextEditingController();
   final _boughtSearch = TextEditingController();
   String? _boughtCategoryKey;
+  bool _boughtAutoApplied = false;
   late final Future<List<AdminMainCategory>> _categoriesFuture;
   late final Future<List<AppBrand>> _brandsFuture;
 
@@ -2052,6 +2054,37 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
 
   static const _boughtTogetherLimit = 3;
 
+  TogetherCandidate _togetherSource() {
+    return TogetherCandidate(
+      id: widget.product?.id ?? '',
+      title: _title.text,
+      brand: _brand.text,
+      mainCategory: _mainCategory,
+      category: _category.text,
+      stock: int.tryParse(_stock.text) ?? 0,
+      active: _active,
+    );
+  }
+
+  List<String> _suggestBoughtTogether(List<AdminProduct> products) {
+    return BoughtTogetherSuggestions.idsFor(
+      source: _togetherSource(),
+      catalog: [
+        for (final item in products)
+          if (item.active)
+            TogetherCandidate(
+              id: item.id,
+              title: item.title,
+              brand: item.brand,
+              mainCategory: item.mainCategory,
+              category: item.category,
+              stock: item.stock,
+              active: item.active,
+            ),
+      ],
+    );
+  }
+
   void _toggleBoughtTogether(String id) {
     final key = id.trim();
     if (key.isEmpty || key == widget.product?.id) return;
@@ -2088,13 +2121,45 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
             final byId = {for (final item in products) item.id: item};
             final selfId = widget.product?.id ?? '';
             final query = _boughtSearch.text.trim().toLowerCase();
+            if (!_boughtAutoApplied &&
+                _boughtTogetherIds.isEmpty &&
+                _category.text.trim().isNotEmpty &&
+                products.isNotEmpty) {
+              final suggested = _suggestBoughtTogether(products);
+              if (suggested.isNotEmpty) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (!mounted ||
+                      _boughtAutoApplied ||
+                      _boughtTogetherIds.isNotEmpty) {
+                    return;
+                  }
+                  setState(() {
+                    _boughtTogetherIds = suggested;
+                    _boughtAutoApplied = true;
+                  });
+                });
+              }
+            }
             return _panel(
               title: 'Birlikte Alınanlar Ürünler',
               subtitle:
-                  'Tüm kategoriler listelenir. Bir kategoriye tıklayınca ürünleri açılır; en fazla 3 ürün seçilir. Seçilenler ürün kartında Birlikte Alınan Ürünler olarak görünür.',
+                  'Boşsa kategoriye göre 3 ürün otomatik seçilir. Kum, malt ve ödül kedi mamasına; benzer mamalar köpek mamasına; ödül ve bakımda aynı gruptan ürünler gelir. Seçimi elle değiştirebilirsin.',
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _boughtTogetherIds = _suggestBoughtTogether(products);
+                          _boughtAutoApplied = true;
+                        });
+                      },
+                      icon: const Icon(Icons.auto_awesome_rounded, size: 18),
+                      label: const Text('Otomatik doldur'),
+                    ),
+                  ),
                   Text(
                     'Seçilenler (${_boughtTogetherIds.length}/$_boughtTogetherLimit)',
                     style: const TextStyle(fontWeight: FontWeight.w800),

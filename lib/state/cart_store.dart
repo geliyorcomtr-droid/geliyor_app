@@ -76,6 +76,17 @@ class CartStore extends ChangeNotifier {
   bool _suppressPersist = false;
   bool _hasRemote = false;
   Timer? _persistTimer;
+  Future<void>? _persistTail;
+  int _editGeneration = 0;
+  int _ackedGeneration = 0;
+  int _writeFailures = 0;
+
+  bool get _hasPendingEdit => _editGeneration != _ackedGeneration;
+
+  void _touch() {
+    _editGeneration++;
+    _writeFailures = 0;
+  }
 
   bool _isUploadedProduct(CartItem item) {
     final path = item.imagePath.trim().toLowerCase();
@@ -88,6 +99,7 @@ class CartStore extends ChangeNotifier {
 
   void clear() {
     if (_items.isEmpty) return;
+    _touch();
     _items.clear();
     notifyListeners();
     _schedulePersist();
@@ -97,15 +109,22 @@ class CartStore extends ChangeNotifier {
     _persistTimer?.cancel();
     _suppressPersist = true;
     _hasRemote = false;
+    _editGeneration = 0;
+    _ackedGeneration = 0;
     _items.clear();
     _suppressPersist = false;
     notifyListeners();
   }
 
   void applyRemote(List<Map<String, dynamic>> rows) {
+    // Adet değişimi henüz yazılmadıysa eski sunucu anlık görüntüsü
+    // yerel sepeti geri almasın ve bekleyen kaydı iptal etmesin.
+    if (_hasRemote && _hasPendingEdit) return;
     _persistTimer?.cancel();
     _suppressPersist = true;
     _hasRemote = true;
+    _editGeneration = 0;
+    _ackedGeneration = 0;
     _items
       ..clear()
       ..addAll(
@@ -139,6 +158,7 @@ class CartStore extends ChangeNotifier {
       }
     }
     if (!changed) return;
+    _touch();
     notifyListeners();
     _schedulePersist();
   }
@@ -176,6 +196,7 @@ class CartStore extends ChangeNotifier {
     String skt = '',
     String barcode = '',
   }) {
+    _touch();
     final existing = _items.where((e) => e.id == id);
     if (existing.isNotEmpty) {
       existing.first.quantity++;
@@ -204,23 +225,35 @@ class CartStore extends ChangeNotifier {
     _schedulePersist();
   }
 
-  void increaseQuantity(int index) {
-    if (index < 0 || index >= _items.length) return;
-    _items[index].quantity++;
+  void setQuantity(String id, int quantity) {
+    if (quantity < 1) return;
+    final index = _items.indexWhere((item) => item.id == id);
+    if (index < 0 || _items[index].quantity == quantity) return;
+    _touch();
+    _items[index].quantity = quantity;
     notifyListeners();
     _schedulePersist();
+  }
+
+  void increaseQuantity(int index) {
+    if (index < 0 || index >= _items.length) return;
+    setQuantity(_items[index].id, _items[index].quantity + 1);
   }
 
   void decreaseQuantity(int index) {
     if (index < 0 || index >= _items.length) return;
-    if (_items[index].quantity <= 1) return;
-    _items[index].quantity--;
-    notifyListeners();
-    _schedulePersist();
+    setQuantity(_items[index].id, _items[index].quantity - 1);
   }
 
   void removeItem(int index) {
     if (index < 0 || index >= _items.length) return;
+    removeById(_items[index].id);
+  }
+
+  void removeById(String id) {
+    final index = _items.indexWhere((item) => item.id == id);
+    if (index < 0) return;
+    _touch();
     _items.removeAt(index);
     notifyListeners();
     _schedulePersist();
@@ -242,14 +275,47 @@ class CartStore extends ChangeNotifier {
 
   Future<void> persistNow() async {
     _persistTimer?.cancel();
-    if (!_hasRemote && _items.isEmpty) return;
+    if (!_hasRemote && _items.isEmpty && !_hasPendingEdit) return;
     await _persist();
   }
 
-  Future<void> _persist() async {
-    if (_suppressPersist) return;
-    await UserDocPersist.merge({
-      UserFields.cart: _items.map((item) => item.toMap()).toList(),
+  Future<void> _persist() {
+    final previous = _persistTail;
+    late final Future<void> current;
+    current = () async {
+      if (previous != null) {
+        try {
+          await previous;
+        } catch (_) {}
+      }
+      await _writeLatest();
+    }();
+    _persistTail = current;
+    return current.whenComplete(() {
+      if (identical(_persistTail, current)) _persistTail = null;
     });
+  }
+
+  Future<void> _writeLatest() async {
+    if (_suppressPersist || !_hasPendingEdit) return;
+    final generation = _editGeneration;
+    final payload = _items.map((item) => item.toMap()).toList();
+    final wrote = await UserDocPersist.merge({
+      UserFields.cart: payload,
+    });
+    if (!wrote) {
+      if (_writeFailures < 4 && _hasPendingEdit) {
+        _writeFailures++;
+        _persistTimer?.cancel();
+        _persistTimer = Timer(const Duration(seconds: 2), () {
+          unawaited(_persist());
+        });
+      }
+      return;
+    }
+    _writeFailures = 0;
+    if (generation == _editGeneration) {
+      _ackedGeneration = generation;
+    }
   }
 }

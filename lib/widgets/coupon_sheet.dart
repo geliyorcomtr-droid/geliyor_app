@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geliyor_app/data/coupon_repository.dart';
@@ -49,6 +51,7 @@ class _CouponSheetBodyState extends State<_CouponSheetBody> {
   void initState() {
     super.initState();
     CouponStore.instance.ensureLoaded();
+    unawaited(CouponStore.instance.refreshUsed());
     CouponStore.instance.addListener(_onStore);
   }
 

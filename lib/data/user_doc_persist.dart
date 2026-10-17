@@ -14,16 +14,19 @@ class UserDocPersist {
         .doc(id);
   }
 
-  static Future<void> merge(Map<String, dynamic> fields) async {
+  /// `true`: yazıldı veya yazılacak hesap yok. `false`: yazma başarısız.
+  static Future<bool> merge(Map<String, dynamic> fields) async {
     final ref = _userRef();
-    if (ref == null) return;
+    if (ref == null) return true;
     try {
       await ref.set({
         ...fields,
         UserFields.updatedAt: FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
+      return true;
     } catch (_) {
       // Offline: local state remains until next save.
+      return false;
     }
   }
 

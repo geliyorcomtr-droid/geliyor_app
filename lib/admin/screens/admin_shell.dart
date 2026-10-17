@@ -60,6 +60,7 @@ class _AdminShellState extends State<AdminShell> {
     super.initState();
     unawaited(CategoryRepository.instance.ensureDefaults());
     unawaited(ProductRepository.instance.backfillBagDays());
+    unawaited(ProductRepository.instance.backfillBoughtTogether());
   }
 
   void _go(

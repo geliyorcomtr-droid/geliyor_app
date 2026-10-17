@@ -1,4 +1,6 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:async';
+
+import 'package:flutter/material.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/screens/order_confirm_screen.dart';
 import 'package:geliyor_app/screens/product_detail_screen.dart';
@@ -28,6 +30,7 @@ class _CartScreenState extends State<CartScreen> {
   void initState() {
     super.initState();
     CouponStore.instance.ensureLoaded();
+    unawaited(CouponStore.instance.refreshUsed());
   }
 
   String _formatPrice(double price, {bool withDecimals = false}) {
@@ -110,7 +113,7 @@ class _CartScreenState extends State<CartScreen> {
                   ),
                   const SizedBox(height: 8),
                   for (int i = 0; i < cartItems.length; i++) ...[
-                    _buildProductCard(i, cartItems[i]),
+                    _buildProductCard(cartItems[i]),
                     if (i != cartItems.length - 1) const SizedBox(height: 8),
                   ],
                   const SizedBox(height: 10),
@@ -233,30 +236,15 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  Widget _buildProductCard(int index, CartItem item) {
+  Widget _buildProductCard(CartItem item) {
     return CartProductCard(
       item: item,
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => const ProductDetailScreen()),
       ),
-      onQuantityChanged: (qty) => _syncCartQuantity(index, qty),
-      onRemove: () => CartStore.instance.removeItem(index),
+      onQuantityChanged: (qty) => CartStore.instance.setQuantity(item.id, qty),
+      onRemove: () => CartStore.instance.removeById(item.id),
     );
-  }
-
-  void _syncCartQuantity(int index, int targetQty) {
-    final items = CartStore.instance.items;
-    if (index < 0 || index >= items.length) return;
-    final current = items[index].quantity;
-    if (targetQty > current) {
-      for (var i = 0; i < targetQty - current; i++) {
-        CartStore.instance.increaseQuantity(index);
-      }
-    } else if (targetQty < current) {
-      for (var i = 0; i < current - targetQty; i++) {
-        CartStore.instance.decreaseQuantity(index);
-      }
-    }
   }
 
   Widget _buildSummaryCard(
