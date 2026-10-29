@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:geliyor_app/data/courier_fee_repository.dart';
 import 'package:geliyor_app/data/firestore_collections.dart';
 import 'package:geliyor_app/data/user_doc_persist.dart';
 import 'package:geliyor_app/utils/courier_fee.dart';
@@ -35,18 +36,18 @@ class CartItem {
   double get lineTotal => unitPrice * quantity;
 
   Map<String, dynamic> toMap() => {
-        'id': id,
-        'imagePath': imagePath,
-        'title': title,
-        'unitPrice': unitPrice,
-        'oldPrice': oldPrice,
-        'discountPercent': discountPercent,
-        'weight': weight,
-        'brand': brand,
-        'skt': skt,
-        'barcode': barcode,
-        'quantity': quantity,
-      };
+    'id': id,
+    'imagePath': imagePath,
+    'title': title,
+    'unitPrice': unitPrice,
+    'oldPrice': oldPrice,
+    'discountPercent': discountPercent,
+    'weight': weight,
+    'brand': brand,
+    'skt': skt,
+    'barcode': barcode,
+    'quantity': quantity,
+  };
 
   factory CartItem.fromMap(Map<String, dynamic> data) {
     return CartItem(
@@ -68,6 +69,7 @@ class CartItem {
 class CartStore extends ChangeNotifier {
   CartStore._() {
     _items = [];
+    CourierFeeRepository.instance.addListener(notifyListeners);
   }
 
   static final CartStore instance = CartStore._();
@@ -175,7 +177,10 @@ class CartStore extends ChangeNotifier {
 
   double get cartOldTotal {
     _dropUnuploadedItems();
-    return _items.fold(0.0, (sum, item) => sum + (item.oldPrice * item.quantity));
+    return _items.fold(
+      0.0,
+      (sum, item) => sum + (item.oldPrice * item.quantity),
+    );
   }
 
   double get cartDiscount => cartOldTotal - cartTotal;
@@ -204,8 +209,8 @@ class CartStore extends ChangeNotifier {
       final discount = discountPercent > 0
           ? discountPercent
           : oldPrice <= 0
-              ? 0
-              : (((oldPrice - unitPrice) / oldPrice) * 100).round();
+          ? 0
+          : (((oldPrice - unitPrice) / oldPrice) * 100).round();
       _items.add(
         CartItem(
           id: id,
@@ -300,9 +305,7 @@ class CartStore extends ChangeNotifier {
     if (_suppressPersist || !_hasPendingEdit) return;
     final generation = _editGeneration;
     final payload = _items.map((item) => item.toMap()).toList();
-    final wrote = await UserDocPersist.merge({
-      UserFields.cart: payload,
-    });
+    final wrote = await UserDocPersist.merge({UserFields.cart: payload});
     if (!wrote) {
       if (_writeFailures < 4 && _hasPendingEdit) {
         _writeFailures++;

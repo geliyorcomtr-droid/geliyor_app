@@ -106,29 +106,38 @@ class _AdminTrustBadgesScreenState extends State<AdminTrustBadgesScreen> {
                         ),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: _imageSlot(
-                            title: 'Açılan görsel',
-                            imageUrl: detailImageUrl.text,
-                            assetPath: '',
-                            name: name.text,
-                            id: existing?.id,
-                            emptyHint: 'Yükle',
-                            uploading: dialogUploading,
-                            onUpload: () async {
-                              setDialogState(() => dialogUploading = true);
-                              final url = await _pickAndUploadImage(
-                                style: UploadImageStyle.photo,
-                                folder: 'trust_badges/detail',
-                              );
-                              if (url != null) detailImageUrl.text = url;
-                              setDialogState(() => dialogUploading = false);
-                            },
-                            onDelete: detailImageUrl.text.trim().isEmpty
-                                ? null
-                                : () => setDialogState(
-                                    () => detailImageUrl.clear(),
-                                  ),
-                          ),
+                          child: TrustBadgeRepository.isAuthorizedSellerBadge(
+                            AppTrustBadge(
+                              id: existing?.id ?? '',
+                              name: name.text,
+                            ),
+                          )
+                              ? const _SellerCertificateNote()
+                              : _imageSlot(
+                                  title: 'Açılan görsel',
+                                  imageUrl: detailImageUrl.text,
+                                  assetPath: '',
+                                  name: name.text,
+                                  id: existing?.id,
+                                  emptyHint: 'Yükle',
+                                  uploading: dialogUploading,
+                                  onUpload: () async {
+                                    setDialogState(() => dialogUploading = true);
+                                    final url = await _pickAndUploadImage(
+                                      style: UploadImageStyle.photo,
+                                      folder: 'trust_badges/detail',
+                                    );
+                                    if (url != null) detailImageUrl.text = url;
+                                    setDialogState(
+                                      () => dialogUploading = false,
+                                    );
+                                  },
+                                  onDelete: detailImageUrl.text.trim().isEmpty
+                                      ? null
+                                      : () => setDialogState(
+                                          () => detailImageUrl.clear(),
+                                        ),
+                                ),
                         ),
                       ],
                     ),
@@ -553,20 +562,27 @@ class _AdminTrustBadgesScreenState extends State<AdminTrustBadgesScreen> {
                               ),
                               const SizedBox(width: 8),
                               InkWell(
-                                onTap: _uploading
+                                onTap: _uploading ||
+                                        TrustBadgeRepository
+                                            .isAuthorizedSellerBadge(badge)
                                     ? null
                                     : () => _changeDetailImage(badge),
                                 borderRadius: BorderRadius.circular(16),
                                 child: SizedBox(
                                   width: 68,
                                   height: 52,
-                                  child: _badgeImage(
-                                    imageUrl: badge.detailImageUrl,
-                                    assetPath: '',
-                                    name: badge.name,
-                                    id: badge.id,
-                                    emptyHint: 'Açılan',
-                                  ),
+                                  child: TrustBadgeRepository
+                                          .isAuthorizedSellerBadge(badge)
+                                      ? const _SellerCertificateNote(
+                                          compact: true,
+                                        )
+                                      : _badgeImage(
+                                          imageUrl: badge.detailImageUrl,
+                                          assetPath: '',
+                                          name: badge.name,
+                                          id: badge.id,
+                                          emptyHint: 'Açılan',
+                                        ),
                                 ),
                               ),
                             ],
@@ -628,10 +644,15 @@ class _AdminTrustBadgesScreenState extends State<AdminTrustBadgesScreen> {
                                 ),
                               ),
                               IconButton(
-                                tooltip: badge.detailImageUrl.trim().isEmpty
+                                tooltip: TrustBadgeRepository
+                                        .isAuthorizedSellerBadge(badge)
+                                    ? 'Yetki belgesi markadan gelir'
+                                    : badge.detailImageUrl.trim().isEmpty
                                     ? 'Açılan Görsel Yükle'
                                     : 'Açılan Görseli Değiştir',
-                                onPressed: _uploading
+                                onPressed: _uploading ||
+                                        TrustBadgeRepository
+                                            .isAuthorizedSellerBadge(badge)
                                     ? null
                                     : () => _changeDetailImage(badge),
                                 icon: const Icon(
@@ -640,8 +661,13 @@ class _AdminTrustBadgesScreenState extends State<AdminTrustBadgesScreen> {
                                 ),
                               ),
                               IconButton(
-                                tooltip: 'Açılan Görseli Sil',
+                                tooltip: TrustBadgeRepository
+                                        .isAuthorizedSellerBadge(badge)
+                                    ? 'Yetki belgesi markadan gelir'
+                                    : 'Açılan Görseli Sil',
                                 onPressed: _uploading ||
+                                        TrustBadgeRepository
+                                            .isAuthorizedSellerBadge(badge) ||
                                         badge.detailImageUrl.trim().isEmpty
                                     ? null
                                     : () => _removeDetailImage(badge),
@@ -854,5 +880,36 @@ class _AdminTrustBadgesScreenState extends State<AdminTrustBadgesScreen> {
         .replaceAll(RegExp(r'^-+|-+$'), '');
     final base = slug.isEmpty ? 'rozet' : slug;
     return '$base-${DateTime.now().millisecondsSinceEpoch}';
+  }
+}
+
+class _SellerCertificateNote extends StatelessWidget {
+  const _SellerCertificateNote({this.compact = false});
+
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      alignment: Alignment.center,
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: AppColors.selected,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Text(
+        compact
+            ? 'Marka\nbelgesi'
+            : 'Açılan görsel, markanın 361×510 yetki belgesidir. Markalar ekranından eklenir.',
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: AppColors.text,
+          fontSize: compact ? 10 : 12,
+          fontWeight: FontWeight.w700,
+          height: 1.3,
+        ),
+      ),
+    );
   }
 }

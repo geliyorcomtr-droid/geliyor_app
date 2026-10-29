@@ -165,9 +165,13 @@ class InfoGuideSheet {
     VoidCallback? onSeeProducts,
     IconData fallbackIcon = Icons.pets_rounded,
     Color fallbackIconColor = AppColors.primary,
+    double height = 280,
+    double width = 361,
   }) {
-    const panelHeight = 280.0;
-    const panelWidth = 361.0;
+    final media = MediaQuery.of(context);
+    final available = media.size.height - 48;
+    final panelHeight = height > available && available > 0 ? available : height;
+    final panelWidth = width;
     final path = imagePath.trim();
     return showCentered(
       context,

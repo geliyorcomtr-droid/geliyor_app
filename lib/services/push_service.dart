@@ -7,6 +7,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:geliyor_app/data/firestore_collections.dart';
 import 'package:geliyor_app/firebase_options.dart';
+import 'package:geliyor_app/services/device_session.dart';
 import 'package:geliyor_app/state/notifications_store.dart';
 
 @pragma('vm:entry-point')
@@ -94,6 +95,7 @@ class PushService {
   Future<void> _saveToken(String uid, String token) async {
     try {
       final tokenId = token.replaceAll('/', '_');
+      final deviceId = await DeviceSession.deviceId();
       await FirebaseFirestore.instance
           .collection(FirestoreCollections.users)
           .doc(uid)
@@ -102,6 +104,7 @@ class PushService {
           .set({
             FcmTokenFields.token: token,
             FcmTokenFields.platform: defaultTargetPlatform.name,
+            FcmTokenFields.deviceId: deviceId,
             FcmTokenFields.updatedAt: FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
     } catch (error) {

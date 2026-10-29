@@ -6,6 +6,7 @@ import 'package:geliyor_app/app_bootstrap.dart';
 import 'package:geliyor_app/app_navigator.dart';
 import 'package:geliyor_app/admin/category_repository.dart';
 import 'package:geliyor_app/data/brand_repository.dart';
+import 'package:geliyor_app/data/courier_fee_repository.dart';
 import 'package:geliyor_app/data/system_feeding_repository.dart';
 import 'package:geliyor_app/data/welcome_splash_repository.dart';
 import 'package:geliyor_app/firebase_options.dart';
@@ -42,6 +43,7 @@ Future<void> main() async {
     FoodReminderSync.start();
     HealthCalendarStore.start();
     BrandRepository.instance.startListening();
+    CourierFeeRepository.instance.startListening();
     CategoryRepository.instance.startListening();
     SystemFeedingRepository.instance.startListening();
     LoginGate.openLogin = (context) async {

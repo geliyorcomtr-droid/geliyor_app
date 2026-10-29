@@ -15,6 +15,7 @@ class AppBannerSlot extends StatelessWidget {
     this.autoPlay = false,
     this.autoPlayInterval = const Duration(seconds: 3),
     this.openOnTap = true,
+    this.onTap,
   });
 
   final BannerPlacement placement;
@@ -23,6 +24,7 @@ class AppBannerSlot extends StatelessWidget {
   final bool autoPlay;
   final Duration autoPlayInterval;
   final bool openOnTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -53,6 +55,7 @@ class AppBannerSlot extends StatelessWidget {
           autoPlay: autoPlay,
           autoPlayInterval: autoPlayInterval,
           openOnTap: openOnTap,
+          onTap: onTap,
         );
       },
     );
@@ -225,6 +228,7 @@ class AppBannerSlider extends StatefulWidget {
     this.autoPlay = false,
     this.autoPlayInterval = const Duration(seconds: 3),
     this.openOnTap = true,
+    this.onTap,
   });
 
   final List<AppBanner> banners;
@@ -233,6 +237,7 @@ class AppBannerSlider extends StatefulWidget {
   final bool autoPlay;
   final Duration autoPlayInterval;
   final bool openOnTap;
+  final VoidCallback? onTap;
 
   @override
   State<AppBannerSlider> createState() => _AppBannerSliderState();
@@ -343,6 +348,13 @@ class _AppBannerSliderState extends State<AppBannerSlider> {
                   cacheWidth: bannerCachePx,
                   errorWidget: _fallback(),
                 );
+                if (widget.onTap != null) {
+                  return GestureDetector(
+                    onTap: widget.onTap,
+                    behavior: HitTestBehavior.opaque,
+                    child: image,
+                  );
+                }
                 if (!widget.openOnTap) return image;
                 return GestureDetector(
                   onTap: () => BannerImagePreview.show(context, banner),

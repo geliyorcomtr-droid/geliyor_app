@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
+import 'package:geliyor_app/data/courier_fee_repository.dart';
 import 'package:geliyor_app/data/order_repository.dart';
 import 'package:geliyor_app/screens/addresses_screen.dart';
 import 'package:geliyor_app/screens/order_success_screen.dart';
@@ -46,6 +47,7 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
     super.initState();
     AddressStore.instance.addListener(_onChanged);
     CouponStore.instance.addListener(_onChanged);
+    CourierFeeRepository.instance.addListener(_onChanged);
     CouponStore.instance.ensureLoaded();
     unawaited(CouponStore.instance.refreshUsed());
     if (AuthStore.instance.uid != null &&
@@ -58,6 +60,7 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
   void dispose() {
     AddressStore.instance.removeListener(_onChanged);
     CouponStore.instance.removeListener(_onChanged);
+    CourierFeeRepository.instance.removeListener(_onChanged);
     super.dispose();
   }
 
@@ -120,7 +123,9 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Sipariş oluşturulamadı. Giriş yapıp tekrar deneyin.'),
+            content: Text(
+              'Sipariş oluşturulamadı. Giriş yapıp tekrar deneyin.',
+            ),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -129,8 +134,9 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
       OrderStore.instance.saveLastOrderFromCart(orderId: id);
       final coupon = CouponStore.instance.selected;
       final couponDiscount = CouponStore.instance.discountFor(widget.cartTotal);
-      final subscriptionDiscount =
-          SubscriptionDiscount.amountFor(widget.cartTotal);
+      final subscriptionDiscount = SubscriptionDiscount.amountFor(
+        widget.cartTotal,
+      );
       await CouponStore.instance.onOrderPlaced();
       CartStore.instance.clear();
       if (!mounted) return;
@@ -187,7 +193,9 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
     });
     final courierFee = CourierFee.forSubtotal(widget.cartTotal);
     final couponDiscount = coupons.discountFor(widget.cartTotal);
-    final subscriptionDiscount = SubscriptionDiscount.amountFor(widget.cartTotal);
+    final subscriptionDiscount = SubscriptionDiscount.amountFor(
+      widget.cartTotal,
+    );
     final payableTotal = SubscriptionDiscount.payable(
       subtotal: widget.cartTotal,
       couponDiscount: couponDiscount,
@@ -368,94 +376,94 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
               padding: const EdgeInsets.all(12),
               decoration: _cardDecoration(),
               child: address == null
-              ? Row(
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        'Kayıtlı adres yok. Lütfen adres ekleyin.',
-                        style: TextStyle(
-                          color: AppColors.subText,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                  ? Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'Kayıtlı adres yok. Lütfen adres ekleyin.',
+                            style: TextStyle(
+                              color: AppColors.subText,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                    AppPressableButton.primary(
-                      onTap: _openAddressPicker,
-                      height: 32,
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      child: const Text(
-                        'Adres Ekle',
-                        style: TextStyle(fontSize: 11),
-                      ),
-                    ),
-                  ],
-                )
-              : Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: Icon(
-                        address.icon,
-                        color: AppColors.primary,
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
+                        AppPressableButton.primary(
+                          onTap: _openAddressPicker,
+                          height: 32,
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          child: const Text(
+                            'Adres Ekle',
+                            style: TextStyle(fontSize: 11),
+                          ),
+                        ),
+                      ],
+                    )
+                  : Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: Icon(
+                            address.icon,
+                            color: AppColors.primary,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _TagChip(label: address.title),
-                              const SizedBox(width: 6),
-                              Flexible(
-                                child: Text(
-                                  address.address,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
+                              Row(
+                                children: [
+                                  _TagChip(label: address.title),
+                                  const SizedBox(width: 6),
+                                  Flexible(
+                                    child: Text(
+                                      address.address,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: AppColors.text,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              if (address.cityDistrictLabel.isNotEmpty)
+                                Text(
+                                  address.cityDistrictLabel,
                                   style: const TextStyle(
                                     color: AppColors.text,
                                     fontSize: 12,
-                                    fontWeight: FontWeight.w800,
+                                    fontWeight: FontWeight.w700,
                                   ),
+                                ),
+                              if (address.cityDistrictLabel.isNotEmpty)
+                                const SizedBox(height: 4),
+                              Text(
+                                address.contactName,
+                                style: const TextStyle(
+                                  color: AppColors.subText,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 4),
-                          if (address.cityDistrictLabel.isNotEmpty)
-                            Text(
-                              address.cityDistrictLabel,
-                              style: const TextStyle(
-                                color: AppColors.text,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          if (address.cityDistrictLabel.isNotEmpty)
-                            const SizedBox(height: 4),
-                          Text(
-                            address.contactName,
-                            style: const TextStyle(
-                              color: AppColors.subText,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
             ),
           ),
         ),
@@ -951,8 +959,14 @@ class _OrderConfirmScreenState extends State<OrderConfirmScreen> {
             icon: Icons.delivery_dining_rounded,
             label: courierFree ? 'Ücretsiz Kurye' : 'Hızlı Kurye',
           ),
-          const _TrustBadge(icon: Icons.shield_outlined, label: 'Güvenli Teslimat'),
-          const _TrustBadge(icon: Icons.support_agent_rounded, label: '7/24 Destek'),
+          const _TrustBadge(
+            icon: Icons.shield_outlined,
+            label: 'Güvenli Teslimat',
+          ),
+          const _TrustBadge(
+            icon: Icons.support_agent_rounded,
+            label: '7/24 Destek',
+          ),
         ],
       ),
     );

@@ -583,6 +583,100 @@ class _AdminProductAdvantagesScreenState
     }
   }
 
+  Future<void> _editCategoryColor(ProductAdvantageCategory category) async {
+    final color = TextEditingController(text: category.color);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final parsed = _categoryColor(color.text);
+          return AlertDialog(
+            title: Text('${category.label} rengi'),
+            content: SizedBox(
+              width: 360,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      color: parsed,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: color,
+                    autofocus: true,
+                    onChanged: (_) => setDialogState(() {}),
+                    decoration: const InputDecoration(
+                      labelText: 'Renk kodu',
+                      hintText: ProductAdvantageCategory.defaultColorHex,
+                      border: OutlineInputBorder(),
+                    ),
+                    onSubmitted: (_) => Navigator.pop(dialogContext, true),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Vazgeç'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Kaydet'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    try {
+      if (ok != true) return;
+      final next = ProductAdvantageCategory.normalizeColor(color.text);
+      if (next.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Renk kodu #RRGGBB formatında olmalı.')),
+        );
+        return;
+      }
+      if (next == category.color) return;
+      await ProductAdvantageRepository.instance.setCategoryColor(
+        categoryId: category.id,
+        color: next,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${category.label} rengi $next olarak kaydedildi.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Renk kaydedilemedi: $error')),
+      );
+    } finally {
+      color.dispose();
+    }
+  }
+
+  Color _categoryColor(String raw) {
+    final normalized = ProductAdvantageCategory.normalizeColor(raw);
+    final hex = normalized.isEmpty
+        ? ProductAdvantageCategory.defaultColorHex
+        : normalized;
+    final value = int.tryParse(hex.substring(1), radix: 16) ??
+        int.parse(
+          ProductAdvantageCategory.defaultColorHex.substring(1),
+          radix: 16,
+        );
+    return Color(0xFF000000 | value);
+  }
+
   Future<void> _deleteCategory({
     required ProductAdvantageCategory category,
     required List<AppProductAdvantage> catalog,
@@ -946,6 +1040,34 @@ class _AdminProductAdvantagesScreenState
                         foregroundColor: AppColors.primary,
                         visualDensity: VisualDensity.compact,
                       ),
+                    ),
+                    Tooltip(
+                      message: category.color,
+                      child: InkWell(
+                        onTap: _moving || _uploading
+                            ? null
+                            : () => _editCategoryColor(category),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: _categoryColor(category.color),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _moving || _uploading
+                          ? null
+                          : () => _editCategoryColor(category),
+                      style: TextButton.styleFrom(
+                        foregroundColor: _categoryColor(category.color),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      child: const Text('Renk'),
                     ),
                     TextButton.icon(
                       onPressed: _moving ||

@@ -26,9 +26,6 @@ class HealthScreen extends StatefulWidget {
 
 class _HealthScreenState extends State<HealthScreen> {
   static const Color _asi = AppColors.primary;
-  static const Color _ilac = AppColors.primary;
-  static const Color _mama = AppColors.primary;
-  static const Color _acil = AppColors.primary;
 
   static const _monthNames = [
     'Ocak',
@@ -478,14 +475,14 @@ class _HealthScreenState extends State<HealthScreen> {
           _serviceCard(
             title: 'Aşı\nTakvimi',
             iconPath: 'assets/images/app_ikonlar/asi_takvimi.png',
-            color: _asi,
+            color: const Color(0xFFF85800),
             onTap: _openVaccineCalendar,
           ),
           const SizedBox(width: 8),
           _serviceCard(
             title: 'İlaç &\nTedavi',
             iconPath: 'assets/images/app_ikonlar/ilac_tedavi.png',
-            color: _ilac,
+            color: const Color(0xFF48A860),
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
@@ -498,7 +495,7 @@ class _HealthScreenState extends State<HealthScreen> {
           _serviceCard(
             title: 'Özel\nMamalar',
             iconPath: 'assets/images/app_ikonlar/mama_kabi.png',
-            color: _mama,
+            color: const Color(0xFFA83088),
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const SpecialFoodsScreen()),
@@ -509,7 +506,7 @@ class _HealthScreenState extends State<HealthScreen> {
           _serviceCard(
             title: 'Acil\nDurum',
             iconPath: 'assets/images/app_ikonlar/acil_durum.png',
-            color: _acil,
+            color: const Color(0xFFE80008),
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
@@ -529,6 +526,8 @@ class _HealthScreenState extends State<HealthScreen> {
     required Color color,
     VoidCallback? onTap,
   }) {
+    final frame = Color.lerp(color, Colors.white, 0.55) ?? color;
+    final background = Color.lerp(color, Colors.white, 0.86) ?? color;
     return Expanded(
       child: GestureDetector(
         onTap: onTap,
@@ -537,12 +536,12 @@ class _HealthScreenState extends State<HealthScreen> {
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: color.withValues(alpha: 0.25)),
+            border: Border.all(color: frame),
           ),
           child: Container(
             padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.10),
+              color: background,
               borderRadius: BorderRadius.circular(16),
             ),
             child: Column(
@@ -555,7 +554,7 @@ class _HealthScreenState extends State<HealthScreen> {
                   decoration: BoxDecoration(
                     color: AppColors.surface,
                     shape: BoxShape.circle,
-                    border: Border.all(color: color),
+                    border: Border.all(color: frame),
                   ),
                   child: ColorFiltered(
                     colorFilter: const ColorFilter.matrix(<double>[

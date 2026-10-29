@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
@@ -34,7 +34,9 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   String _formatPrice(double price, {bool withDecimals = false}) {
-    final fixed = withDecimals ? price.toStringAsFixed(2) : price.round().toString();
+    final fixed = withDecimals
+        ? price.toStringAsFixed(2)
+        : price.round().toString();
     final parts = fixed.split('.');
     final whole = parts.first;
     final buffer = StringBuffer();
@@ -146,13 +148,13 @@ class _CartScreenState extends State<CartScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text(
-                  'Sepetim',
-                  style: AppTextStyles.pageHeader,
-                ),
+                const Text('Sepetim', style: AppTextStyles.pageHeader),
                 const SizedBox(width: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.selected,
                     borderRadius: BorderRadius.circular(999),
@@ -239,9 +241,9 @@ class _CartScreenState extends State<CartScreen> {
   Widget _buildProductCard(CartItem item) {
     return CartProductCard(
       item: item,
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const ProductDetailScreen()),
-      ),
+      onTap: () => Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => const ProductDetailScreen())),
       onQuantityChanged: (qty) => CartStore.instance.setQuantity(item.id, qty),
       onRemove: () => CartStore.instance.removeById(item.id),
     );
@@ -306,7 +308,8 @@ class _CartScreenState extends State<CartScreen> {
           if (cartDiscount > 0) ...[
             _summaryBanner(
               icon: Icons.local_offer_outlined,
-              text: '${_formatPrice(cartDiscount)} TL sepette indirim uygulandı',
+              text:
+                  '${_formatPrice(cartDiscount)} TL sepette indirim uygulandı',
             ),
             const SizedBox(height: 8),
           ],
@@ -314,7 +317,7 @@ class _CartScreenState extends State<CartScreen> {
             icon: Icons.delivery_dining_rounded,
             text: remainingForFree > 0
                 ? 'Ücretsiz kurye için ${_formatPrice(remainingForFree)} TL daha ekleyin'
-                : '599 TL ve üzeri siparişlerde getirme ücreti yok',
+                : '${CourierFee.formatTl(CourierFee.freeThreshold)} TL ve üzeri siparişlerde getirme ücreti yok',
           ),
         ],
       ),

@@ -193,14 +193,6 @@ class CouponRepository {
           batch.set(_col.doc(coupon.id), coupon.toMap());
         }
         await batch.commit();
-      } else {
-        final food = await _col.doc(foodReminderCouponId).get();
-        if (!food.exists) {
-          final mama = defaultCoupons.firstWhere(
-            (c) => c.id == foodReminderCouponId,
-          );
-          await _col.doc(mama.id).set(mama.toMap());
-        }
       }
     } catch (_) {}
   }
@@ -223,6 +215,12 @@ class CouponRepository {
   Future<void> save(AppCoupon coupon) {
     final id = coupon.id.trim().isEmpty ? _col.doc().id : coupon.id;
     return _col.doc(id).set(coupon.toMap(), SetOptions(merge: true));
+  }
+
+  Future<void> delete(String id) {
+    final cleaned = id.trim();
+    if (cleaned.isEmpty) return Future.value();
+    return _col.doc(cleaned).delete();
   }
 
   Future<void> grantToUser(String userId, String couponId) {

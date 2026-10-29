@@ -14,10 +14,13 @@ class AdminAccents {
   static const Color broadcasts = AppColors.primary;
   static const Color banners = AppColors.primary;
   static const Color welcomeSplash = AppColors.primary;
+  static const Color enler = AppColors.primary;
+  static const Color contactBar = AppColors.primary;
   static const Color knowledge = AppColors.primary;
   static const Color support = AppColors.primary;
   static const Color adoption = AppColors.primary;
   static const Color bankTransfer = AppColors.primary;
+  static const Color cartLimit = AppColors.primary;
   static const Color reporting = AppColors.primary;
   static const Color hangiMama = AppColors.primary;
   static const Color canvas = AppColors.background;

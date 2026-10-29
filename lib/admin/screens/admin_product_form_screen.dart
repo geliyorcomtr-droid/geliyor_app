@@ -120,11 +120,7 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
     _description = TextEditingController(text: p?.description ?? '');
     _ingredients = TextEditingController(text: p?.ingredients ?? '');
     _stock = TextEditingController(text: p == null ? '0' : '${p.stock}');
-    _proteinValue = TextEditingController(
-      text: (p?.proteinValue.trim().isNotEmpty ?? false)
-          ? p!.proteinValue
-          : '%42',
-    );
+    _proteinValue = TextEditingController(text: p?.proteinValue.trim() ?? '');
     _animalProteinValue = TextEditingController(
       text: (p?.animalProteinValue.trim().isNotEmpty ?? false)
           ? p!.animalProteinValue
@@ -1571,8 +1567,9 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
                   children: [
                     _field(_proteinValue, 'Protein değeri (ör. %42 veya 42)'),
                     const Text(
-                      'Protein Değeri seçiliyse detayda et ikonu, %42 ve etiket '
-                      'Puan / Çok Satan Ürün ile aynı yapıda gösterilir.',
+                      'Yalnızca mama için. Boş bırakılırsa detayda protein '
+                      'görünmez. Değer girilirse et ikonu ve yüzde, puan ile '
+                      'aynı yapıda gösterilir.',
                       style: TextStyle(
                         color: AppColors.subText,
                         fontSize: 11,
@@ -1757,6 +1754,17 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
     );
   }
 
+  String _brandCertificateHint(List<AppBrand> brands, String name) {
+    for (final brand in brands) {
+      if (brand.name.trim() != name.trim()) continue;
+      if (brand.certificateUrl.trim().isEmpty) {
+        return 'Bu markanın yetki belgesi yok. Markalar ekranından 361×510 görsel ekleyin.';
+      }
+      return 'Yetki belgesi yüklü. Ürün detayında soldaki Yetkili Satıcı kutusunda açılır.';
+    }
+    return 'Yetki belgesi, seçilen markanın kaydından gelir.';
+  }
+
   Widget _buildBrandSection() {
     return FutureBuilder<List<AppBrand>>(
       future: _brandsFuture,
@@ -1816,6 +1824,15 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
                   style: const TextStyle(
                     color: AppColors.primary,
                     fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _brandCertificateHint(brands, current),
+                  style: const TextStyle(
+                    color: AppColors.subText,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 12),

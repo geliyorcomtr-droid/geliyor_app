@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:geliyor_app/data/brand_repository.dart';
+import 'package:geliyor_app/data/enler_repository.dart';
+import 'package:geliyor_app/data/favorite_index_repository.dart';
 import 'package:geliyor_app/data/product_advantage_repository.dart';
 import 'package:geliyor_app/data/product_repository.dart';
 import 'package:geliyor_app/data/trust_badge_repository.dart';
@@ -40,6 +42,7 @@ class PetMarketProductsScreen extends StatefulWidget {
     this.initialSearchQuery,
     this.initialSortBy,
     this.initialCatalogFilter,
+    this.initialHighlight,
     this.openFeatureSheet = false,
   });
 
@@ -52,6 +55,9 @@ class PetMarketProductsScreen extends StatefulWidget {
   final String? initialSortBy;
   /// `bestSellers` | `topRated` | `affordable` | `repurchase`
   final String? initialCatalogFilter;
+
+  /// `sevilenler` | `lezzetli` | `saglikli`
+  final String? initialHighlight;
   final bool openFeatureSheet;
 
   static const double productCardGap = MarketCompactProductCard.cardGap;
@@ -71,6 +77,7 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
   String? _selectedFeature;
   String? _selectedAdvantageId;
   String? _catalogFilter;
+  String? _highlight;
   final _searchController = TextEditingController();
   String _searchQuery = '';
 
@@ -231,6 +238,11 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
     _selectedFeature = widget.initialFeature;
     _selectedAdvantageId = widget.initialAdvantageId;
     _catalogFilter = widget.initialCatalogFilter;
+    _highlight = widget.initialHighlight?.trim();
+    if (_highlight != null && _highlight!.isEmpty) _highlight = null;
+    if (_highlight != null) _mainCategory = '';
+    EnlerRepository.instance.startListening();
+    FavoriteIndexRepository.instance.startListening();
     final initialSort = widget.initialSortBy?.trim() ?? '';
     if (initialSort.isNotEmpty) {
       _sortBy = initialSort;
@@ -280,8 +292,25 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
     });
   }
 
-  List<MarketProductData> _filteredProducts(List<MarketProductData> remote) {
+  List<MarketProductData> _filteredProducts(
+    List<MarketProductData> remote, {
+    required List<AppProductAdvantage> advantages,
+    required Set<String> favoriteIds,
+  }) {
     var items = List<MarketProductData>.from(remote);
+
+    if (_highlight != null) {
+      final ids = _highlightAdvantageIds(advantages);
+      items = items
+          .where(
+            (product) => _matchesHighlight(
+              product,
+              advantageIds: ids,
+              favoriteIds: favoriteIds,
+            ),
+          )
+          .toList();
+    }
 
     if (_selectedBrand != null) {
       items = items
@@ -419,8 +448,43 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
     return int.tryParse(raw) ?? 0;
   }
 
+  Set<String> _highlightAdvantageIds(List<AppProductAdvantage> advantages) {
+    final needle = switch (_highlight) {
+      EnlerRepository.lezzetli => 'enfes',
+      EnlerRepository.saglikli => 'dogal',
+      _ => '',
+    };
+    if (needle.isEmpty) return const {};
+    return {
+      for (final item in advantages)
+        if (_advantageMatches(item, needle)) item.id,
+    };
+  }
+
+  bool _advantageMatches(AppProductAdvantage item, String needle) {
+    final name = ProductAdvantageRepository.foldSearch(item.name);
+    final id = ProductAdvantageRepository.foldSearch(
+      item.id.replaceAll('_', ' '),
+    );
+    return name.contains(needle) || id.contains(needle);
+  }
+
+  bool _matchesHighlight(
+    MarketProductData product, {
+    required Set<String> advantageIds,
+    required Set<String> favoriteIds,
+  }) {
+    return switch (_highlight) {
+      EnlerRepository.sevilenler => favoriteIds.contains(product.id),
+      EnlerRepository.lezzetli || EnlerRepository.saglikli =>
+        product.productAdvantageIds.any(advantageIds.contains),
+      _ => true,
+    };
+  }
+
   bool get _relaxCategoryFilter {
-    return _mainCategory.trim().isEmpty ||
+    return _highlight != null ||
+        _mainCategory.trim().isEmpty ||
         _searchQuery.isNotEmpty ||
         _selectedFeature != null ||
         (_selectedAdvantageId != null &&
@@ -430,6 +494,33 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: Listenable.merge([
+        EnlerRepository.instance,
+        FavoriteIndexRepository.instance,
+      ]),
+      builder: (context, _) {
+        return StreamBuilder<List<AppProductAdvantage>>(
+          stream: ProductAdvantageRepository.instance.watchAll(activeOnly: true),
+          initialData: ProductAdvantageRepository.instance.cached,
+          builder: (context, advantageSnap) {
+            final advantages =
+                advantageSnap.data ??
+                ProductAdvantageRepository.instance.cached;
+            return _buildProductScaffold(
+              advantages: advantages,
+              favoriteIds: FavoriteIndexRepository.instance.productIds,
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildProductScaffold({
+    required List<AppProductAdvantage> advantages,
+    required Set<String> favoriteIds,
+  }) {
     return StreamBuilder<List<MarketProductData>>(
       stream: ProductRepository.instance.watchMarketProducts(
         mainCategory: _relaxCategoryFilter ? null : _mainCategory,
@@ -442,7 +533,11 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
         searchQuery: _searchQuery.isEmpty ? null : _searchQuery,
       ),
       builder: (context, snapshot) {
-        final products = _filteredProducts(snapshot.data ?? const []);
+        final products = _filteredProducts(
+          snapshot.data ?? const [],
+          advantages: advantages,
+          favoriteIds: favoriteIds,
+        );
         ImageWarmup.precache(
           context,
           products.map((product) => product.imagePath),
@@ -511,6 +606,8 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
                 _buildSearchBar(),
                 const SizedBox(height: 10),
                 _buildCategoryRow(),
+                const SizedBox(height: 8),
+                _buildEnlerRow(),
                 const SizedBox(height: 10),
                 _buildFilterRow(),
               ],
@@ -678,6 +775,7 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
     return GestureDetector(
       onTap: () {
         setState(() {
+          _highlight = null;
           _mainCategory = category.id;
           _subCategory = '';
           _selectedBrand = null;
@@ -736,6 +834,98 @@ class _PetMarketProductsScreenState extends State<PetMarketProductsScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildEnlerRow() {
+    final cards = EnlerRepository.instance.cards;
+    return Row(
+      children: [
+        for (var i = 0; i < cards.length; i++) ...[
+          if (i > 0) const SizedBox(width: 8),
+          Expanded(child: _enlerCategory(cards[i])),
+        ],
+      ],
+    );
+  }
+
+  Widget _enlerCategory(EnlerCard card) {
+    final selected = _highlight == card.id;
+    final icon = card.iconUrl.trim();
+    final path = icon.isNotEmpty ? icon : card.assetPath;
+    final nudged = icon.isEmpty;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _highlight = card.id;
+          _mainCategory = '';
+          _subCategory = '';
+          _selectedBrand = null;
+          _selectedWeight = null;
+          _selectedAgeGroup = null;
+          _selectedFeature = null;
+          _selectedAdvantageId = null;
+          _catalogFilter = null;
+          _sortBy = 'Önerilen';
+        });
+      },
+      child: Column(
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            width: 48,
+            height: 48,
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: selected
+                    ? AppColors.success
+                    : AppColors.success.withValues(alpha: 0.28),
+                width: selected ? 1.4 : 1,
+              ),
+            ),
+            child: ClipOval(
+              child: Transform.translate(
+                offset: Offset(0, nudged ? 3 : 0),
+                child: buildProductImage(
+                  path,
+                  fit: BoxFit.cover,
+                  alignment: nudged
+                      ? const Alignment(0, -0.18)
+                      : Alignment.center,
+                  width: 48,
+                  height: 48,
+                  cacheWidth: uiIconAssetPx,
+                  maxDecodePx: uiIconAssetPx,
+                  errorWidget: Image.asset(
+                    card.assetPath,
+                    fit: BoxFit.cover,
+                    alignment: nudged
+                        ? const Alignment(0, -0.18)
+                        : Alignment.center,
+                    cacheWidth: uiIconAssetPx,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            card.singleLine,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: selected ? AppColors.success : AppColors.text,
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              height: 1.15,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:flutter/services.dart';
 import 'package:geliyor_app/data/bank_transfer_repository.dart';
+import 'package:geliyor_app/data/courier_fee_repository.dart';
 import 'package:geliyor_app/screens/gift_select_screen.dart';
 import 'package:geliyor_app/screens/home_screen.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
@@ -90,7 +91,15 @@ class OrderSuccessScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final payableTotal = CourierFee.payableTotal(cartTotal) -
+    return ListenableBuilder(
+      listenable: CourierFeeRepository.instance,
+      builder: (context, _) => _buildBody(context),
+    );
+  }
+
+  Widget _buildBody(BuildContext context) {
+    final payableTotal =
+        CourierFee.payableTotal(cartTotal) -
         couponDiscount -
         subscriptionDiscount;
     final totalText = _formatPrice(payableTotal < 0 ? 0 : payableTotal);
@@ -713,10 +722,8 @@ class OrderSuccessScreen extends StatelessWidget {
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => GiftSelectScreen(
-              orderTotal: cartTotal,
-              orderId: orderId,
-            ),
+            builder: (_) =>
+                GiftSelectScreen(orderTotal: cartTotal, orderId: orderId),
           ),
         );
       },

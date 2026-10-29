@@ -13,6 +13,7 @@ class AppBrand {
     required this.id,
     required this.name,
     this.imageUrl = '',
+    this.certificateUrl = '',
     this.assetPath = '',
     this.order = 0,
     this.active = true,
@@ -22,6 +23,8 @@ class AppBrand {
   final String id;
   final String name;
   final String imageUrl;
+  /// Markanın yetki belgesi. Ürün detayında Yetkili Satıcı kutusundan açılır.
+  final String certificateUrl;
   final String assetPath;
   final int order;
   final bool active;
@@ -48,6 +51,7 @@ class AppBrand {
       id: doc.id,
       name: (data[BrandFields.name] as String?) ?? doc.id,
       imageUrl: (data[BrandFields.imageUrl] as String?) ?? '',
+      certificateUrl: (data[BrandFields.certificateUrl] as String?) ?? '',
       assetPath: (data[BrandFields.assetPath] as String?) ?? '',
       order: (data[BrandFields.order] as num?)?.toInt() ?? 0,
       active: data[BrandFields.active] as bool? ?? true,
@@ -64,6 +68,7 @@ class AppBrand {
   Map<String, dynamic> toMap() => {
         BrandFields.name: name.trim(),
         BrandFields.imageUrl: imageUrl.trim(),
+        BrandFields.certificateUrl: certificateUrl.trim(),
         BrandFields.assetPath: assetPath.trim(),
         BrandFields.order: order,
         BrandFields.active: active,
@@ -82,6 +87,7 @@ class AppBrand {
   AppBrand copyWith({
     String? name,
     String? imageUrl,
+    String? certificateUrl,
     String? assetPath,
     int? order,
     bool? active,
@@ -91,6 +97,7 @@ class AppBrand {
       id: id,
       name: name ?? this.name,
       imageUrl: imageUrl ?? this.imageUrl,
+      certificateUrl: certificateUrl ?? this.certificateUrl,
       assetPath: assetPath ?? this.assetPath,
       order: order ?? this.order,
       active: active ?? this.active,

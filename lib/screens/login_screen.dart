@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geliyor_app/screens/home_screen.dart';
 import 'package:geliyor_app/screens/register_screen.dart';
+import 'package:geliyor_app/services/device_session.dart';
 import 'package:geliyor_app/services/user_profile_sync.dart';
 import 'package:geliyor_app/state/auth_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
@@ -30,9 +33,62 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _codeSent = false;
   bool _busy = false;
   bool _obscurePassword = true;
+  bool _keepAccountOpen = true;
 
   bool get _isEmailEntry {
     return _identifierController.text.trim().contains('@');
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadKeepOpen());
+  }
+
+  Future<void> _loadKeepOpen() async {
+    final value = await DeviceSession.keepAccountOpen();
+    if (!mounted) return;
+    setState(() => _keepAccountOpen = value);
+  }
+
+  Future<void> _setKeepOpen(bool value) async {
+    setState(() => _keepAccountOpen = value);
+    await DeviceSession.setKeepAccountOpen(value);
+  }
+
+  Widget _keepOpenRow() {
+    return Column(
+      children: [
+        const Text(
+          'Hesabım açık kalsın',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: AppColors.text,
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 2),
+        const Text(
+          'Bu cihazda tekrar giriş istenmesin',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: AppColors.subText,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        Transform.scale(
+          scale: 0.82,
+          child: Switch.adaptive(
+            value: _keepAccountOpen,
+            activeTrackColor: AppColors.primary,
+            activeThumbColor: AppColors.surface,
+            onChanged: _busy ? null : (value) => unawaited(_setKeepOpen(value)),
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -96,6 +152,7 @@ class _LoginScreenState extends State<LoginScreen> {
       await AuthStore.instance.signInWithEmail(
         email: email,
         password: password,
+        keepAccountOpen: _keepAccountOpen,
       );
       if (!mounted) return;
       await _finishLogin();
@@ -134,6 +191,7 @@ class _LoginScreenState extends State<LoginScreen> {
       await AuthStore.instance.verifyCode(
         smsCode: code,
         requireExistingUser: true,
+        keepAccountOpen: _keepAccountOpen,
       );
       if (!mounted) return;
       await _finishLogin();
@@ -291,6 +349,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
               ),
+              const SizedBox(height: 12),
+              _keepOpenRow(),
               const SizedBox(height: 22),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,

@@ -67,6 +67,9 @@ class OrderRepository {
       }
     }
     final ref = _col.doc();
+    final pin = address.hasLocation
+        ? address
+        : AddressStore.instance.savedLocation;
     await ref.set({
       OrderFields.userId: uid,
       OrderFields.status: OrderStatuses.preparing,
@@ -89,6 +92,8 @@ class OrderRepository {
       OrderFields.address: address.address.trim(),
       OrderFields.city: address.city.trim(),
       OrderFields.district: address.district.trim(),
+      if (pin != null && pin.hasLocation) OrderFields.latitude: pin.latitude,
+      if (pin != null && pin.hasLocation) OrderFields.longitude: pin.longitude,
       OrderFields.billing: {
         'address': invoice.address.trim(),
         'city': invoice.city.trim(),

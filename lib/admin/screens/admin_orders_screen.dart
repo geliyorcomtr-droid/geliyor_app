@@ -8,6 +8,7 @@ import 'package:geliyor_app/admin/admin_ui.dart';
 import 'package:geliyor_app/data/firestore_collections.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/utils/order_no.dart';
+import 'package:geliyor_app/utils/customer_location.dart';
 import 'package:geliyor_app/utils/product_image.dart';
 
 class AdminOrdersScreen extends StatefulWidget {
@@ -800,6 +801,20 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
               height: 1.4,
             ),
           ),
+          if (CustomerLocation.isValid(order.latitude, order.longitude)) ...[
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => CustomerLocation.open(
+                  order.latitude,
+                  order.longitude,
+                ),
+                icon: const Icon(Icons.my_location_rounded, size: 16),
+                label: const Text('Konuma git'),
+              ),
+            ),
+          ],
           if (order.billingAddress.isNotEmpty ||
               order.billingNationalId.isNotEmpty ||
               order.billingTaxId.isNotEmpty) ...[

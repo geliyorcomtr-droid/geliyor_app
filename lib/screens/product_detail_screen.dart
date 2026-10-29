@@ -1,6 +1,11 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:geliyor_app/data/brand_repository.dart';
 import 'package:geliyor_app/data/bought_together.dart';
+import 'package:geliyor_app/data/product_advantage_category.dart';
 import 'package:geliyor_app/data/product_advantage_repository.dart';
+import 'package:geliyor_app/data/feeding_variant.dart';
 import 'package:geliyor_app/data/product_bag_days.dart';
 import 'package:geliyor_app/data/product_repository.dart';
 import 'package:geliyor_app/data/trust_badge_repository.dart';
@@ -11,6 +16,7 @@ import 'package:geliyor_app/state/cart_store.dart';
 import 'package:geliyor_app/state/favorite_store.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
+import 'package:geliyor_app/utils/icon_dominant_color.dart';
 import 'package:geliyor_app/utils/product_image.dart';
 import 'package:geliyor_app/utils/product_ingredients.dart';
 import 'package:geliyor_app/utils/product_price.dart';
@@ -65,8 +71,15 @@ class ProductDetailScreen extends StatelessWidget {
       product != null && product!.oldPrices.isNotEmpty
       ? product!.oldPrices.first
       : _fallbackOldPrice;
-  int get _productDiscountPercent =>
-      product?.discount ?? _fallbackDiscountPercent;
+  int get _productDiscountPercent {
+    final fromPrices = discountPercentFromPrices(
+      _productUnitPrice,
+      _productOldPrice,
+    );
+    if (fromPrices != null && fromPrices > 0) return fromPrices;
+    final stored = product?.discount ?? _fallbackDiscountPercent;
+    return stored > 0 ? stored : 0;
+  }
   String get _productDescription {
     final subtitle = product?.subtitle.trim() ?? '';
     if (subtitle.isEmpty) return _fallbackDescription;
@@ -86,14 +99,14 @@ class ProductDetailScreen extends StatelessWidget {
   }
 
   String? _advantageStatValue(AppProductAdvantage item) {
+    final own = product?.productAdvantageValues[item.id]?.trim() ?? '';
     if (ProductAdvantageRepository.isAnimalProteinAdvantage(item)) {
       final value = product?.animalProteinValue.trim() ?? '';
       if (value.isNotEmpty) {
         return ProductAdvantageRepository.formatProteinDisplay(value);
       }
-      final override = product?.productAdvantageValues[item.id]?.trim();
-      if (override != null && override.isNotEmpty) {
-        return ProductAdvantageRepository.formatProteinDisplay(override);
+      if (own.isNotEmpty) {
+        return ProductAdvantageRepository.formatProteinDisplay(own);
       }
       return null;
     }
@@ -102,17 +115,20 @@ class ProductDetailScreen extends StatelessWidget {
       if (protein.isNotEmpty) {
         return ProductAdvantageRepository.formatProteinDisplay(protein);
       }
+      if (own.isNotEmpty) {
+        return ProductAdvantageRepository.formatProteinDisplay(own);
+      }
+      return null;
     }
-    final override = product?.productAdvantageValues[item.id]?.trim();
-    if (override != null && override.isNotEmpty) return override;
-    final template = item.value.trim();
-    if (template.isNotEmpty) return template;
-    if (ProductAdvantageRepository.displaysAsStat(item)) return '%42';
+    if (own.isNotEmpty && ProductAdvantageRepository.displaysAsStat(item)) {
+      return own;
+    }
     return null;
   }
 
   bool _showsAsStat(AppProductAdvantage item) {
-    return ProductAdvantageRepository.displaysAsStat(item);
+    final value = _advantageStatValue(item);
+    return value != null && value.isNotEmpty;
   }
 
   String get _productRatingLabel {
@@ -144,10 +160,8 @@ class ProductDetailScreen extends StatelessWidget {
 
   String get _proteinDisplayValue {
     final protein = product?.proteinValue.trim() ?? '';
-    if (protein.isNotEmpty) {
-      return ProductAdvantageRepository.formatProteinDisplay(protein);
-    }
-    return '%42';
+    if (protein.isEmpty) return '';
+    return ProductAdvantageRepository.formatProteinDisplay(protein);
   }
 
   bool _isRepurchaseBadge(AppTrustBadge badge) {
@@ -190,19 +204,44 @@ class ProductDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildExampleRelated({
-    required Widget Function(List<_RelatedProduct> items) builder,
-  }) {
-    return StreamBuilder<List<MarketProductData>>(
-      stream: ProductRepository.instance.watchMarketProducts(),
-      initialData: ProductRepository.instance.cachedMarketProducts(),
-      builder: (context, snapshot) {
-        final catalog = snapshot.data ?? const <MarketProductData>[];
-        final example = product ?? (catalog.isNotEmpty ? catalog.first : null);
-        if (example == null) return const SizedBox.shrink();
-        return builder([_relatedFrom(example)]);
-      },
-    );
+  static const int _similarColumns = 3;
+  static const int _similarCount = 6;
+  static const double _similarCardHeight = 148;
+
+  List<_RelatedProduct> _similarProducts(
+    MarketProductData? current,
+    List<MarketProductData> catalog,
+  ) {
+    if (current == null) return const [];
+    final others = [
+      for (final item in catalog)
+        if (item.id != current.id) item,
+    ];
+    int score(MarketProductData item) {
+      var value = 0;
+      if (item.petTag == current.petTag) value += 20;
+      if (item.dietTag.isNotEmpty && item.dietTag == current.dietTag) {
+        value += 10;
+      }
+      if (item.brand.trim().isNotEmpty && item.brand == current.brand) {
+        value += 4;
+      }
+      final shared = item.categoryTitles.toSet().intersection(
+        current.categoryTitles.toSet(),
+      );
+      value += shared.length * 3;
+      if (item.stock > 0) value += 1;
+      return value;
+    }
+
+    others.sort((a, b) {
+      final byScore = score(b).compareTo(score(a));
+      if (byScore != 0) return byScore;
+      return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+    });
+    return [
+      for (final item in others.take(_similarCount)) _relatedFrom(item),
+    ];
   }
 
   static const double _sideColumnWidth = 54;
@@ -311,14 +350,25 @@ class ProductDetailScreen extends StatelessWidget {
   }
 
   void _openTrustGuide(BuildContext context, _SideBadge badge) {
+    final certificate = badge.opensCertificate;
     InfoGuideSheet.showImageOverlay(
       context,
       imagePath: (badge.detailImageUrl ?? '').trim(),
+      height: certificate
+          ? TrustBadgeRepository.certificateOverlayHeight
+          : 280,
+      width: certificate
+          ? TrustBadgeRepository.certificateOverlayWidth
+          : 361,
       fallbackIcon: badge.isRating
           ? Icons.star_rounded
+          : certificate
+          ? Icons.verified_outlined
           : Icons.workspace_premium_rounded,
       fallbackIconColor: badge.isRating ? AppColors.warning : AppColors.primary,
-      onSeeProducts: () {
+      onSeeProducts: certificate
+          ? null
+          : () {
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => PetMarketProductsScreen(
@@ -432,148 +482,326 @@ class ProductDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildTrustBadgeColumn(BuildContext context) {
-    final cached = TrustBadgeRepository.instance.cached;
-    return StreamBuilder<List<AppTrustBadge>>(
-      initialData: cached.isEmpty ? null : cached,
-      stream: TrustBadgeRepository.instance.watchAll(activeOnly: true),
-      builder: (context, snapshot) {
-        final allBadges = snapshot.data ?? cached;
-        if (allBadges.isEmpty) {
-          return _buildSideColumn(context, const []);
-        }
-        final selectedIds = product?.trustBadgeIds ?? const <String>[];
-        final badges = [
-                    for (final id in selectedIds)
-                      ...allBadges.where((badge) => badge.id == id),
-                  ]
-            .where((badge) => !TrustBadgeRepository.isSmartSuggestionBadge(badge))
-            .where((badge) => !TrustBadgeRepository.isProteinBadge(badge))
-            .toList();
-        if (!badges.any(_isAffordableBadge)) {
-          final insertAt = badges.length >= 4 ? 4 : badges.length;
-          badges.insert(
-            insertAt,
-            TrustBadgeRepository.defaultAffordableBadge,
-          );
-        }
-        if (badges.isEmpty) {
-          return const SizedBox(width: _sideColumnWidth);
-        }
+  AppBrand? _brandFor(List<AppBrand> brands) {
+    final target = _productBrand.trim();
+    if (target.isEmpty) return null;
+    for (final brand in brands) {
+      if (brand.name.trim() == target) return brand;
+    }
+    final id = BrandRepository.matchId(brands, brandName: target);
+    if (id == null) return null;
+    for (final brand in brands) {
+      if (brand.id == id) return brand;
+    }
+    return null;
+  }
 
-        return _buildSideColumn(context, [
-          for (final badge in badges)
-            _SideBadge(
-              id: badge.id,
-              label: _isRatingBadge(badge)
-                  ? 'Puan'
-                  : _shortSideLabel(
-                      TrustBadgeRepository.displayName(badge),
-                    ),
-              iconPath: TrustBadgeRepository.displayAssetPath(badge),
-              imageUrl: TrustBadgeRepository.displayImageUrl(badge),
-              detailImageUrl: TrustBadgeRepository.displayDetailImageUrl(badge),
-              isFavoriteAction:
-                  !_isPreferredBadge(badge) &&
-                  !_isRepurchaseBadge(badge) &&
-                  !_isAffordableBadge(badge) &&
-                  (badge.id == 'favorilere-ekle' ||
-                      badge.name.toLowerCase().contains('favori')),
-              isRating: _isRatingBadge(badge),
-              isPreferred: _isPreferredBadge(badge),
-              isStat:
-                  _isProteinTrustBadge(badge) || _isRepurchaseBadge(badge),
-              ratingValue: _isRatingBadge(badge) ? _productRatingLabel : null,
-              preferredRank: _isPreferredBadge(badge)
-                  ? _preferredRankLabel
-                  : null,
-              catalogFilter: _isPreferredBadge(badge)
-                  ? 'bestSellers'
-                  : _isRatingBadge(badge)
-                  ? 'topRated'
-                  : _isAffordableBadge(badge)
-                  ? 'affordable'
-                  : _isRepurchaseBadge(badge)
-                  ? 'repurchase'
-                  : null,
-              statValue: _isRepurchaseBadge(badge)
-                  ? _repurchaseDisplayValue
-                  : _isProteinTrustBadge(badge)
-                  ? _proteinDisplayValue
-                  : null,
-            ),
-        ]);
+  Widget _buildTrustBadgeColumn(BuildContext context) {
+    return StreamBuilder<List<AppBrand>>(
+      initialData: BrandRepository.instance.cached,
+      stream: BrandRepository.instance.watchAll(),
+      builder: (context, brandSnap) {
+        final brand = _brandFor(
+          brandSnap.data ?? BrandRepository.instance.cached,
+        );
+        final certificateUrl = brand?.certificateUrl.trim() ?? '';
+        final brandImageUrl = brand?.displayImage ?? '';
+        final cached = TrustBadgeRepository.instance.cached;
+        return StreamBuilder<List<AppTrustBadge>>(
+          initialData: cached.isEmpty ? null : cached,
+          stream: TrustBadgeRepository.instance.watchAll(activeOnly: true),
+          builder: (context, snapshot) {
+            final allBadges = snapshot.data ?? cached;
+            if (allBadges.isEmpty && certificateUrl.isEmpty) {
+              return _buildSideColumn(context, const []);
+            }
+            final selectedIds = product?.trustBadgeIds ?? const <String>[];
+            final badges = [
+                        for (final id in selectedIds)
+                          ...allBadges.where((badge) => badge.id == id),
+                      ]
+                .where((badge) => !TrustBadgeRepository.isSmartSuggestionBadge(badge))
+                .where((badge) => !TrustBadgeRepository.isProteinBadge(badge))
+                .toList();
+            if (certificateUrl.isNotEmpty) {
+              final sellerIndex = badges.indexWhere(
+                TrustBadgeRepository.isAuthorizedSellerBadge,
+              );
+              AppTrustBadge? seller;
+              for (final badge in allBadges) {
+                if (TrustBadgeRepository.isAuthorizedSellerBadge(badge)) {
+                  seller = badge;
+                  break;
+                }
+              }
+              seller ??= TrustBadgeRepository.defaultAuthorizedSellerBadge;
+              if (sellerIndex < 0) {
+                badges.insert(0, seller);
+              } else if (sellerIndex >= _sideSlotCount) {
+                final existing = badges.removeAt(sellerIndex);
+                badges.insert(0, existing);
+              }
+            }
+            if (!badges.any(_isAffordableBadge)) {
+              final insertAt = badges.length >= 4 ? 4 : badges.length;
+              badges.insert(
+                insertAt,
+                TrustBadgeRepository.defaultAffordableBadge,
+              );
+            }
+            if (badges.isEmpty) {
+              return const SizedBox(width: _sideColumnWidth);
+            }
+
+            return _buildSideColumn(context, [
+              for (final badge in badges)
+                _sideBadgeFromTrust(badge, certificateUrl, brandImageUrl),
+            ]);
+          },
+        );
       },
     );
   }
 
+  _SideBadge _sideBadgeFromTrust(
+    AppTrustBadge badge,
+    String certificateUrl,
+    String brandImageUrl,
+  ) {
+    final opensCertificate =
+        TrustBadgeRepository.isAuthorizedSellerBadge(badge) &&
+        certificateUrl.isNotEmpty;
+    return _SideBadge(
+      id: badge.id,
+      label: _isRatingBadge(badge)
+          ? 'Puan'
+          : _shortSideLabel(TrustBadgeRepository.displayName(badge)),
+      iconPath: TrustBadgeRepository.displayAssetPath(badge),
+      imageUrl: opensCertificate && brandImageUrl.isNotEmpty
+          ? brandImageUrl
+          : TrustBadgeRepository.displayImageUrl(badge),
+      detailImageUrl: opensCertificate
+          ? certificateUrl
+          : TrustBadgeRepository.displayDetailImageUrl(badge),
+      opensCertificate: opensCertificate,
+      isFavoriteAction:
+          !_isPreferredBadge(badge) &&
+          !_isRepurchaseBadge(badge) &&
+          !_isAffordableBadge(badge) &&
+          !TrustBadgeRepository.isAuthorizedSellerBadge(badge) &&
+          (badge.id == 'favorilere-ekle' ||
+              badge.name.toLowerCase().contains('favori')),
+      isRating: _isRatingBadge(badge),
+      isPreferred: _isPreferredBadge(badge),
+      opensBagDays: _isRepurchaseBadge(badge),
+      isStat: _isProteinTrustBadge(badge) || _isRepurchaseBadge(badge),
+      ratingValue: _isRatingBadge(badge) ? _productRatingLabel : null,
+      preferredRank: _isPreferredBadge(badge) ? _preferredRankLabel : null,
+      catalogFilter: _isPreferredBadge(badge)
+          ? 'bestSellers'
+          : _isRatingBadge(badge)
+          ? 'topRated'
+          : _isAffordableBadge(badge)
+          ? 'affordable'
+          : _isRepurchaseBadge(badge)
+          ? 'repurchase'
+          : null,
+      statValue: _isRepurchaseBadge(badge)
+          ? _repurchaseDisplayValue
+          : _isProteinTrustBadge(badge)
+          ? _proteinDisplayValue
+          : null,
+    );
+  }
+
   Widget _buildAdvantageColumn(BuildContext context) {
-    final cached = ProductAdvantageRepository.instance.cached;
-    return StreamBuilder<List<AppProductAdvantage>>(
-      initialData: cached.isEmpty ? null : cached,
-      stream: ProductAdvantageRepository.instance.watchAll(activeOnly: true),
-      builder: (context, snapshot) {
-        final catalog = snapshot.data ?? cached;
-        if (catalog.isEmpty) {
-          return _buildSideColumn(context, const []);
-        }
-        final selectedIds = product?.productAdvantageIds ?? const <String>[];
-        final items = ProductAdvantageRepository.forProductDetail(
-          selectedIds: selectedIds,
-          catalog: catalog,
-          animalProteinValue: product?.animalProteinValue ?? '',
-        ).take(_sideSlotCount).toList();
-        if (items.isEmpty) {
-          return const SizedBox(width: _sideColumnWidth);
-        }
-        return _buildSideColumn(context, [
-          for (final item in items)
-            _SideBadge(
-              id: item.id,
-              label: _shortSideLabel(item.name),
-              iconPath: ProductAdvantageRepository.displayAssetPath(item),
-              imageUrl: ProductAdvantageRepository.sharedDisplayImageUrl(
-                item,
-                catalog: catalog,
-              ),
-              feature: item.name,
-              advantage: item,
-              isStat: _showsAsStat(item),
-              statValue: _advantageStatValue(item),
-            ),
-        ]);
+    return StreamBuilder<List<ProductAdvantageCategory>>(
+      initialData: ProductAdvantageRepository.instance.cachedCategories,
+      stream: ProductAdvantageRepository.instance.watchCategories(),
+      builder: (context, categorySnapshot) {
+        final categories =
+            categorySnapshot.data ??
+            ProductAdvantageRepository.instance.cachedCategories;
+        final cached = ProductAdvantageRepository.instance.cached;
+        return StreamBuilder<List<AppProductAdvantage>>(
+          initialData: cached.isEmpty ? null : cached,
+          stream: ProductAdvantageRepository.instance.watchAll(activeOnly: true),
+          builder: (context, snapshot) {
+            final catalog = snapshot.data ?? cached;
+            if (catalog.isEmpty) {
+              return _buildSideColumn(context, const []);
+            }
+            final selectedIds = product?.productAdvantageIds ?? const <String>[];
+            final items = ProductAdvantageRepository.forProductDetail(
+              selectedIds: selectedIds,
+              catalog: catalog,
+              animalProteinValue: product?.animalProteinValue ?? '',
+            ).take(_sideSlotCount).toList();
+            if (items.isEmpty) {
+              return const SizedBox(width: _sideColumnWidth);
+            }
+            return _buildSideColumn(context, [
+              for (final item in items)
+                _SideBadge(
+                  id: item.id,
+                  label: _shortSideLabel(item.name),
+                  iconPath: ProductAdvantageRepository.displayAssetPath(item),
+                  imageUrl: ProductAdvantageRepository.sharedDisplayImageUrl(
+                    item,
+                    catalog: catalog,
+                  ),
+                  feature: item.name,
+                  advantage: item,
+                  categoryCaption: _advantageCategoryCaption(
+                    item,
+                    categories,
+                  ),
+                  categoryColor: _advantageCategoryColor(item, categories),
+                  isStat: _showsAsStat(item),
+                  statValue: _advantageStatValue(item),
+                ),
+            ]);
+          },
+        );
       },
     );
+  }
+
+  String _advantageCategoryCaption(
+    AppProductAdvantage item,
+    List<ProductAdvantageCategory> categories,
+  ) {
+    final category = ProductAdvantageCategory.fromId(
+      item.resolvedCategoryId,
+      catalog: categories,
+    );
+    final saved = category.label.trim();
+    final builtin = ProductAdvantageCategory.fromId(category.id).label.trim();
+    if (saved.isNotEmpty && saved != builtin) return saved;
+    return switch (category.id) {
+      'tur' || 'yasam_evresi' => 'Tür',
+      'icerik' => 'İçerik',
+      'saglik' => 'Sağlık',
+      'urun_tipi' => 'Tip',
+      'protein' => 'Protein',
+      'diger' => 'Diğer',
+      _ => saved,
+    };
+  }
+
+  Color _advantageCategoryColor(
+    AppProductAdvantage item,
+    List<ProductAdvantageCategory> categories,
+  ) {
+    final category = ProductAdvantageCategory.fromId(
+      item.resolvedCategoryId,
+      catalog: categories,
+    );
+    return _hexColor(category.color);
+  }
+
+  Color _hexColor(String raw) {
+    final normalized = ProductAdvantageCategory.normalizeColor(raw);
+    final hex = normalized.isEmpty
+        ? ProductAdvantageCategory.defaultColorHex
+        : normalized;
+    final value = int.tryParse(hex.substring(1), radix: 16) ??
+        int.parse(
+          ProductAdvantageCategory.defaultColorHex.substring(1),
+          radix: 16,
+        );
+    return Color(0xFF000000 | value);
   }
 
   Widget _buildSideColumn(BuildContext context, List<_SideBadge> badges) {
     final visible = badges.take(_sideSlotCount).toList();
     return SizedBox(
       width: _sideColumnWidth,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (int i = 0; i < _sideSlotCount; i++) ...[
-            if (i > 0) const SizedBox(height: _sideCardGap),
-            Expanded(
-              child: i < visible.length
-                  ? KeyedSubtree(
-                      key: ValueKey(visible[i].id),
-                      child: _buildSideCard(context, visible[i]),
-                    )
-                  : const SizedBox.expand(),
-            ),
+      child: Padding(
+        padding: const EdgeInsets.only(top: 5),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (int i = 0; i < _sideSlotCount; i++) ...[
+              if (i > 0) const SizedBox(height: _sideCardGap),
+              Expanded(
+                child: i < visible.length
+                    ? KeyedSubtree(
+                        key: ValueKey(visible[i].id),
+                        child: _buildSideCard(context, visible[i]),
+                      )
+                    : const SizedBox.expand(),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildSideCard(BuildContext context, _SideBadge badge) {
-    if (badge.isFavoriteAction) {
-      return _buildFavoriteSideCard(context);
-    }
+  _BagDaysNote? get _bagDaysNote {
+    final main = _marketMainCategory;
+    final category = product?.dietTag;
+    final weight = _productWeight;
+    final days = ProductBagDays.daysFor(
+      mainCategory: main,
+      category: category,
+      weight: weight,
+      title: _productTitle,
+      brand: _productBrand,
+    );
+    final bagKg = ProductBagDays.bagKgFromLabel(weight);
+    if (days == null || bagKg == null) return null;
+    final variant = FeedingVariant.fromProduct(
+      mainCategory: main,
+      category: category,
+      brandName: _productBrand,
+      title: _productTitle,
+    );
+    final daily = ProductBagDays.typicalDailyGrams(variant);
+    if (daily == null || daily <= 0) return null;
+    final bag = bagKg < 1
+        ? '${(bagKg * 1000).round()} g'
+        : '${bagKg == bagKg.roundToDouble() ? bagKg.toStringAsFixed(0) : bagKg.toStringAsFixed(1).replaceAll('.', ',')} kg';
+    final pet = switch (variant) {
+      FeedingVariant.catAdult =>
+        '${ProductBagDays.typicalCatKg} yetişkin bir kedi',
+      FeedingVariant.catKitten =>
+        '${ProductBagDays.typicalKittenKg}, ${ProductBagDays.typicalKittenMonths} aylık bir yavru kedi',
+      FeedingVariant.dogAdult =>
+        '${ProductBagDays.typicalDogKg} yetişkin bir köpek',
+      FeedingVariant.dogPuppy =>
+        '${ProductBagDays.typicalPuppyKg}, ${ProductBagDays.typicalPuppyMonths} aylık bir yavru köpek',
+      FeedingVariant.dogMiniAdult =>
+        '${ProductBagDays.typicalMiniKg} mini ırk yetişkin köpek',
+      FeedingVariant.dogMiniPuppy =>
+        '${ProductBagDays.typicalMiniPuppyKg}, ${ProductBagDays.typicalMiniPuppyMonths} aylık mini ırk yavru köpek',
+    };
+    return _BagDaysNote(
+      title: '$days gün',
+      body:
+          '$bag paket, $pet için günde $daily g tüketimle yaklaşık $days gün yeter.',
+    );
+  }
 
+  Widget _buildSideCard(BuildContext context, _SideBadge badge) {
+    return _SideFrame(
+      color: badge.isFavoriteAction
+          ? AppColors.statNumber
+          : badge.opensCertificate
+          ? _accent
+          : badge.categoryColor,
+      iconPath: badge.iconPath,
+      builder: (borderColor) {
+        if (badge.isFavoriteAction) {
+          return _buildFavoriteSideCard(context, borderColor);
+        }
+        return _sideCardFace(context, badge, borderColor);
+      },
+    );
+  }
+
+  Widget _sideCardFace(BuildContext context, _SideBadge badge, Color borderColor) {
     final card = Container(
       width: double.infinity,
       height: double.infinity,
@@ -582,7 +810,7 @@ class ProductDetailScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _accent, width: 1),
+        border: Border.all(color: borderColor, width: 1),
         boxShadow: const [
           BoxShadow(
             color: Color(0x0D000000),
@@ -593,23 +821,85 @@ class ProductDetailScreen extends StatelessWidget {
       ),
       child: _sideCardBody(badge),
     );
+    final framed = _withCategoryCaption(
+      card,
+      badge.categoryCaption,
+      badge.categoryColor,
+    );
 
     if (badge.advantage != null) {
       return GestureDetector(
         onTap: () => _openAdvantageGuide(context, badge.advantage!),
         behavior: HitTestBehavior.opaque,
-        child: card,
+        child: framed,
       );
     }
 
     return GestureDetector(
-      onTap: () => _openTrustGuide(context, badge),
+      onTap: () {
+        if (badge.opensBagDays && _bagDaysNote != null) {
+          _openBagDaysOverlay(context, badge);
+          return;
+        }
+        _openTrustGuide(context, badge);
+      },
       behavior: HitTestBehavior.opaque,
-      child: card,
+      child: framed,
+    );
+  }
+
+  Widget _withCategoryCaption(Widget card, String caption, Color? color) {
+    final label = caption.trim();
+    if (label.isEmpty) return card;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        card,
+        Positioned(
+          top: -5,
+          left: 0,
+          right: 0,
+          height: 10,
+          child: Center(
+            child: ColoredBox(
+              color: AppColors.surface,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.fade,
+                  softWrap: false,
+                  style: TextStyle(
+                    color: color ?? AppColors.primary,
+                    fontSize: 8,
+                    fontWeight: FontWeight.w800,
+                    height: 1,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
   Widget _sideCardBody(_SideBadge badge) {
+    if (badge.opensCertificate) {
+      return Column(
+        children: [
+          Expanded(
+            flex: 7,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(2, 2, 2, 0),
+              child: _brandLogoThumb(badge.imageUrl ?? ''),
+            ),
+          ),
+          Expanded(flex: 3, child: _fitSideLabel(badge.label, badge.categoryColor)),
+        ],
+      );
+    }
     if (badge.isPreferred) {
       return Column(
         children: [
@@ -627,7 +917,7 @@ class ProductDetailScreen extends StatelessWidget {
           ),
           Expanded(
             flex: 3,
-            child: _fitSideLabel(badge.label),
+            child: _fitSideLabel(badge.label, badge.categoryColor),
           ),
         ],
       );
@@ -644,7 +934,7 @@ class ProductDetailScreen extends StatelessWidget {
               child: _sideBadgeImage(badge),
             ),
           ),
-          _fitSideLabel(badge.label),
+          _fitSideLabel(badge.label, badge.categoryColor),
         ],
       );
     }
@@ -653,6 +943,7 @@ class ProductDetailScreen extends StatelessWidget {
         icon: _sideBadgeImage(badge),
         value: badge.ratingValue ?? '—',
         label: badge.label,
+        labelColor: badge.categoryColor,
         valueColor: _sideValueColor(badge),
         compactTexts: true,
       );
@@ -663,6 +954,7 @@ class ProductDetailScreen extends StatelessWidget {
         icon: _sideBadgeImage(badge),
         value: badge.statValue ?? '—',
         label: badge.label,
+        labelColor: badge.categoryColor,
         valueColor: _sideValueColor(badge),
         valueFontSize: isBagDays ? 13 : 12,
       );
@@ -671,6 +963,7 @@ class ProductDetailScreen extends StatelessWidget {
       children: _sideCardSlots(
         icon: _sideBadgeImage(badge),
         label: badge.label,
+        labelColor: badge.categoryColor,
       ),
     );
   }
@@ -692,6 +985,7 @@ class ProductDetailScreen extends StatelessWidget {
     required String value,
     required String label,
     required Color valueColor,
+    Color? labelColor,
     bool compactTexts = false,
     double valueFontSize = 12,
   }) {
@@ -719,12 +1013,12 @@ class ProductDetailScreen extends StatelessWidget {
           textAlign: TextAlign.center,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: AppColors.text,
-            fontSize: compactTexts ? 9 : 10,
-            fontWeight: FontWeight.w800,
-            height: 1,
-          ),
+            style: TextStyle(
+              color: labelColor ?? AppColors.text,
+              fontSize: compactTexts ? 9 : 10,
+              fontWeight: FontWeight.w800,
+              height: 1,
+            ),
         ),
       ),
     );
@@ -769,7 +1063,7 @@ class ProductDetailScreen extends StatelessWidget {
     return text.trim();
   }
 
-  Widget _fitSideLabel(String label) {
+  Widget _fitSideLabel(String label, [Color? color]) {
     return Align(
       alignment: Alignment.center,
       child: Padding(
@@ -781,8 +1075,8 @@ class ProductDetailScreen extends StatelessWidget {
             textAlign: TextAlign.center,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: AppColors.text,
+            style: TextStyle(
+              color: color ?? AppColors.text,
               fontSize: 11,
               fontWeight: FontWeight.w900,
               height: 1,
@@ -797,6 +1091,7 @@ class ProductDetailScreen extends StatelessWidget {
     required Widget icon,
     String? value,
     required String label,
+    Color? labelColor,
   }) {
     return [
       Expanded(
@@ -829,9 +1124,32 @@ class ProductDetailScreen extends StatelessWidget {
         ),
       Expanded(
         flex: 3,
-        child: _fitSideLabel(label),
+        child: _fitSideLabel(label, labelColor),
       ),
     ];
+  }
+
+  Widget _brandLogoThumb(String imagePath) {
+    final path = imagePath.trim();
+    if (path.isEmpty) {
+      return const FittedBox(
+        fit: BoxFit.contain,
+        child: Icon(Icons.verified_outlined, color: AppColors.primary),
+      );
+    }
+    return buildProductImage(
+      path,
+      fit: BoxFit.contain,
+      width: double.infinity,
+      height: double.infinity,
+      alignment: Alignment.center,
+      filterQuality: FilterQuality.medium,
+      cacheWidth: 160,
+      errorWidget: const FittedBox(
+        fit: BoxFit.contain,
+        child: Icon(Icons.verified_outlined, color: AppColors.primary),
+      ),
+    );
   }
 
   Widget _sideBadgeImage(_SideBadge badge) {
@@ -907,8 +1225,12 @@ class ProductDetailScreen extends StatelessWidget {
       return fallback;
     }
     return ColorFiltered(
-      colorFilter: _knockOutWhite,
-      child: image,
+      colorFilter: badge.categoryColor == null
+          ? _knockOutWhite
+          : ColorFilter.mode(badge.categoryColor!, BlendMode.srcIn),
+      child: badge.categoryColor == null
+          ? image
+          : ColorFiltered(colorFilter: _knockOutWhite, child: image),
     );
   }
 
@@ -919,7 +1241,7 @@ class ProductDetailScreen extends StatelessWidget {
     -1, -1, -1, 3, 0,
   ]);
 
-  Widget _buildFavoriteSideCard(BuildContext context) {
+  Widget _buildFavoriteSideCard(BuildContext context, Color borderColor) {
     return ListenableBuilder(
       listenable: FavoriteStore.instance,
       builder: (context, _) {
@@ -940,7 +1262,7 @@ class ProductDetailScreen extends StatelessWidget {
             decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: _accent, width: 1),
+              border: Border.all(color: borderColor, width: 1),
               boxShadow: const [
                 BoxShadow(
                   color: Color(0x0D000000),
@@ -1050,9 +1372,154 @@ class ProductDetailScreen extends StatelessWidget {
   Widget _buildGallery(BuildContext context) {
     return _ProductHeroGallery(
       images: _galleryImages,
+      discountPercent: _productDiscountPercent,
       onOpenFullscreen: (index) =>
           _openFullscreenImage(context, initialIndex: index),
     );
+  }
+
+  Future<void> _openBagDaysOverlay(
+    BuildContext context,
+    _SideBadge badge,
+  ) async {
+    final note = _bagDaysNote;
+    if (note == null) return;
+    final uploaded = (badge.detailImageUrl ?? '').trim();
+    final image = uploaded.isNotEmpty
+        ? uploaded
+        : (badge.imageUrl ?? '').trim();
+    final decoded = image.isEmpty
+        ? null
+        : await _decodedImageSize(context, image);
+    if (!context.mounted) return;
+
+    final media = MediaQuery.of(context);
+    const maxWidth = 361.0;
+    final maxHeight = media.size.height - 48;
+    var panelWidth = maxWidth;
+    var panelHeight = 280.0;
+    if (decoded != null && decoded.width > 0 && decoded.height > 0) {
+      final ratio = decoded.height / decoded.width;
+      panelHeight = panelWidth * ratio;
+      if (maxHeight > 0 && panelHeight > maxHeight) {
+        panelHeight = maxHeight;
+        panelWidth = panelHeight / ratio;
+      }
+    }
+
+    InfoGuideSheet.showCentered(
+      context,
+      dismissOnContentTap: false,
+      height: panelHeight,
+      maxWidth: panelWidth,
+      builder: (sheetContext) {
+        void close() {
+          if (Navigator.of(sheetContext).canPop()) {
+            Navigator.of(sheetContext).pop();
+          }
+        }
+
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              GestureDetector(
+                onTap: close,
+                behavior: HitTestBehavior.opaque,
+                child: image.isEmpty
+                    ? const ColoredBox(color: AppColors.surface)
+                    : buildProductImage(
+                        image,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: double.infinity,
+                        alignment: Alignment.center,
+                        filterQuality: FilterQuality.high,
+                        cacheWidth: 1083,
+                      ),
+              ),
+              Positioned(
+                left: 14,
+                top: 14,
+                right: 48,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      note.title,
+                      style: const TextStyle(
+                        color: AppColors.statNumber,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        height: 1.05,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      note.body,
+                      style: const TextStyle(
+                        color: AppColors.text,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: GestureDetector(
+                  onTap: close,
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    alignment: Alignment.center,
+                    decoration: const BoxDecoration(
+                      color: AppColors.surface,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.close_rounded,
+                      color: AppColors.text,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<Size?> _decodedImageSize(BuildContext context, String path) {
+    final provider = productImageProvider(path, useHtmlElement: false);
+    if (provider == null) return Future.value(null);
+    final completer = Completer<Size?>();
+    final stream = provider.resolve(createLocalImageConfiguration(context));
+    late final ImageStreamListener listener;
+    listener = ImageStreamListener(
+      (info, _) {
+        stream.removeListener(listener);
+        if (!completer.isCompleted) {
+          completer.complete(
+            Size(info.image.width.toDouble(), info.image.height.toDouble()),
+          );
+        }
+      },
+      onError: (_, _) {
+        stream.removeListener(listener);
+        if (!completer.isCompleted) completer.complete(null);
+      },
+    );
+    stream.addListener(listener);
+    return completer.future;
   }
 
   Widget _buildTitleBlock(BuildContext context) {
@@ -1407,11 +1874,17 @@ class ProductDetailScreen extends StatelessWidget {
   }
 
   Widget _buildSimilarBox(BuildContext context) {
-    return _buildExampleRelated(
-      builder: (items) {
+    return StreamBuilder<List<MarketProductData>>(
+      stream: ProductRepository.instance.watchActiveProducts(),
+      initialData: ProductRepository.instance.cachedActiveProducts(),
+      builder: (context, snapshot) {
+        final catalog = snapshot.data ?? const <MarketProductData>[];
+        final items = _similarProducts(product, catalog);
+        if (items.isEmpty) return const SizedBox.shrink();
+        final rows = (items.length / _similarColumns).ceil();
         return Container(
           width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
           decoration: _boxDecoration,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1425,9 +1898,30 @@ class ProductDetailScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 10),
-              for (int i = 0; i < items.length; i++) ...[
-                if (i > 0) const SizedBox(height: _sectionGap),
-                _buildSimilarProductRow(context, items[i]),
+              for (int row = 0; row < rows; row++) ...[
+                if (row > 0) const SizedBox(height: _cardGap),
+                SizedBox(
+                  height: _similarCardHeight,
+                  child: Row(
+                    children: [
+                      for (int col = 0; col < _similarColumns; col++) ...[
+                        if (col > 0) const SizedBox(width: _cardGap),
+                        Expanded(
+                          child: () {
+                            final index = row * _similarColumns + col;
+                            if (index >= items.length) {
+                              return const SizedBox.shrink();
+                            }
+                            return _buildCompactProductCard(
+                              context,
+                              items[index],
+                            );
+                          }(),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
               ],
             ],
           ),
@@ -1544,143 +2038,6 @@ class ProductDetailScreen extends StatelessWidget {
                   ),
                 ),
               ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSimilarProductRow(
-    BuildContext context,
-    _RelatedProduct product,
-  ) {
-    return GestureDetector(
-      onTap: () => _openRelatedDetail(context, product),
-      child: Container(
-        height: 78,
-        padding: const EdgeInsets.fromLTRB(8, 8, 10, 8),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: _accent),
-        ),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 58,
-              height: 58,
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: AppColors.background,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: buildProductImage(
-                        product.imagePath,
-                        fit: BoxFit.contain,
-                        filterQuality: FilterQuality.high,
-                        errorWidget: const Icon(
-                              Icons.image_outlined,
-                              color: AppColors.subText,
-                              size: 28,
-                            ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    top: 0,
-                    left: 0,
-                    child: ProductFavoriteCorner(
-                      productId: product.id,
-                      onToggle: () => _toggleRelatedFavorite(product),
-                      size: 20,
-                      iconSize: 11,
-                    ),
-                  ),
-                  if (product.animalProteinLabel.isNotEmpty)
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: AnimalProteinBadge(
-                        label: product.animalProteinLabel,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    product.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.text,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${product.brand}  ·  ${product.weight}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.subText,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Text(
-                        product.price,
-                        style: const TextStyle(
-                          color: AppColors.discount,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        product.oldPrice,
-                        style: const TextStyle(
-                          color: AppColors.subText,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          decoration: TextDecoration.lineThrough,
-                          decorationColor: AppColors.subText,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            GestureDetector(
-              onTap: () => _addRelatedToCart(context, product),
-              child: Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: _accent,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: const Icon(
-                  Icons.shopping_cart_rounded,
-                  size: 14,
-                  color: AppColors.surface,
-                ),
-              ),
             ),
           ],
         ),
@@ -2071,8 +2428,12 @@ class _SideBadge {
     required this.iconPath,
     this.imageUrl,
     this.detailImageUrl,
+    this.opensCertificate = false,
     this.feature,
     this.advantage,
+    this.categoryCaption = '',
+    this.categoryColor,
+    this.opensBagDays = false,
     this.isFavoriteAction = false,
     this.isStat = false,
     this.isRating = false,
@@ -2088,8 +2449,12 @@ class _SideBadge {
   final String iconPath;
   final String? imageUrl;
   final String? detailImageUrl;
+  final bool opensCertificate;
   final String? feature;
   final AppProductAdvantage? advantage;
+  final String categoryCaption;
+  final Color? categoryColor;
+  final bool opensBagDays;
   final bool isFavoriteAction;
   final bool isStat;
   final bool isRating;
@@ -2158,10 +2523,12 @@ class _DashedDivider extends StatelessWidget {
 class _ProductHeroGallery extends StatefulWidget {
   const _ProductHeroGallery({
     required this.images,
+    required this.discountPercent,
     required this.onOpenFullscreen,
   });
 
   final List<String> images;
+  final int discountPercent;
   final ValueChanged<int> onOpenFullscreen;
 
   @override
@@ -2223,41 +2590,42 @@ class _ProductHeroGalleryState extends State<_ProductHeroGallery> {
                       ),
               ),
             ),
-            Positioned(
-              top: 0,
-              right: 0,
-              child: Container(
-                width: 46,
-                padding: const EdgeInsets.symmetric(vertical: 7),
-                decoration: BoxDecoration(
-                  color: AppColors.statNumber,
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: const Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      '%15',
-                      style: TextStyle(
-                        color: AppColors.surface,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w900,
-                        height: 1.1,
+            if (widget.discountPercent > 0)
+              Positioned(
+                top: 0,
+                right: 0,
+                child: Container(
+                  constraints: const BoxConstraints(minWidth: 46),
+                  padding: const EdgeInsets.fromLTRB(6, 7, 6, 7),
+                  decoration: BoxDecoration(
+                    color: AppColors.statNumber,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '%${widget.discountPercent}',
+                        style: const TextStyle(
+                          color: AppColors.surface,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                          height: 1.1,
+                        ),
                       ),
-                    ),
-                    Text(
-                      'İNDİRİM',
-                      style: TextStyle(
-                        color: AppColors.surface,
-                        fontSize: 8,
-                        fontWeight: FontWeight.w800,
-                        height: 1.2,
+                      const Text(
+                        'İNDİRİM',
+                        style: TextStyle(
+                          color: AppColors.surface,
+                          fontSize: 8,
+                          fontWeight: FontWeight.w800,
+                          height: 1.2,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
             if (images.length > 1)
               Positioned(
                 left: 0,
@@ -2398,5 +2766,62 @@ class _FullscreenProductGalleryState extends State<_FullscreenProductGallery> {
         ],
       ),
     );
+  }
+}
+
+class _BagDaysNote {
+  const _BagDaysNote({required this.title, required this.body});
+
+  final String title;
+  final String body;
+}
+
+class _SideFrame extends StatefulWidget {
+  const _SideFrame({
+    required this.color,
+    required this.iconPath,
+    required this.builder,
+  });
+
+  final Color? color;
+  final String iconPath;
+  final Widget Function(Color borderColor) builder;
+
+  @override
+  State<_SideFrame> createState() => _SideFrameState();
+}
+
+class _SideFrameState extends State<_SideFrame> {
+  Color _sampled = AppColors.primary;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant _SideFrame oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.iconPath != widget.iconPath || oldWidget.color != widget.color) {
+      _load();
+    }
+  }
+
+  Future<void> _load() async {
+    if (widget.color != null) return;
+    final path = widget.iconPath.trim();
+    if (path.isEmpty || path.contains('://')) {
+      if (mounted) setState(() => _sampled = AppColors.primary);
+      return;
+    }
+    final color = await IconDominantColor.fromAsset(path);
+    if (!mounted) return;
+    setState(() => _sampled = color);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return widget.builder(widget.color ?? _sampled);
   }
 }

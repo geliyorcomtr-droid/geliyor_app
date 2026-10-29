@@ -17,12 +17,15 @@ enum AdminPage {
   knowledge,
   support,
   bankTransfer,
+  cartLimit,
   adoption,
   foodTracking,
   softtrStock,
   reporting,
   hangiMama,
   welcomeSplash,
+  enler,
+  contactBar,
 }
 
 class AdminNavChild {
@@ -179,6 +182,16 @@ const adminNavItems = <AdminNavItem>[
       ),
       AdminNavChild(
         page: AdminPage.banners,
+        label: 'Platform',
+        bannerGroup: 'platform',
+      ),
+      AdminNavChild(
+        page: AdminPage.banners,
+        label: 'Özel Hizmetler',
+        bannerGroup: 'ozel_hizmetler',
+      ),
+      AdminNavChild(
+        page: AdminPage.banners,
         label: 'Dost Ekle',
         bannerGroup: 'dost_ekle',
       ),
@@ -186,6 +199,11 @@ const adminNavItems = <AdminNavItem>[
         page: AdminPage.banners,
         label: 'Pet Market',
         bannerGroup: 'pet_market',
+      ),
+      AdminNavChild(
+        page: AdminPage.banners,
+        label: 'Reklam',
+        bannerGroup: 'reklam',
       ),
       AdminNavChild(
         page: AdminPage.banners,
@@ -326,10 +344,28 @@ const adminNavItems = <AdminNavItem>[
     ],
   ),
   AdminNavItem(
+    page: AdminPage.enler,
+    label: 'Enler',
+    icon: Icons.workspace_premium_rounded,
+    accent: AdminAccents.enler,
+  ),
+  AdminNavItem(
+    page: AdminPage.contactBar,
+    label: 'İletişim',
+    icon: Icons.call_rounded,
+    accent: AdminAccents.contactBar,
+  ),
+  AdminNavItem(
     page: AdminPage.support,
     label: 'Talepler',
     icon: Icons.support_agent_rounded,
     accent: AdminAccents.support,
+  ),
+  AdminNavItem(
+    page: AdminPage.cartLimit,
+    label: 'Sepet limiti',
+    icon: Icons.shopping_cart_rounded,
+    accent: AdminAccents.cartLimit,
   ),
   AdminNavItem(
     page: AdminPage.bankTransfer,
@@ -382,5 +418,8 @@ String adminPageTitle(
       _ => 'Sahiplendirme ilanları',
     },
     AdminPage.bankTransfer => 'Havale / EFT',
+    AdminPage.cartLimit => 'Sepet limiti',
+    AdminPage.enler => 'Enler',
+    AdminPage.contactBar => 'İletişim',
   };
 }

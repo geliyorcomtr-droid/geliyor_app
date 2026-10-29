@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:geliyor_app/admin/admin_models.dart';
 import 'package:geliyor_app/admin/admin_ui.dart';
 import 'package:geliyor_app/data/banner_repository.dart';
+import 'package:geliyor_app/data/brand_repository.dart';
 import 'package:geliyor_app/data/firestore_collections.dart';
 import 'package:geliyor_app/data/knowledge_article_repository.dart';
 import 'package:geliyor_app/data/product_repository.dart';
@@ -153,11 +154,14 @@ class _AdminBannersScreenState extends State<AdminBannersScreen> {
     var active = existing?.active ?? true;
     var selectedPlacement = existing?.placement ?? placement.id;
     var linkType = existing?.linkType ?? BannerLinkType.none;
-    if (linkType != BannerLinkType.product &&
+    var linkId = existing?.linkId ?? '';
+    if (BannerPlacement.byId(selectedPlacement).pageId == 'reklam') {
+      linkType = BannerLinkType.brand;
+      if (linkId.trim().isEmpty) linkId = 'N&D';
+    } else if (linkType != BannerLinkType.product &&
         linkType != BannerLinkType.article) {
       linkType = BannerLinkType.none;
     }
-    var linkId = existing?.linkId ?? '';
 
     final saved = await showDialog<bool>(
       context: context,
@@ -245,7 +249,61 @@ class _AdminBannersScreenState extends State<AdminBannersScreen> {
                       icon: const Icon(Icons.upload_rounded),
                       label: Text(_uploading ? 'Yükleniyor…' : 'Görsel yükle'),
                     ),
-                    if (slot.pageId != 'smart_plan') ...[
+                    if (slot.pageId == 'reklam') ...[
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Tıklanınca gidilecek marka',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      StreamBuilder<List<AppBrand>>(
+                        stream: BrandRepository.instance.watchAll(
+                          activeOnly: true,
+                        ),
+                        builder: (context, snapshot) {
+                          final brands =
+                              snapshot.data ??
+                              BrandRepository.instance.cached
+                                  .where((brand) => brand.active)
+                                  .toList();
+                          final names = [
+                            for (final brand in brands)
+                              if (brand.name.trim().isNotEmpty) brand.name.trim(),
+                          ];
+                          if (!names.contains('N&D')) names.insert(0, 'N&D');
+                          final selected = names.contains(linkId)
+                              ? linkId
+                              : 'N&D';
+                          return DropdownButtonFormField<String>(
+                            key: ValueKey('brand-$selected-${names.length}'),
+                            initialValue: selected,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Marka',
+                            ),
+                            items: [
+                              for (final name in names)
+                                DropdownMenuItem(
+                                  value: name,
+                                  child: Text(
+                                    name,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                            ],
+                            onChanged: (value) {
+                              if (value == null) return;
+                              setDialog(() => linkId = value);
+                            },
+                          );
+                        },
+                      ),
+                    ],
+                    if (slot.pageId != 'smart_plan' &&
+                        slot.pageId != 'reklam') ...[
                     const SizedBox(height: 12),
                     const Text(
                       'Tıklanınca',
@@ -420,15 +478,25 @@ class _AdminBannersScreenState extends State<AdminBannersScreen> {
           placement: selectedPlacement,
           order: existing?.order ?? nextOrder,
           active: active,
-          linkType: BannerPlacement.byId(selectedPlacement).pageId ==
-                  'smart_plan'
-              ? BannerLinkType.none
-              : linkType,
-          linkId: BannerPlacement.byId(selectedPlacement).pageId ==
-                      'smart_plan' ||
-                  linkType == BannerLinkType.none
-              ? ''
-              : linkId,
+          linkType: () {
+            final pageId = BannerPlacement.byId(selectedPlacement).pageId;
+            if (pageId == 'smart_plan') return BannerLinkType.none;
+            if (pageId == 'reklam') return BannerLinkType.brand;
+            return linkType;
+          }(),
+          linkId: () {
+            final pageId = BannerPlacement.byId(selectedPlacement).pageId;
+            if (pageId == 'smart_plan') return '';
+            if (pageId == 'reklam') {
+              final brand = linkId.trim();
+              return brand.isEmpty ? 'N&D' : brand;
+            }
+            if (linkType == BannerLinkType.none) return '';
+            return linkId;
+          }(),
+          linkLabel: BannerPlacement.byId(selectedPlacement).pageId == 'reklam'
+              ? (linkId.trim().isEmpty ? 'N&D' : linkId.trim())
+              : (existing?.linkLabel ?? ''),
         ),
       );
       if (previousUrl.isNotEmpty && previousUrl != nextUrl) {
@@ -1054,7 +1122,10 @@ class _AdminBannersScreenState extends State<AdminBannersScreen> {
                   ],
                   if (pageId == BannerPlacement.adoption.pageId ||
                       pageId == BannerPlacement.campaignDiscount.pageId ||
-                      pageId == BannerPlacement.emergency.pageId)
+                      pageId == BannerPlacement.emergency.pageId ||
+                      pageId == BannerPlacement.platformPoster.pageId ||
+                      pageId == BannerPlacement.ozelKolaySiparis.pageId ||
+                      pageId == BannerPlacement.homeReklam.pageId)
                     for (final slot in slots)
                       if (!banners.any((item) => item.placement == slot.id))
                         _emptySlotRow(slot: slot, catalog: catalog),
@@ -1210,6 +1281,18 @@ class _AdminBannersScreenState extends State<AdminBannersScreen> {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
+                if (banner.linkType == BannerLinkType.brand &&
+                    banner.linkId.trim().isNotEmpty)
+                  Text(
+                    'Marka: ${banner.linkId.trim()}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.subText,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 Text(
                   banner.active ? 'Yayında' : 'Gizli',
                   style: TextStyle(

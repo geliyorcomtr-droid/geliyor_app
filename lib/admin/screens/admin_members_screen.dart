@@ -4,6 +4,7 @@ import 'package:geliyor_app/admin/admin_auth.dart';
 import 'package:geliyor_app/admin/admin_member.dart';
 import 'package:geliyor_app/data/firestore_collections.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:geliyor_app/utils/customer_location.dart';
 
 enum _MemberFilter { all, members, guests, admins, inactive }
 
@@ -65,7 +66,8 @@ class _AdminMembersScreenState extends State<AdminMembersScreen> {
       if (!_matchesFilter(member)) continue;
       if (query.isNotEmpty) {
         final haystack =
-            '${member.displayName} ${member.phoneNumber} ${member.email}'
+            '${member.displayName} ${member.phoneNumber} ${member.email} '
+                    '${member.addressBlock}'
                 .toLowerCase();
         if (!haystack.contains(query)) continue;
       }
@@ -324,7 +326,7 @@ class _AdminMembersScreenState extends State<AdminMembersScreen> {
             controller: _search,
             onChanged: (_) => setState(() {}),
             decoration: InputDecoration(
-              hintText: 'Ad, telefon veya e-posta ile ara',
+              hintText: 'Ad, telefon, e-posta veya adres ile ara',
               prefixIcon: const Icon(Icons.search_rounded),
               filled: true,
               fillColor: AppColors.surface,
@@ -470,10 +472,6 @@ class _MemberTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final contact = [
-      if (member.phoneNumber.isNotEmpty) member.phoneNumber,
-      if (member.email.isNotEmpty) member.email,
-    ].join('  ·  ');
     final chips = Wrap(
       spacing: 6,
       runSpacing: 6,
@@ -497,6 +495,7 @@ class _MemberTile extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 CircleAvatar(
                   radius: 22,
@@ -514,30 +513,65 @@ class _MemberTile extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        member.displayName.isEmpty
-                            ? 'İsimsiz üye'
-                            : member.displayName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.text,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 14,
-                        ),
-                      ),
-                      if (contact.isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          contact,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: AppColors.subText,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 2,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Text(
+                            member.displayName.isEmpty
+                                ? 'İsimsiz üye'
+                                : member.displayName,
+                            style: const TextStyle(
+                              color: AppColors.text,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14,
+                            ),
                           ),
-                        ),
+                          if (member.phoneNumber.isNotEmpty)
+                            Text(
+                              member.phoneNumber,
+                              style: const TextStyle(
+                                color: AppColors.text,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                        ],
+                      ),
+                      if (member.addresses.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        for (final item in member.addresses) ...[
+                          if (item.fullLabel.trim().isNotEmpty)
+                            Text(
+                              item.fullLabel,
+                              style: const TextStyle(
+                                color: AppColors.subText,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                height: 1.35,
+                              ),
+                            ),
+                          if (item.hasLocation)
+                            GestureDetector(
+                              onTap: () => CustomerLocation.open(
+                                item.latitude,
+                                item.longitude,
+                              ),
+                              behavior: HitTestBehavior.opaque,
+                              child: const Padding(
+                                padding: EdgeInsets.only(top: 2, bottom: 4),
+                                child: Text(
+                                  'Konuma git',
+                                  style: TextStyle(
+                                    color: AppColors.primary,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
                       ],
                       if (compact) ...[const SizedBox(height: 8), chips],
                     ],

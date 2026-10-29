@@ -1,5 +1,6 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:geliyor_app/data/banner_repository.dart';
+import 'package:geliyor_app/data/courier_fee_repository.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
 import 'package:geliyor_app/screens/order_confirm_screen.dart';
@@ -29,6 +30,7 @@ class _EasyOrderScreenState extends State<EasyOrderScreen> {
   @override
   void initState() {
     super.initState();
+    CourierFeeRepository.instance.addListener(_onFeeChanged);
     _items = OrderStore.instance.lastOrderItems
         .map(
           (item) => _EasyOrderItem(
@@ -43,6 +45,16 @@ class _EasyOrderScreenState extends State<EasyOrderScreen> {
           ),
         )
         .toList();
+  }
+
+  void _onFeeChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    CourierFeeRepository.instance.removeListener(_onFeeChanged);
+    super.dispose();
   }
 
   double get _subtotal =>
@@ -118,7 +130,9 @@ class _EasyOrderScreenState extends State<EasyOrderScreen> {
               child: Text(
                 'Kolay Sipariş',
                 textAlign: TextAlign.center,
-                style: AppTextStyles.pageHeader.copyWith(color: AppColors.success),
+                style: AppTextStyles.pageHeader.copyWith(
+                  color: AppColors.success,
+                ),
               ),
             ),
           ),
@@ -194,9 +208,9 @@ class _EasyOrderScreenState extends State<EasyOrderScreen> {
         brand: item.badge == 'Son siparişinden' ? null : item.badge,
         quantity: item.quantity,
       ),
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const ProductDetailScreen()),
-      ),
+      onTap: () => Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => const ProductDetailScreen())),
       onQuantityChanged: (qty) => setState(() => _items[index].quantity = qty),
       onRemove: () => _remove(index),
       accent: AppColors.success,
@@ -216,7 +230,11 @@ class _EasyOrderScreenState extends State<EasyOrderScreen> {
         ),
         child: const Row(
           children: [
-            Icon(Icons.add_circle_outline_rounded, color: AppColors.success, size: 20),
+            Icon(
+              Icons.add_circle_outline_rounded,
+              color: AppColors.success,
+              size: 20,
+            ),
             SizedBox(width: 8),
             Expanded(
               child: Text(
@@ -228,7 +246,11 @@ class _EasyOrderScreenState extends State<EasyOrderScreen> {
                 ),
               ),
             ),
-            Icon(Icons.chevron_right_rounded, color: AppColors.success, size: 22),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: AppColors.success,
+              size: 22,
+            ),
           ],
         ),
       ),
@@ -251,7 +273,9 @@ class _EasyOrderScreenState extends State<EasyOrderScreen> {
             decoration: BoxDecoration(
               color: AppColors.success.withValues(alpha: 0.10),
               shape: BoxShape.circle,
-              border: Border.all(color: AppColors.success.withValues(alpha: 0.28)),
+              border: Border.all(
+                color: AppColors.success.withValues(alpha: 0.28),
+              ),
             ),
             child: const Icon(
               Icons.delivery_dining_rounded,
@@ -289,7 +313,7 @@ class _EasyOrderScreenState extends State<EasyOrderScreen> {
             children: [
               Text(
                 _courierFee > 0
-                    ? '${CourierFee.amount.round()} TL getirme ücreti'
+                    ? '${CourierFee.formatTl(CourierFee.amount)} TL getirme ücreti'
                     : 'Kurye ücretsiz',
                 style: const TextStyle(
                   color: AppColors.subText,

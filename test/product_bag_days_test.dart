@@ -100,6 +100,44 @@ void main() {
     );
   });
 
+  test('note explains a different pet for each product type', () {
+    final cat = ProductBagDays.noteFor(
+      mainCategory: 'cat',
+      category: 'Yetişkin',
+      weight: '10 kg',
+    );
+    expect(cat, isNotNull);
+    expect(cat!.days, 182);
+    expect(cat.title, '182 gün');
+    expect(cat.body, contains('4 kg yetişkin bir kedi'));
+    expect(cat.body, contains('55 g'));
+
+    final dog = ProductBagDays.noteFor(
+      mainCategory: 'dog',
+      category: 'Yetişkin',
+      weight: '15 kg',
+    );
+    expect(dog!.days, 56);
+    expect(dog.body, contains('20 kg yetişkin bir köpek'));
+    expect(dog.body, contains('270 g'));
+
+    final kitten = ProductBagDays.noteFor(
+      mainCategory: 'cat',
+      category: 'Yavru',
+      weight: '2 kg',
+    );
+    expect(kitten!.body, contains('yavru kedi'));
+    expect(kitten.body, isNot(contains('köpek')));
+
+    final mini = ProductBagDays.noteFor(
+      mainCategory: 'dog',
+      category: 'Mini Irk',
+      weight: '3 kg',
+    );
+    expect(mini!.days, 32);
+    expect(mini.body, contains('mini ırk yetişkin köpek'));
+  });
+
   test('parses kg and gram labels', () {
     expect(ProductBagDays.bagKgFromLabel('2 Kg'), 2);
     expect(ProductBagDays.bagKgFromLabel('1,5kg'), 1.5);

@@ -932,7 +932,20 @@ class ProductAdvantageRepository {
     return ProductAdvantageCategory.mergeCatalog(
       removedIds: _stringIds(data?[ProductAdvantageFields.removedIds]),
       extras: _extrasFrom(data),
+      colors: _displayColors(data),
     );
+  }
+
+  /// Kayıtlı kategori renkleri. `colorTone` 1 değilse her renk bir ton açıktır.
+  static Map<String, String> _displayColors(Map<String, dynamic>? data) {
+    final stored = _colorsFrom(data);
+    final tone =
+        (data?[ProductAdvantageFields.colorTone] as num?)?.toInt() ?? 0;
+    if (tone >= 1) return stored;
+    return {
+      for (final entry in stored.entries)
+        entry.key: ProductAdvantageCategory.lightenOneTone(entry.value),
+    };
   }
 
   static List<String> _stringIds(dynamic raw) {
@@ -941,6 +954,72 @@ class ProductAdvantageRepository {
       for (final value in raw)
         if ('$value'.trim().isNotEmpty) '$value'.trim(),
     ];
+  }
+
+  static Map<String, String> _colorsFrom(Map<String, dynamic>? data) {
+    final raw = data?[ProductAdvantageFields.colors];
+    if (raw is! Map) return const {};
+    final colors = <String, String>{};
+    for (final entry in raw.entries) {
+      final id = '${entry.key}'.trim();
+      final color = ProductAdvantageCategory.normalizeColor('${entry.value}');
+      if (id.isEmpty || color.isEmpty) continue;
+      colors[id] = color;
+    }
+    return colors;
+  }
+
+  Future<void> setCategoryColor({
+    required String categoryId,
+    required String color,
+  }) async {
+    final id = categoryId.trim();
+    final next = ProductAdvantageCategory.normalizeColor(color);
+    if (id.isEmpty || isSystemDocId(id)) {
+      throw ArgumentError('Bu kategorinin rengi değiştirilemez.');
+    }
+    if (next.isEmpty) {
+      throw ArgumentError('Renk kodu #RRGGBB formatında olmalı.');
+    }
+    final snap = await _categoriesDoc.get();
+    final data = snap.data();
+    final tone =
+        (data?[ProductAdvantageFields.colorTone] as num?)?.toInt() ?? 0;
+    final colors = {..._colorsFrom(data)};
+    if (tone < 1) {
+      final lightened = {
+        for (final entry in colors.entries)
+          entry.key: ProductAdvantageCategory.lightenOneTone(entry.value),
+      };
+      colors
+        ..clear()
+        ..addAll(lightened);
+    }
+    colors[id] = next;
+    await _categoriesDoc.set({
+      ProductAdvantageFields.colors: colors,
+      ProductAdvantageFields.colorTone: 1,
+      ProductAdvantageFields.updatedAt: FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  /// Kayıtlı kategori renklerini bir kez bir ton açar.
+  Future<void> _migrateCategoryColorTone() async {
+    final snap = await _categoriesDoc.get();
+    final data = snap.data();
+    final tone =
+        (data?[ProductAdvantageFields.colorTone] as num?)?.toInt() ?? 0;
+    if (tone >= 1) return;
+    final stored = _colorsFrom(data);
+    final lightened = {
+      for (final entry in stored.entries)
+        entry.key: ProductAdvantageCategory.lightenOneTone(entry.value),
+    };
+    await _categoriesDoc.set({
+      if (lightened.isNotEmpty) ProductAdvantageFields.colors: lightened,
+      ProductAdvantageFields.colorTone: 1,
+      ProductAdvantageFields.updatedAt: FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
   }
 
   static List<ProductAdvantageCategory> _extrasFrom(Map<String, dynamic>? data) {
@@ -1274,6 +1353,7 @@ class ProductAdvantageRepository {
 
       if (hasWrites) await batch.commit();
       await _rebindKnowledgeAdrarIcons(snapshot.docs);
+      await _migrateCategoryColorTone();
     } on FirebaseException catch (error) {
       if (error.code == 'permission-denied') return;
       rethrow;

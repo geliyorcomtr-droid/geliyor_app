@@ -1,6 +1,8 @@
-﻿import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:geliyor_app/data/courier_fee_repository.dart';
 import 'package:geliyor_app/data/firestore_collections.dart';
+import 'package:geliyor_app/utils/courier_fee.dart';
 import 'package:geliyor_app/state/auth_store.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
@@ -32,7 +34,17 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
     'Diğer',
   ];
 
-  static const _faqs = [
+  @override
+  void initState() {
+    super.initState();
+    CourierFeeRepository.instance.addListener(_onFeeChanged);
+  }
+
+  void _onFeeChanged() {
+    if (mounted) setState(() {});
+  }
+
+  List<(String, String)> get _faqs => [
     (
       'Siparişim ne zaman teslim edilir?',
       'Siparişler kurye ile kısa süre içinde, genellikle aynı gün kapınıza teslim edilir.',
@@ -47,12 +59,13 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
     ),
     (
       'Getirme ücreti ne kadar?',
-      '599 TL altındaki siparişlerde 99 TL getirme ücreti alınır. 599 TL ve üzeri siparişlerde kurye ücretsizdir.',
+      '${CourierFee.formatTl(CourierFee.freeThreshold)} TL altındaki siparişlerde ${CourierFee.formatTl(CourierFee.amount)} TL getirme ücreti alınır. ${CourierFee.formatTl(CourierFee.freeThreshold)} TL ve üzeri siparişlerde kurye ücretsizdir.',
     ),
   ];
 
   @override
   void dispose() {
+    CourierFeeRepository.instance.removeListener(_onFeeChanged);
     _nameController.dispose();
     _emailController.dispose();
     _messageController.dispose();
@@ -506,10 +519,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
             children: [
               Icon(Icons.edit_note_rounded, color: AppColors.primary, size: 18),
               SizedBox(width: 6),
-              Text(
-                'Bize Yazın',
-                style: AppTextStyles.sectionHeader,
-              ),
+              Text('Bize Yazın', style: AppTextStyles.sectionHeader),
             ],
           ),
           const SizedBox(height: 4),

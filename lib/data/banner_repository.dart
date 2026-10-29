@@ -55,8 +55,67 @@ class BannerPlacement {
     pageLabel: 'Ana Sayfa',
     slotLabel: 'Alt reklam kutusu',
     height: 82,
-    boxRadius: 999,
     description: '361×82 · Dost Ekle / Pet Market / Sahiplendirme ile aynı',
+  );
+  static const platformPoster = BannerPlacement(
+    id: 'platform_poster',
+    title: 'Platform görseli',
+    pageId: 'platform',
+    pageLabel: 'Platform',
+    slotLabel: 'Açılan görsel',
+    height: 600,
+    boxWidth: 361,
+    boxRadius: 24,
+    description:
+        '361×600 · Ana sayfada sahiplendirme altındaki şeride tıklanınca açılır',
+  );
+  static const ozelKolaySiparis = BannerPlacement(
+    id: 'ozel_kolay_siparis',
+    title: 'Kolay Sipariş',
+    pageId: 'ozel_hizmetler',
+    pageLabel: 'Özel Hizmetler',
+    slotLabel: 'Kolay Sipariş',
+    height: 124,
+    boxWidth: 76,
+    boxRadius: 16,
+    description:
+        '76×124 · Size Özel Hizmetler kutusu içi. Dış kutu 84×132. Çerçeve ve boşluk sabit.',
+  );
+  static const ozelPetEnabiz = BannerPlacement(
+    id: 'ozel_pet_enabiz',
+    title: 'Pet E-nabız',
+    pageId: 'ozel_hizmetler',
+    pageLabel: 'Özel Hizmetler',
+    slotLabel: 'Pet E-nabız',
+    height: 124,
+    boxWidth: 76,
+    boxRadius: 16,
+    description:
+        '76×124 · Size Özel Hizmetler kutusu içi. Dış kutu 84×132. Çerçeve ve boşluk sabit.',
+  );
+  static const ozelBilgiBankasi = BannerPlacement(
+    id: 'ozel_bilgi_bankasi',
+    title: 'Bilgi Bankası',
+    pageId: 'ozel_hizmetler',
+    pageLabel: 'Özel Hizmetler',
+    slotLabel: 'Bilgi Bankası',
+    height: 124,
+    boxWidth: 76,
+    boxRadius: 16,
+    description:
+        '76×124 · Size Özel Hizmetler kutusu içi. Dış kutu 84×132. Çerçeve ve boşluk sabit.',
+  );
+  static const ozelHangiMama = BannerPlacement(
+    id: 'ozel_hangi_mama',
+    title: 'Hangi Mama',
+    pageId: 'ozel_hizmetler',
+    pageLabel: 'Özel Hizmetler',
+    slotLabel: 'Hangi Mama',
+    height: 124,
+    boxWidth: 76,
+    boxRadius: 16,
+    description:
+        '76×124 · Size Özel Hizmetler kutusu içi. Dış kutu 84×132. Çerçeve ve boşluk sabit.',
   );
   static const homeAd1 = BannerPlacement(
     id: 'home_ad_1',
@@ -109,7 +168,6 @@ class BannerPlacement {
     pageLabel: 'Dost Ekle',
     slotLabel: 'Ana sayfa şeridi',
     height: 82,
-    boxRadius: 999,
     description: '361×82 · tıklanınca Dost Ekle sayfası',
   );
   static const homePetMarket = BannerPlacement(
@@ -119,8 +177,29 @@ class BannerPlacement {
     pageLabel: 'Pet Market',
     slotLabel: 'Ana sayfa şeridi',
     height: 82,
-    boxRadius: 999,
     description: '361×82 · tıklanınca Pet Market',
+  );
+  static const homeReklam = BannerPlacement(
+    id: 'home_reklam',
+    title: 'Reklam 1',
+    pageId: 'reklam',
+    pageLabel: 'Reklam',
+    slotLabel: 'Sol',
+    height: 82,
+    boxWidth: 176,
+    description:
+        '176×82 · Sol kutu. Tıklanınca seçilen markanın ürünleri açılır.',
+  );
+  static const homeReklam2 = BannerPlacement(
+    id: 'home_reklam_2',
+    title: 'Reklam 2',
+    pageId: 'reklam',
+    pageLabel: 'Reklam',
+    slotLabel: 'Sağ',
+    height: 82,
+    boxWidth: 176,
+    description:
+        '176×82 · Sağ kutu. Tıklanınca seçilen markanın ürünleri açılır.',
   );
   static const homeSahiplendirme = BannerPlacement(
     id: 'home_sahiplendirme',
@@ -129,7 +208,6 @@ class BannerPlacement {
     pageLabel: 'Sahiplendirme',
     slotLabel: 'Ana sayfa şeridi',
     height: 82,
-    boxRadius: 999,
     description: '361×82 · tıklanınca Sahiplendirme',
   );
   static const homeSmartPlan = BannerPlacement(
@@ -140,7 +218,6 @@ class BannerPlacement {
     slotLabel: 'Akıllı Plan kutusu',
     height: 82,
     boxWidth: 361,
-    boxRadius: 999,
     description: '361×82 · Pet Market / Dost Ekle / Sahiplendirme ile aynı',
   );
   static const adoption = BannerPlacement(
@@ -511,9 +588,16 @@ class BannerPlacement {
   static const values = <BannerPlacement>[
     home,
     homeBottom,
+    platformPoster,
+    ozelKolaySiparis,
+    ozelPetEnabiz,
+    ozelBilgiBankasi,
+    ozelHangiMama,
     homeSmartPlan,
     homeDostEkle,
     homePetMarket,
+    homeReklam,
+    homeReklam2,
     homeSahiplendirme,
     adoption,
     adoptionBoxAdopt,
@@ -577,6 +661,7 @@ class BannerLinkType {
   static const none = '';
   static const product = 'product';
   static const article = 'article';
+  static const brand = 'brand';
 }
 
 class AppBanner {
@@ -719,6 +804,60 @@ class AppBanner {
 }
 
 const defaultBanners = <AppBanner>[
+  AppBanner(
+    id: 'ozel-kolay-siparis',
+    title: 'Kolay Sipariş',
+    assetPath: 'assets/images/ozel_hizmet_kolay_siparis.jpg',
+    placement: 'ozel_kolay_siparis',
+    order: 0,
+  ),
+  AppBanner(
+    id: 'ozel-pet-enabiz',
+    title: 'Pet E-nabız',
+    assetPath: 'assets/images/ozel_hizmet_pet_enabiz.jpg',
+    placement: 'ozel_pet_enabiz',
+    order: 1,
+  ),
+  AppBanner(
+    id: 'ozel-bilgi-bankasi',
+    title: 'Bilgi Bankası',
+    assetPath: 'assets/images/ozel_hizmet_bilgi_bankasi.jpg',
+    placement: 'ozel_bilgi_bankasi',
+    order: 2,
+  ),
+  AppBanner(
+    id: 'ozel-hangi-mama',
+    title: 'Hangi Mama',
+    assetPath: 'assets/images/ozel_hizmet_hangi_mama.jpg',
+    placement: 'ozel_hangi_mama',
+    order: 3,
+  ),
+  AppBanner(
+    id: 'home-reklam',
+    title: 'Reklam 1',
+    assetPath: 'assets/images/reklam_nd.jpg',
+    placement: 'home_reklam',
+    linkType: BannerLinkType.brand,
+    linkId: 'N&D',
+    linkLabel: 'N&D',
+    order: 0,
+  ),
+  AppBanner(
+    id: 'home-reklam-2',
+    title: 'Reklam 2',
+    assetPath: 'assets/images/brands/advance.png',
+    placement: 'home_reklam_2',
+    linkType: BannerLinkType.brand,
+    linkId: 'Advance',
+    linkLabel: 'Advance',
+    order: 1,
+  ),
+  AppBanner(
+    id: 'platform-poster',
+    title: 'Türkiye\'nin ilk pet yaşam platformu',
+    assetPath: 'assets/images/platform_poster.jpg',
+    placement: 'platform_poster',
+  ),
   AppBanner(
     id: 'home-sahiplendirme',
     title: 'Sahiplendirme',
@@ -1111,6 +1250,8 @@ class BannerRepository {
       'home_pet_market',
       'home_dost_ekle',
       'home_sahiplendirme',
+      'home_reklam',
+      'home_reklam_2',
     };
     try {
       final snap = await _col.get(const GetOptions(source: Source.server));
@@ -1285,6 +1426,74 @@ class BannerRepository {
           .toList();
       return (banners: banners, fromCache: item.fromCache);
     });
+  }
+
+  Stream<({List<AppBanner> banners, Set<String> deletedIds, bool fromCache})>
+  watchCatalog() {
+    return _col.snapshots(includeMetadataChanges: true).map((snap) {
+      return (
+        banners: [
+          for (final doc in snap.docs)
+            if (_isBannerDoc(doc)) AppBanner.fromDoc(doc),
+        ],
+        deletedIds: _deletedIds(snap),
+        fromCache: snap.metadata.isFromCache,
+      );
+    });
+  }
+
+  /// Yerleşimdeki yayındaki görsel. Kayıt silinmiş veya gizlenmişse boş döner.
+  Future<String> loadPlacementImage({
+    required String placement,
+    String seededId = '',
+    String fallbackAsset = '',
+  }) async {
+    QuerySnapshot<Map<String, dynamic>>? snap;
+    try {
+      snap = await _col.get(const GetOptions(source: Source.server));
+    } catch (_) {
+      try {
+        snap = await _col.get(const GetOptions(source: Source.cache));
+      } catch (_) {}
+    }
+    if (snap == null) return fallbackAsset.trim();
+    return resolvePlacementImage(
+      banners: snap.docs.where(_isBannerDoc).map(AppBanner.fromDoc),
+      deletedIds: _deletedIds(snap),
+      placement: placement,
+      seededId: seededId,
+      fallbackAsset: fallbackAsset,
+    );
+  }
+
+  static Set<String> _deletedIds(QuerySnapshot<Map<String, dynamic>> snap) {
+    final deletedIds = <String>{};
+    for (final doc in snap.docs) {
+      if (doc.id != seededDocId) continue;
+      final raw = doc.data()['deletedIds'];
+      if (raw is Iterable) {
+        deletedIds.addAll(raw.map((item) => item.toString()));
+      }
+    }
+    return deletedIds;
+  }
+
+  static String resolvePlacementImage({
+    required Iterable<AppBanner> banners,
+    required Set<String> deletedIds,
+    required String placement,
+    required String seededId,
+    required String fallbackAsset,
+  }) {
+    final slot = banners.where((item) => item.placement == placement).toList();
+    final active = slot
+        .where((item) => item.active && item.displayImage.trim().isNotEmpty)
+        .toList();
+    final live = AppBanner.latestLive(active);
+    if (live != null) return live.displayImage.trim();
+    if (slot.isNotEmpty) return '';
+    if (seededId.isNotEmpty && deletedIds.contains(seededId)) return '';
+    return fallbackAsset.trim();
   }
 
   Future<List<AppBanner>> fetchActiveFromServer({String? placement}) async {

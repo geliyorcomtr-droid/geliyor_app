@@ -475,6 +475,8 @@ class AdminOrder {
     this.subtotal = 0,
     this.courierFee = 0,
     this.address = '',
+    this.latitude,
+    this.longitude,
     this.customerName = '',
     this.phone = '',
     this.paymentMethod = '',
@@ -511,6 +513,8 @@ class AdminOrder {
   final String statusMessage;
   final List<AdminOrderItem> items;
   final String address;
+  final double? latitude;
+  final double? longitude;
   final String customerName;
   final String phone;
   final String paymentMethod;
@@ -572,6 +576,8 @@ class AdminOrder {
       statusMessage: (d[OrderFields.statusMessage] as String?) ?? '',
       items: parsedItems,
       address: (d[OrderFields.address] as String?) ?? '',
+      latitude: (d[OrderFields.latitude] as num?)?.toDouble(),
+      longitude: (d[OrderFields.longitude] as num?)?.toDouble(),
       customerName: (d[OrderFields.customerName] as String?) ?? '',
       phone: (d[OrderFields.phone] as String?) ?? '',
       paymentMethod: (d[OrderFields.paymentMethod] as String?) ?? '',

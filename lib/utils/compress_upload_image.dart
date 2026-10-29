@@ -26,6 +26,15 @@ enum UploadImageStyle {
 
   /// Karşılama ekranı (393×852 @ 3x).
   screen,
+
+  /// Marka yetki belgesi (361×510 @ 3x).
+  certificate,
+
+  /// Enler kutusu, 120×132 kutunun 3 katı: 360×396.
+  enler,
+
+  /// Ana sayfa iletişim kutusu, 1024×201.
+  contactBar,
 }
 
 class UploadImageQuota {
@@ -38,6 +47,15 @@ class UploadImageQuota {
   static const screenMaxWidth = 1179; // 393 × 3
   static const screenMaxHeight = 2556; // 852 × 3
   static const screenMaxBytes = 400 * 1024;
+  static const certificateWidth = 1083; // 361 × 3
+  static const certificateHeight = 1530; // 510 × 3
+  static const certificateMaxBytes = 500 * 1024;
+  static const enlerWidth = 360;
+  static const enlerHeight = 396;
+  static const enlerMaxBytes = 80 * 1024;
+  static const contactWidth = 1024;
+  static const contactHeight = 201;
+  static const contactMaxBytes = 80 * 1024;
 }
 
 /// Yüklenen her görseli tek standarda indirir; kota aşılırsa yüklemez.
@@ -60,10 +78,48 @@ PreparedUploadImage prepareUploadImage(
     throw Exception('Bu görsel okunamadı. JPG veya PNG dene.');
   }
 
+  if (style == UploadImageStyle.certificate) {
+    return _encodeJpeg(
+      _fitCertificate(decoded),
+      originalName: originalName,
+      maxBytes: UploadImageQuota.certificateMaxBytes,
+      qualities: const [86, 80, 74, 68, 60],
+    );
+  }
+
+  if (style == UploadImageStyle.enler) {
+    return _encodeJpeg(
+      _cover(
+        decoded,
+        UploadImageQuota.enlerWidth,
+        UploadImageQuota.enlerHeight,
+      ),
+      originalName: originalName,
+      maxBytes: UploadImageQuota.enlerMaxBytes,
+      qualities: const [76, 68, 60, 52, 44],
+    );
+  }
+
+  if (style == UploadImageStyle.contactBar) {
+    return _encodeJpeg(
+      _cover(
+        decoded,
+        UploadImageQuota.contactWidth,
+        UploadImageQuota.contactHeight,
+      ),
+      originalName: originalName,
+      maxBytes: UploadImageQuota.contactMaxBytes,
+      qualities: const [76, 68, 60, 52, 44],
+    );
+  }
+
   final maxBytes = switch (style) {
     UploadImageStyle.icon => UploadImageQuota.iconMaxBytes,
     UploadImageStyle.screen => UploadImageQuota.screenMaxBytes,
     UploadImageStyle.photo => UploadImageQuota.photoMaxBytes,
+    UploadImageStyle.certificate => UploadImageQuota.certificateMaxBytes,
+    UploadImageStyle.enler => UploadImageQuota.enlerMaxBytes,
+    UploadImageStyle.contactBar => UploadImageQuota.contactMaxBytes,
   };
   var image = _fitToQuota(decoded, style);
 
@@ -85,6 +141,53 @@ PreparedUploadImage prepareUploadImage(
     qualities: style == UploadImageStyle.screen
         ? const [90, 86, 82, 78]
         : const [78, 70, 62, 54, 46],
+  );
+}
+
+/// Yetki belgesini 361×510 oranında (3x) beyaz tuvale ortalar.
+img.Image _fitCertificate(img.Image image) {
+  const maxW = UploadImageQuota.certificateWidth;
+  const maxH = UploadImageQuota.certificateHeight;
+  final scale = math.min(maxW / image.width, maxH / image.height);
+  final fitted = (scale - 1).abs() < 0.001
+      ? image
+      : img.copyResize(
+          image,
+          width: math.min(maxW, math.max(1, (image.width * scale).round())),
+          height: math.min(maxH, math.max(1, (image.height * scale).round())),
+          interpolation: img.Interpolation.cubic,
+        );
+  if (fitted.width == maxW && fitted.height == maxH) return fitted;
+  final canvas = img.Image(width: maxW, height: maxH, numChannels: 3);
+  img.fill(canvas, color: img.ColorRgb8(255, 255, 255));
+  img.compositeImage(
+    canvas,
+    fitted,
+    dstX: ((maxW - fitted.width) / 2).round(),
+    dstY: ((maxH - fitted.height) / 2).round(),
+  );
+  return canvas;
+}
+
+/// Görseli hedef ölçüye tam oturtur; taşan kenarı ortadan keser.
+img.Image _cover(img.Image image, int width, int height) {
+  final scale = math.max(width / image.width, height / image.height);
+  final resized = img.copyResize(
+    image,
+    width: math.max(width, (image.width * scale).ceil()),
+    height: math.max(height, (image.height * scale).ceil()),
+    interpolation: img.Interpolation.linear,
+  );
+  final cropW = math.min(width, resized.width);
+  final cropH = math.min(height, resized.height);
+  final x = math.max(0, ((resized.width - cropW) / 2).floor());
+  final y = math.max(0, ((resized.height - cropH) / 2).floor());
+  return img.copyCrop(
+    resized,
+    x: x,
+    y: y,
+    width: cropW,
+    height: cropH,
   );
 }
 

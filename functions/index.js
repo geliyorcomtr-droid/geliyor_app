@@ -216,6 +216,82 @@ async function sendNetgsmSms({phone, message, kind, docPath}) {
   return {ok: true, jobid: parsed.jobid || "", code: String(code)};
 }
 
+/** Login codes use NetGSM's OTP channel so they are not held in the bulk queue. */
+async function sendNetgsmOtp({phone, message, docPath}) {
+  const gsmno = normalizePhone(phone);
+  if (!gsmno) {
+    return {ok: false, error: "invalid-phone"};
+  }
+
+  let usercode = "";
+  let password = "";
+  let msgheader = "";
+  try {
+    usercode = String(netgsmUser.value() || "").trim();
+    password = String(netgsmPass.value() || "").trim();
+    msgheader = String(netgsmHeader.value() || "").trim();
+  } catch (error) {
+    logger.error("OTP skipped: NetGSM secret unavailable", {error: String(error)});
+    return {ok: false, error: "missing-credentials"};
+  }
+  if (!usercode || !password || !msgheader) {
+    return {ok: false, error: "missing-credentials"};
+  }
+
+  const payload = JSON.stringify({
+    msgheader,
+    msg: String(message || "").slice(0, 150),
+    no: gsmno,
+  });
+  const headers = {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+    Authorization:
+      "Basic " + Buffer.from(`${usercode}:${password}`).toString("base64"),
+  };
+
+  let response;
+  let raw;
+  try {
+    response = await fetch("https://api.netgsm.com.tr/sms/rest/v2/otp", {
+      method: "POST",
+      headers,
+      body: payload,
+      signal: AbortSignal.timeout(15000),
+    });
+    raw = await response.text();
+  } catch (error) {
+    logger.error("NetGSM OTP fetch failed", {docPath, gsmno, error: String(error)});
+    return {ok: false, error: "netgsm-unreachable"};
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (_) {
+    parsed = {code: String(response.status), description: raw};
+  }
+  const code = String(parsed.code ?? parsed.status ?? "").trim();
+  const jobid = String(parsed.jobid || parsed.jobId || "");
+  if (!response.ok || !isSuccessCode(code)) {
+    logger.error("NetGSM OTP failed", {
+      docPath,
+      gsmno,
+      code,
+      description: parsed.description,
+      raw,
+    });
+    return {
+      ok: false,
+      error: String(parsed.description || code || "otp-failed"),
+      code,
+    };
+  }
+
+  logger.info("NetGSM OTP sent", {docPath, gsmno, jobid, code});
+  return {ok: true, jobid, code};
+}
+
 async function markSms(docRef, fields) {
   await docRef.set(
       {
@@ -277,15 +353,97 @@ async function sendOrderStatusSms(ref, data, {
   return result;
 }
 
-async function sendAdminNewOrderSms(ref, data, orderId) {
-  if (data.smsAdminCreatedAt) return {ok: true, skipped: true};
-  const customerPhone = await resolveOrderPhone(data);
-  const customerGsm = normalizePhone(customerPhone) || normalizePhone(data.phone);
+function adminNewOrderMessage(data, orderId, customerGsm) {
   const name = String(data.customerName || "Uye").trim() || "Uye";
-  const message =
-    `Yeni siparis ${shortOrderNo(orderId)}. Musteri: ${name}` +
+  return `Yeni siparis ${shortOrderNo(orderId)}. Musteri: ${name}` +
     (customerGsm ? ` 0${customerGsm}` : "") +
     `. Toplam: ${formatTotal(data.total)} TL. geliyor.tr`;
+}
+
+function orderAddressLines(data) {
+  const street = String(data.address || "").trim();
+  const district = String(data.district || "").trim();
+  const city = String(data.city || "").trim();
+  const place = [district, city].filter(Boolean).join(" / ");
+  return {street, place};
+}
+
+function readCoord(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value.trim().replace(",", "."));
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+function orderLocation(data) {
+  let lat = readCoord(data.latitude);
+  let lng = readCoord(data.longitude);
+  const street = String(data.address || "").trim();
+  const missing = lat == null || lng == null || (lat === 0 && lng === 0);
+  if (missing && street.startsWith("Konum ·")) {
+    const parts = street.slice("Konum ·".length).split(",");
+    if (parts.length >= 2) {
+      lat = readCoord(parts[0]);
+      lng = readCoord(parts[1]);
+    }
+  }
+  if (lat == null || lng == null) return null;
+  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
+  if (lat === 0 && lng === 0) return null;
+  return {lat, lng};
+}
+
+function mapsDirectionsUrl(destination) {
+  return "https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=" +
+    encodeURIComponent(destination);
+}
+
+async function resolveAdminNotifyEmails() {
+  const found = new Set();
+  const add = (raw) => {
+    const email = normalizeEmail(raw);
+    if (email) found.add(email);
+  };
+  try {
+    const settings = await db().doc("settings/sms").get();
+    add(settings.get("adminEmail"));
+    add(settings.get("notifyEmail"));
+  } catch (error) {
+    logger.warn("Admin notify email settings could not be loaded", error);
+  }
+  for (const field of ["user_role", "role"]) {
+    try {
+      const snap = await db().collection("users").where(field, "==", "admin").get();
+      for (const doc of snap.docs) {
+        add(doc.get("email"));
+        if (normalizeEmail(doc.get("email"))) continue;
+        try {
+          const user = await getAuth().getUser(doc.id);
+          add(user.email);
+        } catch (error) {
+          logger.warn("Admin auth email lookup failed", {
+            uid: doc.id,
+            error: String(error),
+          });
+        }
+      }
+    } catch (error) {
+      logger.warn("Admin user email lookup failed", {field, error: String(error)});
+    }
+  }
+  if (!found.size) add(MAIL_USER);
+  return [...found];
+}
+
+async function sendAdminNewOrderSms(ref, data, orderId) {
+  const fresh = await ref.get();
+  const current = fresh.data() || data;
+  if (current.smsAdminCreatedAt) return {ok: true, skipped: true};
+  const customerPhone = await resolveOrderPhone(data);
+  const customerGsm = normalizePhone(customerPhone) || normalizePhone(data.phone);
+  const message = adminNewOrderMessage(data, orderId, customerGsm);
   const result = await sendNetgsmSms({
     phone: ADMIN_ORDER_SMS_PHONE,
     message,
@@ -307,6 +465,212 @@ async function sendAdminNewOrderSms(ref, data, orderId) {
     error: result.error || "",
   });
   return result;
+}
+
+function formatMoney(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "0 TL";
+  const rounded = Math.round(n * 100) / 100;
+  if (Number.isInteger(rounded)) return `${rounded} TL`;
+  return `${rounded.toFixed(2).replace(".", ",")} TL`;
+}
+
+function orderItems(data) {
+  const raw = Array.isArray(data.items) ? data.items : [];
+  return raw.map((item) => {
+    const title = String(item?.title || "Ürün").trim() || "Ürün";
+    const brand = String(item?.brand || "").trim();
+    const weight = String(item?.weight || "").trim();
+    const barcode = String(item?.barcode || "").trim();
+    const qty = Math.max(0, Number(item?.quantity) || 0);
+    const unit = Number(item?.unitPrice) || 0;
+    const name = brand && !title.toLowerCase().includes(brand.toLowerCase()) ?
+      `${brand} ${title}` :
+      title;
+    return {name, weight, barcode, qty, unit, line: unit * qty};
+  });
+}
+
+function billingText(data) {
+  const billing = data.billing && typeof data.billing === "object" ? data.billing : null;
+  if (!billing) return "";
+  const street = String(billing.address || "").trim();
+  const district = String(billing.district || billing.town || "").trim();
+  const city = String(billing.city || "").trim();
+  const place = [district, city].filter(Boolean).join(" / ");
+  const contact = String(billing.contactName || "").trim();
+  const lines = [contact, street, place].filter(Boolean);
+  if (String(billing.accountType || "") === "corporate") {
+    const office = String(billing.taxOffice || "").trim();
+    const taxId = String(billing.taxId || "").trim();
+    if (office) lines.push(`Vergi dairesi: ${office}`);
+    if (taxId) lines.push(`Vergi no: ${taxId}`);
+  } else {
+    const nationalId = String(billing.nationalId || "").trim();
+    if (nationalId) lines.push(`TCKN: ${nationalId}`);
+  }
+  const email = String(billing.email || "").trim();
+  if (email) lines.push(email);
+  return lines.join("\n");
+}
+
+function sameAddress(left, right) {
+  const norm = (value) => String(value || "").replace(/\s+/g, " ").trim().toLowerCase();
+  return norm(left) !== "" && norm(left) === norm(right);
+}
+
+function adminOrderMailContent(data, orderId, phoneLine) {
+  const orderNo = shortOrderNo(orderId);
+  const name = String(data.customerName || "Üye").trim() || "Üye";
+  const {street, place} = orderAddressLines(data);
+  const delivery = [street, place].filter(Boolean).join("\n");
+  const fullAddress = [street, place].filter(Boolean).join(", ");
+  const pin = orderLocation(data);
+  const locationLine = pin ?
+    `${pin.lat.toFixed(6)}, ${pin.lng.toFixed(6)}` :
+    "";
+  const mapsTarget = pin ? `${pin.lat},${pin.lng}` : fullAddress;
+  const mapsUrl = mapsTarget ? mapsDirectionsUrl(mapsTarget) : "";
+  const billing = billingText(data);
+  const showBilling = billing && !sameAddress(delivery, billing);
+  const payment = String(data.paymentMethod || "").trim();
+  const slot = String(data.deliverySlot || "").trim();
+  const items = orderItems(data);
+  const gifts = Array.isArray(data.gifts) ? data.gifts : [];
+  const itemText = items.length ?
+    items.map((item, index) => {
+      const meta = [
+        item.weight,
+        item.qty ? `${item.qty} adet` : "",
+        `birim ${formatMoney(item.unit)}`,
+        formatMoney(item.line),
+      ].filter(Boolean).join(" · ");
+      const barcode = item.barcode ? `\nBarkod: ${item.barcode}` : "";
+      return `${index + 1}. ${item.name}\n${meta}${barcode}`;
+    }).join("\n\n") :
+    "Ürün satırı yok.";
+  const totals = [];
+  if (data.subtotal != null) totals.push(`Ara toplam: ${formatMoney(data.subtotal)}`);
+  if (Number(data.courierFee) > 0) totals.push(`Kurye: ${formatMoney(data.courierFee)}`);
+  if (Number(data.couponDiscount) > 0) {
+    const code = String(data.couponCode || data.couponTitle || "").trim();
+    totals.push(`Kupon${code ? ` ${code}` : ""}: −${formatMoney(data.couponDiscount)}`);
+  }
+  if (Number(data.subscriptionDiscount) > 0) {
+    const title = String(data.subscriptionTitle || "Abonelik").trim();
+    totals.push(`${title}: −${formatMoney(data.subscriptionDiscount)}`);
+  }
+  totals.push(`Toplam: ${formatMoney(data.total)}`);
+  const giftText = gifts
+      .map((gift) => String(gift?.title || "").trim())
+      .filter(Boolean)
+      .map((title) => `- ${title}`)
+      .join("\n");
+  const text = [
+    `Yeni sipariş ${orderNo}`,
+    `Müşteri: ${name}`,
+    phoneLine ? `Telefon: ${phoneLine}` : "",
+    delivery ? `Tam adres:\n${delivery}` : "Tam adres: —",
+    locationLine ? `Konum: ${locationLine}` : "",
+    mapsUrl ? `Konuma git: ${mapsUrl}` : "",
+    showBilling ? `Fatura adresi:\n${billing}` : "",
+    payment ? `Ödeme: ${payment}` : "",
+    slot ? `Teslimat dilimi: ${slot}` : "",
+    `Ürünler:\n${itemText}`,
+    totals.join("\n"),
+    giftText ? `Hediyeler:\n${giftText}` : "",
+  ].filter(Boolean).join("\n\n");
+  const itemRows = items.map((item) => {
+    const meta = [item.weight, item.barcode ? `Barkod ${item.barcode}` : ""]
+        .filter(Boolean)
+        .join(" · ");
+    return `<tr>
+      <td style="padding:8px 0;border-bottom:1px solid #E5E7EB;vertical-align:top;">
+        <strong>${escapeHtml(item.name)}</strong>
+        ${meta ? `<br><span style="color:#6B7280;">${escapeHtml(meta)}</span>` : ""}
+      </td>
+      <td style="padding:8px 8px;border-bottom:1px solid #E5E7EB;white-space:nowrap;vertical-align:top;">${item.qty} adet</td>
+      <td style="padding:8px 0;border-bottom:1px solid #E5E7EB;text-align:right;white-space:nowrap;vertical-align:top;">${escapeHtml(formatMoney(item.line))}</td>
+    </tr>`;
+  }).join("");
+  const html = [
+    `<div style="font-family:Arial,sans-serif;color:#1F2937;font-size:14px;line-height:1.45;">`,
+    `<h2 style="margin:0 0 12px;">Yeni sipariş ${escapeHtml(orderNo)}</h2>`,
+    `<p><strong>Müşteri:</strong> ${escapeHtml(name)}` +
+      (phoneLine ? `<br><strong>Telefon:</strong> ${escapeHtml(phoneLine)}` : "") +
+      `</p>`,
+    `<p><strong>Tam adres</strong><br>${escapeHtml(delivery || "—").replace(/\n/g, "<br>")}</p>`,
+    mapsUrl ? `<p><strong>Konum</strong>` +
+      (locationLine ? `<br>${escapeHtml(locationLine)}` : "") +
+      `<br><a href="${escapeHtml(mapsUrl)}" style="display:inline-block;margin-top:8px;background:#1E90FF;color:#ffffff;text-decoration:none;font-weight:700;padding:10px 16px;border-radius:999px;">Konuma git</a></p>` :
+      "",
+    showBilling ?
+      `<p><strong>Fatura adresi</strong><br>${escapeHtml(billing).replace(/\n/g, "<br>")}</p>` :
+      "",
+    (payment || slot) ?
+      `<p>${payment ? `<strong>Ödeme:</strong> ${escapeHtml(payment)}` : ""}` +
+      `${payment && slot ? "<br>" : ""}` +
+      `${slot ? `<strong>Teslimat dilimi:</strong> ${escapeHtml(slot)}` : ""}</p>` :
+      "",
+    `<p style="margin-bottom:4px;"><strong>Ürünler</strong></p>`,
+    `<table style="width:100%;border-collapse:collapse;">${itemRows || "<tr><td>Ürün satırı yok.</td></tr>"}</table>`,
+    `<p>${escapeHtml(totals.join("\n")).replace(/\n/g, "<br>")}</p>`,
+    giftText ?
+      `<p><strong>Hediyeler</strong><br>${escapeHtml(giftText).replace(/\n/g, "<br>")}</p>` :
+      "",
+    `</div>`,
+  ].filter(Boolean).join("");
+  return {
+    subject: `Yeni sipariş ${orderNo}`,
+    text,
+    html,
+  };
+}
+
+async function sendAdminNewOrderMail(ref, data, orderId) {
+  const fresh = await ref.get();
+  const current = fresh.data() || data;
+  if (current.mailAdminCreatedAt) return {ok: true, skipped: true};
+  const customerPhone = await resolveOrderPhone(current);
+  const customerGsm = normalizePhone(customerPhone) || normalizePhone(current.phone);
+  const phoneLine = customerGsm ? `0${customerGsm}` : "";
+  const {subject, text, html} = adminOrderMailContent(current, orderId, phoneLine);
+  const emails = await resolveAdminNotifyEmails();
+  if (!emails.length) {
+    await markSms(ref, {mailAdminLastError: "admin-email-missing"});
+    return {ok: false, error: "admin-email-missing"};
+  }
+  let sent = 0;
+  let failed = "";
+  for (const email of emails) {
+    const result = await sendMail({
+      to: email,
+      kind: "order_created_admin",
+      subject,
+      text,
+      html,
+    });
+    if (result.ok) {
+      sent += 1;
+    } else {
+      failed = result.error || "mail-failed";
+    }
+  }
+  const patch = sent > 0 ?
+    {
+      mailAdminCreatedAt: FieldValue.serverTimestamp(),
+      mailAdminLastError: failed ? failed : FieldValue.delete(),
+    } :
+    {mailAdminLastError: failed || "mail-failed"};
+  await markSms(ref, patch);
+  logger.info("Admin new-order email", {
+    orderId,
+    recipients: emails.length,
+    sent,
+    ok: sent > 0,
+    error: failed,
+  });
+  return sent > 0 ? {ok: true} : {ok: false, error: failed || "mail-failed"};
 }
 
 const STATUS_NOTICES = {
@@ -435,7 +799,7 @@ function readNotifyPrefs(userData) {
 
 async function notifyUser(
     uid,
-    {title, body, category, data, skipPrefs = false, includeSms = true},
+    {title, body, category, data, skipPrefs = false, includeSms = true, excludeDeviceId = ""},
 ) {
   const userId = String(uid || "").trim();
   if (!userId || !title || !body) return false;
@@ -486,9 +850,15 @@ async function notifyUser(
           .doc(userId)
           .collection("fcm_tokens")
           .get();
+      const skipDevice = String(excludeDeviceId || "");
       const entries = snap.docs
-          .map((doc) => ({id: doc.id, token: doc.data()?.token}))
-          .filter((item) => item.token);
+          .map((doc, index) => ({
+            index,
+            token: doc.data()?.token,
+            deviceId: String(doc.data()?.deviceId || ""),
+          }))
+          .filter((item) => item.token)
+          .filter((item) => !skipDevice || item.deviceId !== skipDevice);
       if (entries.length) {
         const response = await getMessaging().sendEachForMulticast({
           tokens: entries.map((item) => item.token),
@@ -518,7 +888,7 @@ async function notifyUser(
             code === "messaging/registration-token-not-registered" ||
             code === "messaging/invalid-registration-token"
           ) {
-            return snap.docs[index].ref.delete().catch(() => null);
+            return snap.docs[entries[index].index].ref.delete().catch(() => null);
           }
           logger.warn("FCM send failed", {code, userId});
           return null;
@@ -838,6 +1208,14 @@ exports.onOrderCreated = onDocumentCreated(
         await sendAdminNewOrderSms(snap.ref, data, orderId);
       } catch (error) {
         logger.error("Admin new-order SMS failed", {
+          orderId,
+          error: String(error),
+        });
+      }
+      try {
+        await sendAdminNewOrderMail(snap.ref, data, orderId);
+      } catch (error) {
+        logger.error("Admin new-order email failed", {
           orderId,
           error: String(error),
         });
@@ -1245,12 +1623,24 @@ exports.sendLoginCode = onCall(callOpts(), async (request) => {
   const code = String(Math.floor(100000 + Math.random() * 900000));
   const templates = await loadTemplates();
   const message = fillTemplate(templates.otp, {code});
-  const result = await sendNetgsmSms({
+  let result = await sendNetgsmOtp({
     phone: gsmno,
     message,
-    kind: "otp",
     docPath: ref.path,
   });
+  if (!result.ok) {
+    logger.warn("OTP channel failed, falling back to bulk SMS", {
+      gsmno,
+      error: result.error,
+      code: result.code || "",
+    });
+    result = await sendNetgsmSms({
+      phone: gsmno,
+      message,
+      kind: "otp",
+      docPath: ref.path,
+    });
+  }
   if (!result.ok) {
     logger.error("OTP SMS failed", result);
     throw new HttpsError(
@@ -1358,6 +1748,53 @@ exports.verifyLoginCode = onCall(callOpts(), async (request) => {
   }
   await ref.delete();
   return {token, uid: user.uid, phone: phoneE164, displayName: savedName};
+});
+
+exports.claimLoginSession = onCall(callOpts(), async (request) => {
+  if (!request.auth?.uid) {
+    throw new HttpsError("unauthenticated", "Giris gerekli.");
+  }
+  const uid = request.auth.uid;
+  const deviceId = String(request.data?.deviceId || "").trim();
+  const remember = request.data?.remember === true;
+  if (deviceId.length < 8) {
+    throw new HttpsError("invalid-argument", "Cihaz taninamadi.");
+  }
+
+  const userRef = db().collection("users").doc(uid);
+  const snap = await userRef.get();
+  const previous = String(snap.data()?.active_device_id || "").trim();
+  const switched = Boolean(previous) && previous !== deviceId;
+
+  if (switched) {
+    try {
+      await getAuth().revokeRefreshTokens(uid);
+    } catch (error) {
+      logger.warn("revokeRefreshTokens failed", {uid, error: String(error)});
+    }
+    await notifyUser(uid, {
+      title: "Farklı cihazdan giriş",
+      body: "Hesabınıza farklı bir cihazdan giriş yapıldı. Önceki oturum kapatıldı.",
+      category: "system",
+      skipPrefs: true,
+      includeSms: false,
+      excludeDeviceId: deviceId,
+      data: {kind: "session_replaced"},
+    });
+  }
+
+  await userRef.set({
+    active_device_id: deviceId,
+    active_device_at: FieldValue.serverTimestamp(),
+    keep_account_open: remember,
+    updatedAt: FieldValue.serverTimestamp(),
+  }, {merge: true});
+
+  let token = null;
+  if (switched) {
+    token = await getAuth().createCustomToken(uid);
+  }
+  return {ok: true, replaced: switched, token};
 });
 
 function istanbulYmd(date = new Date()) {

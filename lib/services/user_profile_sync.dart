@@ -128,6 +128,7 @@ class UserProfileSync {
         ? List<FavoriteItem>.from(FavoriteStore.instance.items)
         : const <FavoriteItem>[];
 
+    await AddressStore.instance.restoreLocal(uid);
     final snap = await UserDocPersist.fetchUserDoc(uid);
     if (AuthStore.instance.uid != uid) return;
     if (snap == null) {

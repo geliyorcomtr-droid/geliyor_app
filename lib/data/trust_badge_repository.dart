@@ -90,6 +90,11 @@ const defaultTrustBadges = <AppTrustBadge>[
     assetPath: 'assets/images/app_ikonlar/uygun_fiyat.png',
     order: 5,
   ),
+  AppTrustBadge(
+    id: 'yetkili-satici',
+    name: 'Yetkili Satıcı',
+    order: 3,
+  ),
 ];
 
 class TrustBadgeRepository {
@@ -105,6 +110,7 @@ class TrustBadgeRepository {
     if (id == proteinBadgeId) return 'Protein Değeri';
     if (id == repurchaseBadgeId) return 'Tekrar Alım';
     if (id == affordableBadgeId) return 'Uygun Fiyat';
+    if (id == authorizedSellerBadgeId) return 'Yetkili Satıcı';
     return badge.id;
   }
 
@@ -125,6 +131,9 @@ class TrustBadgeRepository {
   static const affordableBadgeId = 'uygun-fiyat';
   static const affordableIconPath = 'assets/images/app_ikonlar/uygun_fiyat.png';
   static const ratingBadgeId = 'degerlendirme';
+  static const authorizedSellerBadgeId = 'yetkili-satici';
+  static const certificateOverlayWidth = 361.0;
+  static const certificateOverlayHeight = 510.0;
 
   static bool isRatingBadge(AppTrustBadge badge) {
     final id = badge.id.toLowerCase();
@@ -175,6 +184,22 @@ class TrustBadgeRepository {
     return id == repurchaseBadgeId ||
         name.contains('tekrar alım') ||
         name.contains('tekrar alim');
+  }
+
+  static AppTrustBadge get defaultAuthorizedSellerBadge =>
+      defaultTrustBadges.firstWhere(
+        (badge) => badge.id == authorizedSellerBadgeId,
+      );
+
+  static bool isAuthorizedSellerBadge(AppTrustBadge badge) {
+    final id = badge.id.toLowerCase();
+    final name = badge.name.toLowerCase();
+    return id == authorizedSellerBadgeId ||
+        id.contains('yetkili-satici') ||
+        id.contains('yetkili_satici') ||
+        name.contains('yetkili satıcı') ||
+        name.contains('yetkili satici') ||
+        name.contains('yetki belgesi');
   }
 
   static bool isPreferredBadge(AppTrustBadge badge) {
@@ -290,6 +315,17 @@ class TrustBadgeRepository {
           TrustBadgeFields.assetPath: repurchaseIconPath,
           TrustBadgeFields.updatedAt: FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
+        hasWrites = true;
+      }
+
+      final hasAuthorizedSeller = snapshot.docs.any(
+        (doc) => isAuthorizedSellerBadge(AppTrustBadge.fromDoc(doc)),
+      );
+      if (snapshot.docs.isNotEmpty && !hasAuthorizedSeller) {
+        batch.set(
+          _collection.doc(authorizedSellerBadgeId),
+          defaultAuthorizedSellerBadge.toMap(),
+        );
         hasWrites = true;
       }
 

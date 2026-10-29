@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:geliyor_app/data/cat_feeding_guide.dart';
+import 'package:geliyor_app/utils/courier_fee.dart';
 import 'package:geliyor_app/state/pet_store.dart';
 import 'package:http/http.dart' as http;
 
@@ -224,16 +225,17 @@ class AssistantService {
     final petContext = pets.isEmpty
         ? 'Kullanıcının kayıtlı dostu yok.'
         : pets
-            .map(
-              (p) =>
-                  '${p.name} (${p.species}, yaş: ${p.shortAge}, kilo: ${p.weight ?? '-'}, '
-                  'vücut: ${p.bodyType ?? '-'}, kısır: ${p.neutered ?? '-'}, '
-                  'aktivite: ${p.activityLevel ?? '-'}, ekstra besin: ${p.extraFood ?? '-'}, '
-                  'alerji: ${p.allergies.isEmpty ? 'yok' : p.allergies.join(', ')})',
-            )
-            .join('; ');
+              .map(
+                (p) =>
+                    '${p.name} (${p.species}, yaş: ${p.shortAge}, kilo: ${p.weight ?? '-'}, '
+                    'vücut: ${p.bodyType ?? '-'}, kısır: ${p.neutered ?? '-'}, '
+                    'aktivite: ${p.activityLevel ?? '-'}, ekstra besin: ${p.extraFood ?? '-'}, '
+                    'alerji: ${p.allergies.isEmpty ? 'yok' : p.allergies.join(', ')})',
+              )
+              .join('; ');
 
-    final systemPrompt = '''
+    final systemPrompt =
+        '''
 Sen Geliyor.tr uygulamasının ChatGPT benzeri yapay zeka asistanısın.
 Kurallar:
 - Türkçe, doğal ve yardımcı konuş. Kalıp cümle tekrarlama.
@@ -427,11 +429,18 @@ Kayıtlı dost bilgileri: $petContext
     final neutered = primary?.neutered;
     final extraFood = primary?.extraFood;
     final isCat = (primary?.species ?? '').toLowerCase().contains('kedi');
-    final isDog = (primary?.species ?? '').toLowerCase().contains('köpek') ||
+    final isDog =
+        (primary?.species ?? '').toLowerCase().contains('köpek') ||
         (primary?.species ?? '').toLowerCase().contains('kopek');
 
     // Greeting / thanks
-    if (_containsAny(lower, ['merhaba', 'selam', 'iyi gun', 'iyi gün', 'hey'])) {
+    if (_containsAny(lower, [
+      'merhaba',
+      'selam',
+      'iyi gun',
+      'iyi gün',
+      'hey',
+    ])) {
       return AssistantReply(
         text: pets.isEmpty
             ? 'Merhaba! Ben Geliyor.tr asistanıyım. Mama, aşı, bakım veya ürün konularında yardımcı olurum. Önce Dost Ekle’den dostunu kaydedersen önerilerim daha isabetli olur.'
@@ -449,8 +458,8 @@ Kayıtlı dost bilgileri: $petContext
       final speciesTip = isDog
           ? 'Köpeklerde karma, kuduz ve gerektiğinde kennel cough aşıları planlanır.'
           : isCat
-              ? 'Kedilerde karma (FVRCP) ve kuduz temel takvimdedir; yaşam tarzına göre lösemi aşısı eklenebilir.'
-              : 'Türüne göre temel aşı takvimi değişir.';
+          ? 'Kedilerde karma (FVRCP) ve kuduz temel takvimdedir; yaşam tarzına göre lösemi aşısı eklenebilir.'
+          : 'Türüne göre temel aşı takvimi değişir.';
       return AssistantReply(
         text:
             '$name ($age) için aşı takvimini Sağlık > Aşı Takvimi’nden takip edebilirsin. $speciesTip '
@@ -548,8 +557,8 @@ Kayıtlı dost bilgileri: $petContext
         _ => 'Vücut yapısına göre porsiyonu ayarlamak önemli.',
       };
       final activityTip = switch (activity) {
-        'Yüksek' || 'Çok aktif' =>
-          'Aktivitesi yüksek; enerji ihtiyacı artabilir.',
+        'Yüksek' ||
+        'Çok aktif' => 'Aktivitesi yüksek; enerji ihtiyacı artabilir.',
         'Düşük' => 'Aktivitesi düşük; fazla kaloriden kaçının.',
         _ => '',
       };
@@ -579,14 +588,23 @@ Kayıtlı dost bilgileri: $petContext
     }
 
     // Weight / body
-    if (_containsAny(lower, ['kilo', 'obez', 'zayif', 'zayıf', 'sisman', 'şişman', 'vucut'])) {
+    if (_containsAny(lower, [
+      'kilo',
+      'obez',
+      'zayif',
+      'zayıf',
+      'sisman',
+      'şişman',
+      'vucut',
+    ])) {
       final tip = body == 'Kilolu'
           ? 'Kilolu görünüyorsa porsiyonu %10-15 azaltmak, ödül mamasını sınırlamak ve kısa yürüyüş/oyun eklemek yardımcı olur.'
           : body == 'Zayıf'
-              ? 'Zayıfsa öğün sayısını artırmak ve yüksek kaliteli proteinli mama denemek düşünülebilir; ani kilo kaybında veterinere danışın.'
-              : 'Kilosunu düzenli tartarak takip etmek en sağlıklısı; ani değişimde veteriner kontrolü iyi olur.';
+          ? 'Zayıfsa öğün sayısını artırmak ve yüksek kaliteli proteinli mama denemek düşünülebilir; ani kilo kaybında veterinere danışın.'
+          : 'Kilosunu düzenli tartarak takip etmek en sağlıklısı; ani değişimde veteriner kontrolü iyi olur.';
       return AssistantReply(
-        text: '$name şu an $weight aralığında kayıtlı${body != null ? ', vücut yapısı: $body' : ''}. $tip',
+        text:
+            '$name şu an $weight aralığında kayıtlı${body != null ? ', vücut yapısı: $body' : ''}. $tip',
       );
     }
 
@@ -620,7 +638,15 @@ Kayıtlı dost bilgileri: $petContext
     }
 
     // Hair / shedding
-    if (_containsAny(lower, ['tuy', 'tüy', 'dokul', 'dökül', 'tuybakim', 'fırça', 'firca'])) {
+    if (_containsAny(lower, [
+      'tuy',
+      'tüy',
+      'dokul',
+      'dökül',
+      'tuybakim',
+      'fırça',
+      'firca',
+    ])) {
       return AssistantReply(
         text: isDog
             ? '$name için düzenli tarama, omega-3 destekli mama ve yeterince su tüy dökülmesini azaltmaya yardımcı olur. Mevsim geçişlerinde tarama sıklığını artırın.'
@@ -629,7 +655,14 @@ Kayıtlı dost bilgileri: $petContext
     }
 
     // Litter / toilet (cats)
-    if (_containsAny(lower, ['kum', 'tuvalet', 'kutu', 'idrar', 'cismar', 'çiş'])) {
+    if (_containsAny(lower, [
+      'kum',
+      'tuvalet',
+      'kutu',
+      'idrar',
+      'cismar',
+      'çiş',
+    ])) {
       return AssistantReply(
         text: isCat || !isDog
             ? 'Kedi kumunda topaklanan, tozsuz bentonit veya silika tercih edilebilir. Kum kabı sayısı idealde kedi sayısı + 1 olmalıdır; kabı sessiz bir yerde tutun. İdrar sorununda gecikmeden veterinere gidin.'
@@ -671,7 +704,7 @@ Kayıtlı dost bilgileri: $petContext
     ])) {
       return AssistantReply(
         text:
-            'Pet Market’ten sipariş verebilir, Sepetim’den ödeme adımlarını tamamlayabilirsin. Teslimat kurye ile kısa sürede yapılır. 599 TL ve üzeri siparişlerde getirme ücreti yoktur; altında 99 TL getirme ücreti uygulanır. Adres için Hesabım > Adreslerim bölümünü güncel tutman yeterli.',
+            'Pet Market’ten sipariş verebilir, Sepetim’den ödeme adımlarını tamamlayabilirsin. Teslimat kurye ile kısa sürede yapılır. ${CourierFee.formatTl(CourierFee.freeThreshold)} TL ve üzeri siparişlerde getirme ücreti yoktur; altında ${CourierFee.formatTl(CourierFee.amount)} TL getirme ücreti uygulanır. Adres için Hesabım > Adreslerim bölümünü güncel tutman yeterli.',
         actions: const [
           AssistantAction(
             label: 'Mama öner',
@@ -717,7 +750,13 @@ Kayıtlı dost bilgileri: $petContext
     }
 
     // Parasite specifically
-    if (_containsAny(lower, ['pire', 'kene', 'kurt', 'iç parazit', 'ic parazit'])) {
+    if (_containsAny(lower, [
+      'pire',
+      'kene',
+      'kurt',
+      'iç parazit',
+      'ic parazit',
+    ])) {
       return AssistantReply(
         text:
             'Pire-kene ve iç parazit koruması genellikle aylık veya veterinerin önerdiği aralıklarla yapılır. $species için yaşa uygun ürün seçmek önemli; yavru ve yetişkin dozları farklıdır. Ürün seçiminde Sağlık / İlaç ve Tedavi bölümüne bakabilirsin.',
@@ -725,7 +764,13 @@ Kayıtlı dost bilgileri: $petContext
     }
 
     // Walk / exercise (dogs)
-    if (_containsAny(lower, ['yuruyus', 'yürüyüş', 'egzersiz', 'oyun', 'gezdir'])) {
+    if (_containsAny(lower, [
+      'yuruyus',
+      'yürüyüş',
+      'egzersiz',
+      'oyun',
+      'gezdir',
+    ])) {
       return AssistantReply(
         text: isDog
             ? '$name için aktivite seviyesi ${activity ?? 'belirtilmemiş'}. Orta-yüksek aktivitede günde 2 yürüyüş + kısa oyun iyi bir başlangıçtır. Sıcak havalarda öğlen gezilerinden kaçının, suyu unutmayın.'
@@ -734,7 +779,14 @@ Kayıtlı dost bilgileri: $petContext
     }
 
     // Wet food / treats
-    if (_containsAny(lower, ['yas mama', 'yaş mama', 'odul', 'ödül', 'treat', 'konserve'])) {
+    if (_containsAny(lower, [
+      'yas mama',
+      'yaş mama',
+      'odul',
+      'ödül',
+      'treat',
+      'konserve',
+    ])) {
       return AssistantReply(
         text: extraFood != null && extraFood != 'Hayır'
             ? '$name düzenli olarak "$extraFood" tüketiyor kayıtlı. Yaş mama/ödül kalorisini günlük ihtiyaçtan düşerek kuru mama porsiyonunu ayarla; ödülü eğitim için küçük parçalar halinde kullan.'
@@ -771,8 +823,14 @@ Kayıtlı dost bilgileri: $petContext
             'Acil bir belirti varsa veterinere başvurmanı öneririm.',
         actions: const [
           AssistantAction(label: 'Mama öner', prompt: 'Mama önerir misin?'),
-          AssistantAction(label: 'Aşı takvimi', prompt: 'Aşı takvimi nasıl olmalı?'),
-          AssistantAction(label: 'Tüy bakımı', prompt: 'Tüy dökülmesi için ne yapmalıyım?'),
+          AssistantAction(
+            label: 'Aşı takvimi',
+            prompt: 'Aşı takvimi nasıl olmalı?',
+          ),
+          AssistantAction(
+            label: 'Tüy bakımı',
+            prompt: 'Tüy dökülmesi için ne yapmalıyım?',
+          ),
         ],
       );
     }
@@ -792,19 +850,21 @@ Kayıtlı dost bilgileri: $petContext
   AssistantReply _enrichReply(String text, String question) {
     final lower = _normalize('$text $question');
     final pets = PetStore.instance.pets;
-    final isDog = pets.isNotEmpty &&
+    final isDog =
+        pets.isNotEmpty &&
         (pets.first.species.toLowerCase().contains('köpek') ||
             pets.first.species.toLowerCase().contains('kopek'));
 
-    final products = _containsAny(lower, [
-      'mama',
-      'beslen',
-      'pro plan',
-      'royal',
-      'hill',
-      'diyet',
-      'porsiyon',
-    ])
+    final products =
+        _containsAny(lower, [
+          'mama',
+          'beslen',
+          'pro plan',
+          'royal',
+          'hill',
+          'diyet',
+          'porsiyon',
+        ])
         ? _defaultProducts(isDog: isDog)
         : <AssistantProduct>[];
 

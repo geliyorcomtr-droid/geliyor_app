@@ -175,6 +175,7 @@ class _AdminBrandsScreenState extends State<AdminBrandsScreen> {
         assetPath: uploadedImage.isNotEmpty ? '' : (existing?.assetPath ?? ''),
         order: brandOrder,
         active: active,
+        certificateUrl: existing?.certificateUrl ?? '',
         feeding: existing?.feeding ?? BrandFeedingGuide.empty,
       ),
     );
@@ -197,6 +198,49 @@ class _AdminBrandsScreenState extends State<AdminBrandsScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('${brand.name} görseli güncellendi.')),
+    );
+  }
+
+  Future<void> _changeCertificate(AppBrand brand) async {
+    final url = await _pickAndUploadImage(
+      style: UploadImageStyle.certificate,
+      folder: 'brands/certificates',
+    );
+    if (url == null) return;
+    await BrandRepository.instance.save(brand.copyWith(certificateUrl: url));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${brand.name} yetki belgesi güncellendi.')),
+    );
+  }
+
+  Future<void> _removeCertificate(AppBrand brand) async {
+    if (brand.certificateUrl.trim().isEmpty) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Yetki belgesini sil'),
+        content: Text(
+          '"${brand.name}" için yüklenen yetki belgesi silinsin mi?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('Sil'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await BrandRepository.instance.save(brand.copyWith(certificateUrl: ''));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${brand.name} yetki belgesi silindi.')),
     );
   }
 
@@ -223,19 +267,18 @@ class _AdminBrandsScreenState extends State<AdminBrandsScreen> {
     await BrandRepository.instance.delete(brand.id);
   }
 
-  Future<String?> _pickAndUploadImage() async {
+  Future<String?> _pickAndUploadImage({
+    UploadImageStyle style = UploadImageStyle.icon,
+    String folder = 'brands',
+  }) async {
     final file = await FilePicker.pickFile(type: FileType.image);
     if (file == null) return null;
     setState(() => _uploading = true);
     try {
       final bytes = await file.readAsBytes();
-      final prepared = prepareUploadImage(
-        bytes,
-        file.name,
-        style: UploadImageStyle.icon,
-      );
+      final prepared = prepareUploadImage(bytes, file.name, style: style);
       final reference = FirebaseStorage.instance.ref(
-        'brands/${DateTime.now().microsecondsSinceEpoch}_${prepared.fileName}',
+        '$folder/${DateTime.now().microsecondsSinceEpoch}_${prepared.fileName}',
       );
       await reference.putData(
         prepared.bytes,
@@ -282,6 +325,14 @@ class _AdminBrandsScreenState extends State<AdminBrandsScreen> {
                 fontSize: 22,
                 fontWeight: FontWeight.w800,
                 color: AppColors.text,
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Yetki belgesi 361×510 px kaydedilir ve ürün detayında Yetkili Satıcı kutusundan açılır.',
+              style: TextStyle(
+                color: AppColors.subText,
+                fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: 14),
@@ -374,13 +425,14 @@ class _AdminBrandsScreenState extends State<AdminBrandsScreen> {
                   AppColors.selected,
                 ),
                 headingRowHeight: 46,
-                dataRowMinHeight: 70,
-                dataRowMaxHeight: 70,
-                columnSpacing: 34,
+                dataRowMinHeight: 84,
+                dataRowMaxHeight: 84,
+                columnSpacing: 28,
                 horizontalMargin: 14,
                 columns: const [
                   DataColumn(label: Text('Resim')),
                   DataColumn(label: Text('Marka Adı')),
+                  DataColumn(label: Text('Yetki Belgesi')),
                   DataColumn(label: Text('Sıra No')),
                   DataColumn(label: Text('Yayın Durumu')),
                   DataColumn(label: Text('İşlem')),
@@ -419,6 +471,7 @@ class _AdminBrandsScreenState extends State<AdminBrandsScreen> {
                             ),
                           ),
                         ),
+                        DataCell(_certificateCell(brand)),
                         DataCell(Text('${brand.order}')),
                         DataCell(
                           TextButton(
@@ -472,6 +525,79 @@ class _AdminBrandsScreenState extends State<AdminBrandsScreen> {
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _certificateCell(AppBrand brand) {
+    final url = brand.certificateUrl.trim();
+    final hasCertificate = url.isNotEmpty;
+    return SizedBox(
+      width: 250,
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 56,
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.border),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: hasCertificate
+                ? buildProductImage(
+                    url,
+                    fit: BoxFit.cover,
+                    width: 40,
+                    height: 56,
+                    filterQuality: FilterQuality.medium,
+                    errorWidget: const Center(
+                      child: Icon(
+                        Icons.broken_image_outlined,
+                        size: 16,
+                        color: AppColors.subText,
+                      ),
+                    ),
+                  )
+                : const Center(
+                    child: Text(
+                      'Yok',
+                      style: TextStyle(
+                        color: AppColors.subText,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: _uploading ? null : () => _changeCertificate(brand),
+            style: TextButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text('Ekle'),
+          ),
+          TextButton(
+            onPressed: _uploading || !hasCertificate
+                ? null
+                : () => _removeCertificate(brand),
+            style: TextButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              foregroundColor: hasCertificate
+                  ? AppColors.error
+                  : AppColors.subText,
+            ),
+            child: const Text('Sil'),
+          ),
+        ],
       ),
     );
   }

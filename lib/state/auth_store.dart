@@ -4,7 +4,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:geliyor_app/data/firestore_collections.dart';
 import 'package:geliyor_app/data/user_doc_persist.dart';
+import 'package:geliyor_app/services/device_session.dart';
 
 class AuthStore extends ChangeNotifier {
   AuthStore._() {
@@ -39,6 +41,10 @@ class AuthStore extends ChangeNotifier {
   String? _uid;
   bool _otpReady = false;
   bool _emailVerified = false;
+  bool _deviceClaimed = false;
+  bool _endingForeignSession = false;
+  String? _sessionNotice;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _deviceSub;
 
   bool get isLoggedIn => _isLoggedIn;
   bool get isBusy => _isBusy;
@@ -103,8 +109,17 @@ class AuthStore extends ChangeNotifier {
     throw const FormatException('Geçersiz telefon numarası');
   }
 
+  String? takeSessionNotice() {
+    final notice = _sessionNotice;
+    _sessionNotice = null;
+    return notice;
+  }
+
   Future<void> _onAuthChanged(User? user) async {
     if (user == null) {
+      await _deviceSub?.cancel();
+      _deviceSub = null;
+      _deviceClaimed = false;
       _isLoggedIn = false;
       _fullName = '';
       _phone = '';
@@ -142,6 +157,22 @@ class AuthStore extends ChangeNotifier {
         _fullName = 'Üye';
       }
     }
+
+    if (DeviceSession.claimedThisLaunch && !_deviceClaimed) {
+      notifyListeners();
+      return;
+    }
+
+    if (!DeviceSession.claimedThisLaunch) {
+      final keep = await DeviceSession.keepAccountOpen();
+      if (!keep) {
+        await _auth.signOut();
+        return;
+      }
+      if (await _dropIfAnotherDevice(user.uid)) return;
+      _deviceClaimed = true;
+    }
+    _watchActiveDevice(user.uid);
     notifyListeners();
   }
 
@@ -182,6 +213,91 @@ class AuthStore extends ChangeNotifier {
   }
 
   void notifyProfileUpdated() => notifyListeners();
+
+  Future<bool> _dropIfAnotherDevice(String uid) async {
+    try {
+      final snap = await _db.collection(FirestoreCollections.users).doc(uid).get();
+      final active =
+          (snap.data()?[UserFields.activeDeviceId] as String?)?.trim() ?? '';
+      if (active.isEmpty) return false;
+      final mine = await DeviceSession.deviceId();
+      if (active == mine) return false;
+      _sessionNotice =
+          'Hesabınıza farklı bir cihazdan giriş yapıldı. Bu cihazdaki oturum kapatıldı.';
+      await _auth.signOut();
+      notifyListeners();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  void _watchActiveDevice(String uid) {
+    _deviceSub?.cancel();
+    _deviceSub = _db
+        .collection(FirestoreCollections.users)
+        .doc(uid)
+        .snapshots()
+        .listen((snap) async {
+          if (!_deviceClaimed || _endingForeignSession) return;
+          final active =
+              (snap.data()?[UserFields.activeDeviceId] as String?)?.trim() ??
+              '';
+          if (active.isEmpty) return;
+          final mine = await DeviceSession.deviceId();
+          if (active == mine || _uid != uid) return;
+          _endingForeignSession = true;
+          _deviceClaimed = false;
+          _sessionNotice =
+              'Hesabınıza farklı bir cihazdan giriş yapıldı. Bu cihazdaki oturum kapatıldı.';
+          try {
+            await _auth.signOut();
+          } finally {
+            _endingForeignSession = false;
+            notifyListeners();
+          }
+        });
+  }
+
+  Future<void> _claimDeviceSession(bool keepAccountOpen) async {
+    await DeviceSession.setKeepAccountOpen(keepAccountOpen);
+    try {
+      final deviceId = await DeviceSession.deviceId();
+      final result = await _functions.httpsCallable('claimLoginSession').call({
+        'deviceId': deviceId,
+        'remember': keepAccountOpen,
+      });
+      final raw = result.data;
+      final token = raw is Map ? raw['token'] as String? : null;
+      if (token != null && token.isNotEmpty) {
+        await _auth.signInWithCustomToken(token);
+      }
+    } catch (error) {
+      debugPrint('Cihaz oturumu kaydedilemedi: $error');
+    }
+    _deviceClaimed = true;
+    final uid = _auth.currentUser?.uid;
+    if (uid != null) _watchActiveDevice(uid);
+  }
+
+  Future<void> _clearActiveDeviceIfMine() async {
+    final uid = _uid ?? _auth.currentUser?.uid;
+    if (uid == null) return;
+    try {
+      final ref = _db.collection(FirestoreCollections.users).doc(uid);
+      final snap = await ref.get();
+      final active =
+          (snap.data()?[UserFields.activeDeviceId] as String?)?.trim() ?? '';
+      final mine = await DeviceSession.deviceId();
+      if (active.isNotEmpty && active == mine) {
+        await ref.set({
+          UserFields.activeDeviceId: FieldValue.delete(),
+        }, SetOptions(merge: true));
+      }
+    } catch (error) {
+      debugPrint('Aktif cihaz temizlenemedi: $error');
+    }
+  }
 
   Future<void> updateProfile({
     String? fullName,
@@ -330,6 +446,7 @@ class AuthStore extends ChangeNotifier {
   Future<void> signInWithEmail({
     required String email,
     required String password,
+    bool keepAccountOpen = true,
   }) async {
     final normalized = email.trim().toLowerCase();
     if (normalized.isEmpty || !normalized.contains('@')) {
@@ -344,6 +461,8 @@ class AuthStore extends ChangeNotifier {
         message: 'Şifrenizi girin.',
       );
     }
+    DeviceSession.claimedThisLaunch = true;
+    await DeviceSession.setKeepAccountOpen(keepAccountOpen);
     _setBusy(true);
     try {
       final cred = await _auth.signInWithEmailAndPassword(
@@ -361,6 +480,7 @@ class AuthStore extends ChangeNotifier {
       _email = user.email ?? normalized;
       _isLoggedIn = true;
       _authReady = true;
+      await _claimDeviceSession(keepAccountOpen);
       notifyListeners();
     } on FirebaseAuthException catch (e) {
       if (e.code == 'user-not-found' ||
@@ -383,6 +503,7 @@ class AuthStore extends ChangeNotifier {
     required String smsCode,
     String? fullName,
     bool requireExistingUser = false,
+    bool keepAccountOpen = true,
   }) async {
     if (!_otpReady) {
       throw FirebaseAuthException(
@@ -390,6 +511,8 @@ class AuthStore extends ChangeNotifier {
         message: 'Önce SMS kodu gönderin.',
       );
     }
+    DeviceSession.claimedThisLaunch = true;
+    await DeviceSession.setKeepAccountOpen(keepAccountOpen);
     _setBusy(true);
     try {
       final result = await _functions.httpsCallable('verifyLoginCode').call({
@@ -471,6 +594,7 @@ class AuthStore extends ChangeNotifier {
       _phone = resolvedPhone;
       _isLoggedIn = true;
       _authReady = true;
+      await _claimDeviceSession(keepAccountOpen);
       notifyListeners();
     } on FirebaseFunctionsException catch (e) {
       throw FirebaseAuthException(
@@ -485,6 +609,10 @@ class AuthStore extends ChangeNotifier {
   Future<void> logout() async {
     _setBusy(true);
     try {
+      await _deviceSub?.cancel();
+      _deviceSub = null;
+      _deviceClaimed = false;
+      await _clearActiveDeviceIfMine();
       await beforeLogout?.call();
       await _auth.signOut();
       _otpReady = false;

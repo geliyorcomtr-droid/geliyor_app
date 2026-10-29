@@ -3,7 +3,10 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:geliyor_app/data/banner_repository.dart';
+import 'package:geliyor_app/data/contact_bar_repository.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:geliyor_app/data/brand_repository.dart';
+import 'package:geliyor_app/data/enler_repository.dart';
 import 'package:geliyor_app/data/product_repository.dart';
 import 'package:geliyor_app/theme/app_text_styles.dart';
 import 'package:geliyor_app/screens/easy_order_screen.dart';
@@ -26,10 +29,13 @@ import 'package:geliyor_app/theme/app_icons.dart';
 import 'package:geliyor_app/utils/advantage_search.dart';
 import 'package:geliyor_app/utils/product_image.dart';
 import 'package:geliyor_app/widgets/app_banner_slider.dart';
+import 'package:geliyor_app/widgets/enler_framed_image.dart';
+import 'package:geliyor_app/widgets/framed_bar_image.dart';
 import 'package:geliyor_app/widgets/brand_tile_image.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_notification_button.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
+import 'package:geliyor_app/widgets/platform_poster_overlay.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -71,6 +77,8 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     unawaited(BannerRepository.instance.restoreHomeDostEkleIfMeetPetLeaked());
     ProductRepository.instance.ensureWarm();
+    EnlerRepository.instance.startListening();
+    ContactBarRepository.instance.startListening();
   }
 
   @override
@@ -111,14 +119,22 @@ class _HomeScreenState extends State<HomeScreen> {
         header: _buildHeader(),
         content: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Column(
             children: [
-              const SizedBox(height: 2),
-              _buildBannerSlider(),
-              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+              _ovalFramedStrip(
+                color: AppColors.primary,
+                radius: BannerPlacement.radius,
+                innerRadius: BannerPlacement.radius - 3,
+                child: _buildBannerSlider(),
+              ),
+              const SizedBox(height: 10),
               _buildSearchRow(),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               ListenableBuilder(
                 listenable: Listenable.merge([
                   PetStore.instance,
@@ -134,11 +150,12 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 7),
               _buildSpecialServices(),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               _ovalFramedStrip(
                 color: AppColors.success,
                 child: _buildPetMarket(),
               ),
+              _buildHomeReklam(),
               const SizedBox(height: _serviceCardGap),
               _ovalFramedStrip(
                 color: AppColors.error,
@@ -156,7 +173,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: AppColors.violet,
                 child: _buildHomeHalfBanner(),
               ),
+              const SizedBox(height: 7),
+              _buildEnler(),
+              const SizedBox(height: 7),
+              _buildContactRow(),
               const SizedBox(height: 12),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -225,10 +249,21 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHomeHalfBanner() {
-    return const AppBannerSlot(
+    return AppBannerSlot(
       placement: BannerPlacement.homeBottom,
       openOnTap: false,
+      onTap: _openPlatformPoster,
     );
+  }
+
+  Future<void> _openPlatformPoster() async {
+    final path = await BannerRepository.instance.loadPlacementImage(
+      placement: BannerPlacement.platformPoster.id,
+      seededId: 'platform-poster',
+      fallbackAsset: 'assets/images/platform_poster.jpg',
+    );
+    if (!mounted || path.isEmpty) return;
+    await PlatformPosterOverlay.show(context, imagePath: path);
   }
 
   Widget _buildSearchRow() {
@@ -452,83 +487,330 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildSpecialServices() {
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+  Widget _buildEnler() {
+    return ListenableBuilder(
+      listenable: EnlerRepository.instance,
+      builder: (context, _) {
+        final cards = EnlerRepository.instance.cards;
+        return Column(
           children: [
-            Text(
-              'Size Özel Hizmetler',
-              style: AppTextStyles.sectionHeader.copyWith(
-                fontSize: 20,
-                fontWeight: FontWeight.w900,
-                height: 1.1,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  "En'ler",
+                  style: AppTextStyles.sectionHeader.copyWith(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    height: 1.1,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                const Icon(
+                  Icons.pets_rounded,
+                  size: 22,
+                  color: AppColors.primary,
+                ),
+              ],
+            ),
+            const SizedBox(height: 7),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final count = cards.length;
+                if (count == 0) return const SizedBox.shrink();
+                final width = (constraints.maxWidth -
+                        _serviceCardGap * (count - 1)) /
+                    count;
+                return SizedBox(
+                  height: EnlerRepository.boxHeight,
+                  child: Row(
+                    children: [
+                      for (var i = 0; i < count; i++) ...[
+                        if (i > 0) const SizedBox(width: _serviceCardGap),
+                        SizedBox(
+                          width: width,
+                          height: EnlerRepository.boxHeight,
+                          child: _enlerCard(cards[i]),
+                        ),
+                      ],
+                    ],
+                  ),
+                );
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _enlerCard(EnlerCard card) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => PetMarketProductsScreen(
+              initialMainCategory: '',
+              initialHighlight: card.id,
+            ),
+          ),
+        );
+      },
+      child: EnlerFramedImage(
+        path: card.imageUrl.trim().isNotEmpty
+            ? card.imageUrl.trim()
+            : card.assetPath,
+        fallbackPath: card.assetPath,
+        cacheWidth: EnlerRepository.uploadWidth,
+        maxDecodePx: EnlerRepository.uploadHeight,
+      ),
+    );
+  }
+
+  Widget _buildContactRow() {
+    return ListenableBuilder(
+      listenable: ContactBarRepository.instance,
+      builder: (context, _) {
+        final repo = ContactBarRepository.instance;
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            const gap = 8.0;
+            final boxW = (constraints.maxWidth - gap) / 2;
+            final imageH = boxW *
+                ContactBarRepository.artHeight /
+                ContactBarRepository.artWidth;
+            return Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Bize Ulaşın',
+                      style: AppTextStyles.sectionHeader.copyWith(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        height: 1.1,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Icon(
+                      Icons.pets_rounded,
+                      size: 22,
+                      color: AppColors.primary,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 7),
+                SizedBox(
+                  height: imageH + 8,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        child: FramedBarImage(
+                          path: repo.imageUrl.isNotEmpty
+                              ? repo.imageUrl
+                              : ContactBarRepository.assetPath,
+                          fallbackPath: ContactBarRepository.assetPath,
+                          borderColor: AppColors.primary,
+                          onTap: () => _callContact(repo.phone),
+                        ),
+                      ),
+                      const SizedBox(width: gap),
+                      Expanded(
+                        child: FramedBarImage(
+                          path: repo.whatsappImageUrl.isNotEmpty
+                              ? repo.whatsappImageUrl
+                              : ContactBarRepository.whatsappAssetPath,
+                          fallbackPath: ContactBarRepository.whatsappAssetPath,
+                          borderColor: const Color(0xFF25D366),
+                          onTap: () => _openWhatsapp(repo.whatsappPhone),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _openWhatsapp(String phone) async {
+    final digits = ContactBarRepository.whatsappDigits(phone);
+    if (digits.isEmpty) return;
+    final uri = Uri.parse('https://wa.me/$digits');
+    try {
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('WhatsApp açılamadı.')),
+        );
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('WhatsApp açılamadı.')),
+      );
+    }
+  }
+
+  Future<void> _callContact(String phone) async {
+    final number = phone.replaceAll(RegExp(r'[^\d+]'), '');
+    if (number.isEmpty) return;
+    final uri = Uri(scheme: 'tel', path: number);
+    try {
+      final launched = await launchUrl(uri);
+      if (!launched && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Arama başlatılamadı.')),
+        );
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Arama başlatılamadı.')),
+      );
+    }
+  }
+
+  Widget _buildSpecialServices() {
+    return StreamBuilder<
+      ({List<AppBanner> banners, Set<String> deletedIds, bool fromCache})
+    >(
+      stream: BannerRepository.instance.watchCatalog(),
+      builder: (context, snapshot) {
+        final catalog = snapshot.data;
+        return Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'Size Özel Hizmetler',
+                  style: AppTextStyles.sectionHeader.copyWith(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    height: 1.1,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                const Icon(
+                  Icons.pets_rounded,
+                  size: 22,
+                  color: AppColors.primary,
+                ),
+              ],
+            ),
+            const SizedBox(height: 7),
+            SizedBox(
+              height: _serviceCardHeight,
+              child: Row(
+                children: [
+                  _serviceCard(
+                    title: 'Kolay\nSipariş',
+                    icon: Icons.delivery_dining_rounded,
+                    color: const Color(0xFF22C55E),
+                    coverImage: _ozelHizmetCover(
+                      catalog,
+                      placement: BannerPlacement.ozelKolaySiparis.id,
+                      seededId: 'ozel-kolay-siparis',
+                      fallbackAsset:
+                          'assets/images/ozel_hizmet_kolay_siparis.jpg',
+                    ),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const EasyOrderScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(width: _serviceCardGap),
+                  _serviceCard(
+                    title: 'Pet\nE-nabız',
+                    icon: Icons.health_and_safety_rounded,
+                    color: const Color(0xFFEF4444),
+                    coverImage: _ozelHizmetCover(
+                      catalog,
+                      placement: BannerPlacement.ozelPetEnabiz.id,
+                      seededId: 'ozel-pet-enabiz',
+                      fallbackAsset: 'assets/images/ozel_hizmet_pet_enabiz.jpg',
+                    ),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const HealthScreen()),
+                      );
+                    },
+                  ),
+                  const SizedBox(width: _serviceCardGap),
+                  _serviceCard(
+                    title: 'Bilgi\nBankası',
+                    icon: Icons.menu_book_rounded,
+                    color: const Color(0xFFF59E0B),
+                    coverImage: _ozelHizmetCover(
+                      catalog,
+                      placement: BannerPlacement.ozelBilgiBankasi.id,
+                      seededId: 'ozel-bilgi-bankasi',
+                      fallbackAsset:
+                          'assets/images/ozel_hizmet_bilgi_bankasi.jpg',
+                    ),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const KnowledgeBaseScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(width: _serviceCardGap),
+                  _serviceCard(
+                    title: 'Hangi\nMama',
+                    icon: Icons.question_mark_rounded,
+                    color: const Color(0xFF8B5CF6),
+                    imagePath: AppIcons.mamaKabi,
+                    coverImage: _ozelHizmetCover(
+                      catalog,
+                      placement: BannerPlacement.ozelHangiMama.id,
+                      seededId: 'ozel-hangi-mama',
+                      fallbackAsset: 'assets/images/ozel_hizmet_hangi_mama.jpg',
+                    ),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const HangiMamaScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ),
             ),
-            const SizedBox(width: 6),
-            const Icon(Icons.pets_rounded, size: 22, color: AppColors.primary),
           ],
-        ),
-        const SizedBox(height: 7),
-        SizedBox(
-          height: _serviceCardHeight,
-          child: Row(
-            children: [
-              _serviceCard(
-                title: 'Kolay\nSipariş',
-                icon: Icons.delivery_dining_rounded,
-                color: AppColors.primary,
-                iconColor: const Color(0xFF22C55E),
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const EasyOrderScreen()),
-                  );
-                },
-              ),
-              const SizedBox(width: _serviceCardGap),
-              _serviceCard(
-                title: 'Pet\nE-nabız',
-                icon: Icons.health_and_safety_rounded,
-                color: AppColors.primary,
-                iconColor: const Color(0xFFEF4444),
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const HealthScreen()),
-                  );
-                },
-              ),
-              const SizedBox(width: _serviceCardGap),
-              _serviceCard(
-                title: 'Bilgi\nBankası',
-                icon: Icons.menu_book_rounded,
-                color: AppColors.primary,
-                iconColor: const Color(0xFFF59E0B),
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const KnowledgeBaseScreen(),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(width: _serviceCardGap),
-              _serviceCard(
-                title: 'Hangi\nMama',
-                icon: Icons.question_mark_rounded,
-                color: AppColors.primary,
-                iconColor: const Color(0xFF8B5CF6),
-                imagePath: AppIcons.mamaKabi,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const HangiMamaScreen()),
-                  );
-                },
-              ),
-            ],
-          ),
-        ),
-      ],
+        );
+      },
+    );
+  }
+
+  String _ozelHizmetCover(
+    ({List<AppBanner> banners, Set<String> deletedIds, bool fromCache})?
+    catalog, {
+    required String placement,
+    required String seededId,
+    required String fallbackAsset,
+  }) {
+    if (catalog == null) return fallbackAsset;
+    return BannerRepository.resolvePlacementImage(
+      banners: catalog.banners,
+      deletedIds: catalog.deletedIds,
+      placement: placement,
+      seededId: seededId,
+      fallbackAsset: fallbackAsset,
     );
   }
 
@@ -538,8 +820,13 @@ class _HomeScreenState extends State<HomeScreen> {
     required Color color,
     Color? iconColor,
     String? imagePath,
+    String coverImage = '',
     VoidCallback? onTap,
   }) {
+    final tone = iconColor ?? color;
+    final frame = Color.lerp(tone, Colors.white, 0.45) ?? tone;
+    final background = Color.lerp(tone, Colors.white, 0.86) ?? tone;
+    final cover = coverImage.trim();
     return Expanded(
       child: GestureDetector(
         onTap: onTap,
@@ -548,53 +835,94 @@ class _HomeScreenState extends State<HomeScreen> {
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(_serviceCardRadius),
-            border: Border.all(color: color),
+            border: Border.all(color: frame),
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(16),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                ColoredBox(color: color.withValues(alpha: 0.10)),
-                _serviceCardPaws(color),
-                _serviceSparkles(color),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: Column(
-                    children: [
-                      const Spacer(),
-                      _serviceLogo(
+            child: cover.isEmpty
+                ? _serviceCardBody(
+                    title: title,
+                    icon: icon,
+                    color: color,
+                    iconColor: iconColor,
+                    imagePath: imagePath,
+                    tone: tone,
+                    background: background,
+                  )
+                : SizedBox.expand(
+                    child: buildProductImage(
+                      cover,
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      height: double.infinity,
+                      alignment: Alignment.center,
+                      filterQuality: FilterQuality.high,
+                      cacheWidth: 252,
+                      errorWidget: _serviceCardBody(
+                        title: title,
                         icon: icon,
                         color: color,
-                        iconColor: iconColor ?? color,
+                        iconColor: iconColor,
                         imagePath: imagePath,
+                        tone: tone,
+                        background: background,
                       ),
-                      const Spacer(),
-                      Text(
-                        title,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: color,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w900,
-                          height: 1.15,
-                        ),
-                      ),
-                      const Spacer(),
-                      Icon(
-                        Icons.arrow_forward_rounded,
-                        color: color,
-                        size: 22,
-                      ),
-                      const Spacer(),
-                    ],
+                    ),
                   ),
-                ),
-              ],
-            ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _serviceCardBody({
+    required String title,
+    required IconData icon,
+    required Color color,
+    required Color tone,
+    required Color background,
+    Color? iconColor,
+    String? imagePath,
+  }) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        ColoredBox(color: background),
+        _serviceCardPaws(tone),
+        _serviceSparkles(tone),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          child: Column(
+            children: [
+              const Spacer(),
+              _serviceLogo(
+                icon: icon,
+                color: color,
+                iconColor: iconColor ?? color,
+                imagePath: imagePath,
+              ),
+              const Spacer(),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                  height: 1.15,
+                ),
+              ),
+              const Spacer(),
+              Icon(
+                Icons.arrow_forward_rounded,
+                color: color,
+                size: 22,
+              ),
+              const Spacer(),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -644,7 +972,7 @@ class _HomeScreenState extends State<HomeScreen> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         shape: BoxShape.circle,
-        border: Border.all(color: color),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
       ),
       child: imagePath != null
           ? Image.asset(
@@ -696,8 +1024,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _ovalFramedStrip({
     required Color color,
     required Widget child,
-    double radius = 999,
-    double innerRadius = 999,
+    double radius = BannerPlacement.radius,
+    double innerRadius = BannerPlacement.radius - 3,
   }) {
     return Container(
       padding: const EdgeInsets.all(3),
@@ -736,6 +1064,166 @@ class _HomeScreenState extends State<HomeScreen> {
           MaterialPageRoute(builder: (_) => const PetMarketScreen()),
         );
       },
+    );
+  }
+
+  static const _reklamGap = 9.0;
+  static final Map<String, String> _rememberedReklamImages = {};
+  static final Map<String, String> _rememberedReklamBrands = {};
+
+  Widget _buildHomeReklam() {
+    return StreamBuilder<
+      ({List<AppBanner> banners, Set<String> deletedIds, bool fromCache})
+    >(
+      stream: BannerRepository.instance.watchCatalog(),
+      builder: (context, snapshot) {
+        final catalog = snapshot.data;
+        final leftPath = _reklamImagePath(
+          catalog,
+          placement: BannerPlacement.homeReklam.id,
+          seededId: 'home-reklam',
+          fallback: 'assets/images/reklam_nd.jpg',
+        );
+        final rightPath = _reklamImagePath(
+          catalog,
+          placement: BannerPlacement.homeReklam2.id,
+          seededId: 'home-reklam-2',
+          fallback: 'assets/images/brands/advance.png',
+        );
+        if (leftPath.isEmpty && rightPath.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        return Padding(
+          padding: const EdgeInsets.only(top: _serviceCardGap),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final boxW = (constraints.maxWidth - _reklamGap) / 2;
+              return Row(
+                children: [
+                  SizedBox(
+                    width: boxW,
+                    child: _reklamBox(
+                      path: leftPath,
+                      brand: _reklamBrand(
+                        catalog,
+                        placement: BannerPlacement.homeReklam.id,
+                        fallbackBrand: 'N&D',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: _reklamGap),
+                  SizedBox(
+                    width: boxW,
+                    child: _reklamBox(
+                      path: rightPath,
+                      brand: _reklamBrand(
+                        catalog,
+                        placement: BannerPlacement.homeReklam2.id,
+                        fallbackBrand: 'Advance',
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _reklamBox({required String path, required String brand}) {
+    return _ovalFramedStrip(
+      color: AppColors.primary,
+      child: GestureDetector(
+        onTap: path.isEmpty ? null : () => _openReklamBrand(brand),
+        behavior: HitTestBehavior.opaque,
+        child: SizedBox(
+          width: double.infinity,
+          height: BannerPlacement.homeReklam.height,
+          child: path.isEmpty
+              ? const ColoredBox(color: AppColors.surface)
+              : buildProductImage(
+                  path,
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  height: double.infinity,
+                  alignment: Alignment.center,
+                  filterQuality: FilterQuality.high,
+                  cacheWidth: 528,
+                ),
+        ),
+      ),
+    );
+  }
+
+  String _reklamImagePath(
+    ({List<AppBanner> banners, Set<String> deletedIds, bool fromCache})?
+    catalog, {
+    required String placement,
+    required String seededId,
+    required String fallback,
+  }) {
+    final remembered = _rememberedReklamImages[placement] ?? '';
+    if (catalog == null) return remembered;
+    final slot = catalog.banners
+        .where((banner) => banner.placement == placement && banner.active)
+        .toList();
+    final live = AppBanner.latestLive(slot);
+    final url = live?.imageUrl.trim() ?? '';
+    if (url.isNotEmpty) {
+      final rememberedStamp = AppBanner.storageUploadStamp(remembered);
+      final nextStamp = AppBanner.storageUploadStamp(url);
+      if (catalog.fromCache &&
+          rememberedStamp > 0 &&
+          nextStamp > 0 &&
+          nextStamp < rememberedStamp) {
+        return remembered;
+      }
+      _rememberedReklamImages[placement] = url;
+      return url;
+    }
+    if (catalog.fromCache) return remembered;
+    final deleted = catalog.deletedIds.contains(seededId);
+    if (deleted || slot.isNotEmpty) {
+      _rememberedReklamImages[placement] = '';
+      return '';
+    }
+    return fallback;
+  }
+
+  String _reklamBrand(
+    ({List<AppBanner> banners, Set<String> deletedIds, bool fromCache})?
+    catalog, {
+    required String placement,
+    required String fallbackBrand,
+  }) {
+    final remembered = _rememberedReklamBrands[placement] ?? fallbackBrand;
+    if (catalog == null) return remembered;
+    final slot = catalog.banners
+        .where((banner) => banner.placement == placement && banner.active)
+        .toList();
+    final live = AppBanner.latestLive(slot);
+    final name = live?.linkId.trim() ?? '';
+    if (live?.linkType == BannerLinkType.brand && name.isNotEmpty) {
+      if (!catalog.fromCache || !_rememberedReklamBrands.containsKey(placement)) {
+        _rememberedReklamBrands[placement] = name;
+      }
+      return _rememberedReklamBrands[placement] ?? name;
+    }
+    if (!catalog.fromCache) _rememberedReklamBrands[placement] = fallbackBrand;
+    return _rememberedReklamBrands[placement] ?? fallbackBrand;
+  }
+
+  void _openReklamBrand(String brand) {
+    final name = brand.trim().isEmpty ? 'N&D' : brand.trim();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PetMarketProductsScreen(
+          initialMainCategory: '',
+          initialBrand: name,
+        ),
+      ),
     );
   }
 

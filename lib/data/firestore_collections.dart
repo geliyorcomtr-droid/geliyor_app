@@ -18,6 +18,7 @@ class FirestoreCollections {
   static const trustBadges = 'trust_badges';
   static const productAdvantages = 'product_advantages';
   static const settings = 'settings';
+  static const favoriteMembers = 'favorite_members';
   static const coupons = 'coupons';
   static const foodCouponQueue = 'food_coupon_queue';
   static const adoptionListings = 'adoption_listings';
@@ -59,6 +60,9 @@ class UserFields {
   static const addresses = 'addresses';
   static const lastOrder = 'last_order';
   static const notificationSettings = 'notification_settings';
+  static const activeDeviceId = 'active_device_id';
+  static const activeDeviceAt = 'active_device_at';
+  static const keepAccountOpen = 'keep_account_open';
   static const earnedCouponIds = 'earned_coupon_ids';
   static const dostPoints = 'dost_points';
   static const foodReminder = 'food_reminder';
@@ -81,6 +85,7 @@ class FcmTokenFields {
 
   static const token = 'token';
   static const platform = 'platform';
+  static const deviceId = 'deviceId';
   static const updatedAt = 'updatedAt';
 }
 
@@ -269,6 +274,8 @@ class OrderFields {
   static const address = 'address';
   static const city = 'city';
   static const district = 'district';
+  static const latitude = 'latitude';
+  static const longitude = 'longitude';
   static const billing = 'billing';
   static const invoiceLink = 'invoiceLink';
   static const invoiceNumber = 'invoiceNumber';
@@ -288,6 +295,8 @@ class OrderFields {
   static const smsAdminCreatedAt = 'smsAdminCreatedAt';
   static const smsAdminCreatedJobId = 'smsAdminCreatedJobId';
   static const smsAdminLastError = 'smsAdminLastError';
+  static const mailAdminCreatedAt = 'mailAdminCreatedAt';
+  static const mailAdminLastError = 'mailAdminLastError';
   static const smsShippingAt = 'smsShippingAt';
   static const smsShippingJobId = 'smsShippingJobId';
   static const smsCancelledAt = 'smsCancelledAt';
@@ -329,6 +338,7 @@ class BrandFields {
 
   static const name = 'name';
   static const imageUrl = 'imageUrl';
+  static const certificateUrl = 'certificateUrl';
   static const assetPath = 'assetPath';
   static const order = 'order';
   static const active = 'active';
@@ -371,6 +381,8 @@ class ProductAdvantageFields {
   static const active = 'active';
   static const removedIds = 'removedIds';
   static const extras = 'extras';
+  static const colors = 'colors';
+  static const colorTone = 'colorTone';
   static const updatedAt = 'updatedAt';
 }
 
@@ -497,6 +509,31 @@ class SettingsDocs {
   static const softtr = 'softtr';
   static const hangiMama = 'hangi_mama';
   static const welcomeSplash = 'welcome_splash';
+  static const courierFee = 'courier_fee';
+  static const enler = 'enler';
+  static const contactBar = 'contact_bar';
+}
+
+/// `settings/contact_bar` — ana sayfa altı iletişim şeridi
+class ContactBarFields {
+  ContactBarFields._();
+
+  static const imageUrl = 'imageUrl';
+  static const phone = 'phone';
+  static const whatsappImageUrl = 'whatsappImageUrl';
+  static const whatsappPhone = 'whatsappPhone';
+  static const updatedAt = 'updatedAt';
+}
+
+class EnlerFields {
+  EnlerFields._();
+
+  static const items = 'items';
+  static const id = 'id';
+  static const title = 'title';
+  static const imageUrl = 'imageUrl';
+  static const iconUrl = 'iconUrl';
+  static const updatedAt = 'updatedAt';
 }
 
 class HangiMamaFields {
@@ -530,6 +567,15 @@ class FeedingGuideFields {
   static const adultDogFactors = 'adultDogFactors';
   static const puppyDogFactors = 'puppyDogFactors';
   static const kittenFactors = 'kittenFactors';
+  static const updatedAt = 'updatedAt';
+}
+
+/// `settings/courier_fee` — sepet limiti ve getirme ücreti
+class CourierFeeFields {
+  CourierFeeFields._();
+
+  static const freeThreshold = 'freeThreshold';
+  static const amount = 'amount';
   static const updatedAt = 'updatedAt';
 }
 

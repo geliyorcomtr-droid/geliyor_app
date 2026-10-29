@@ -32,4 +32,30 @@ void main() {
       lessThanOrEqualTo(UploadImageQuota.screenMaxBytes),
     );
   });
+
+  test('yetki belgesi 361x510 oranında 3x tuvale oturur', () {
+    final source = img.Image(width: 800, height: 1200);
+    img.fill(source, color: img.ColorRgb8(255, 255, 255));
+    img.fillRect(
+      source,
+      x1: 40,
+      y1: 40,
+      x2: 760,
+      y2: 1160,
+      color: img.ColorRgb8(30, 144, 255),
+    );
+    final raw = Uint8List.fromList(img.encodeJpg(source, quality: 90));
+    final prepared = prepareUploadImage(
+      raw,
+      'yetki.jpg',
+      style: UploadImageStyle.certificate,
+    );
+    final decoded = img.decodeImage(prepared.bytes)!;
+    expect(decoded.width, UploadImageQuota.certificateWidth);
+    expect(decoded.height, UploadImageQuota.certificateHeight);
+    expect(
+      prepared.bytes.length,
+      lessThanOrEqualTo(UploadImageQuota.certificateMaxBytes),
+    );
+  });
 }

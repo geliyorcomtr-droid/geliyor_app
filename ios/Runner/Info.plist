@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Teslimat adresine konum eklemek için bulunduğunuz yer kullanılır.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Sahiplendirme ilanı ve stokta olmayan mama için fotoğraf veya kısa video çekmek üzere kamera kullanılır.</string>
 	<key>NSMicrophoneUsageDescription</key>

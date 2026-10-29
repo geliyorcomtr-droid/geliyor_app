@@ -13,8 +13,11 @@ import 'package:geliyor_app/admin/screens/admin_brands_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_broadcasts_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_campaigns_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_categories_screen.dart';
+import 'package:geliyor_app/admin/screens/admin_contact_bar_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_coupons_screen.dart';
+import 'package:geliyor_app/admin/screens/admin_courier_setting_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_dashboard_screen.dart';
+import 'package:geliyor_app/admin/screens/admin_enler_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_food_tracking_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_hangi_mama_screen.dart';
 import 'package:geliyor_app/admin/screens/admin_knowledge_screen.dart';
@@ -75,9 +78,7 @@ class _AdminShellState extends State<AdminShell> {
     setState(() {
       _page = page;
       _orderStatus = page == AdminPage.orders ? orderStatus : null;
-      _bannerGroup = page == AdminPage.banners
-          ? (bannerGroup ?? 'all')
-          : null;
+      _bannerGroup = page == AdminPage.banners ? (bannerGroup ?? 'all') : null;
       _knowledgeGroup = page == AdminPage.knowledge
           ? (knowledgeGroup ?? 'topics')
           : null;
@@ -162,6 +163,9 @@ class _AdminShellState extends State<AdminShell> {
         initialStatus: _adoptionStatus ?? 'pending',
       ),
       AdminPage.bankTransfer => const AdminBankTransferScreen(),
+      AdminPage.cartLimit => const AdminCourierSettingScreen(),
+      AdminPage.enler => const AdminEnlerScreen(),
+      AdminPage.contactBar => const AdminContactBarScreen(),
     };
   }
 
@@ -277,7 +281,9 @@ class _AdminShellState extends State<AdminShell> {
       child: Column(
         children: [
           Material(
-            color: selected ? item.accent.withValues(alpha: 0.12) : Colors.transparent,
+            color: selected
+                ? item.accent.withValues(alpha: 0.12)
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(14),
             child: InkWell(
               borderRadius: BorderRadius.circular(14),
@@ -294,14 +300,19 @@ class _AdminShellState extends State<AdminShell> {
                 _go(item.page);
               },
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 9,
+                ),
                 child: Row(
                   children: [
                     Container(
                       width: 32,
                       height: 32,
                       decoration: BoxDecoration(
-                        color: item.accent.withValues(alpha: selected ? 1 : 0.16),
+                        color: item.accent.withValues(
+                          alpha: selected ? 1 : 0.16,
+                        ),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(

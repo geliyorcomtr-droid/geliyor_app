@@ -2,6 +2,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/services.dart';
 import 'package:geliyor_app/theme/app_colors.dart';
+import 'package:http/http.dart' as http;
 
 /// PNG ikonların (beyaz zemin hariç) baskın rengini okur.
 class IconDominantColor {
@@ -9,14 +10,28 @@ class IconDominantColor {
 
   static final Map<String, Color> _cache = {};
 
-  static Future<Color> fromAsset(String path) async {
+  static Future<Color> fromAsset(String path) => of(path);
+
+  /// Varlık ya da ağ görselinin baskın rengi. Beyaz zemin sayılmaz.
+  static Future<Color> of(String path) async {
     final key = path.trim();
     if (key.isEmpty) return AppColors.primary;
     final cached = _cache[key];
     if (cached != null) return cached;
     try {
-      final data = await rootBundle.load(key);
-      final color = await fromBytes(data.buffer.asUint8List());
+      final Uint8List bytes;
+      final lower = key.toLowerCase();
+      if (lower.startsWith('http://') || lower.startsWith('https://')) {
+        final response = await http.get(Uri.parse(key));
+        if (response.statusCode != 200 || response.bodyBytes.isEmpty) {
+          return AppColors.primary;
+        }
+        bytes = response.bodyBytes;
+      } else {
+        final data = await rootBundle.load(key);
+        bytes = data.buffer.asUint8List();
+      }
+      final color = await fromBytes(bytes);
       _cache[key] = color;
       return color;
     } catch (_) {

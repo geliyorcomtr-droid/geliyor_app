@@ -70,6 +70,60 @@ abstract final class ProductBagDays {
     return ((bagKg * 1000) / daily).round().clamp(1, 9999);
   }
 
+  /// Ürün görselinin üzerine yazılan kısa gün hesabı. Kedi, yavru, köpek ve
+  /// mini ırk tabloları farklı günlük gram kullandığı için metin ürüne göre değişir.
+  static ProductBagDaysNote? noteFor({
+    String? mainCategory,
+    String? category,
+    String? weight,
+    String? title,
+    String? brand,
+  }) {
+    if (!supportsMainCategory(mainCategory)) return null;
+    final bagKg = bagKgFromLabel(weight);
+    if (bagKg == null || bagKg <= 0) return null;
+    final variant = FeedingVariant.fromProduct(
+      mainCategory: mainCategory,
+      category: category,
+      brandName: brand,
+      title: title,
+    );
+    final daily = typicalDailyGrams(variant);
+    if (daily == null || daily <= 0) return null;
+    final days = ((bagKg * 1000) / daily).round().clamp(1, 9999);
+    final bag = formatKg(bagKg);
+    final pet = _typicalPetPhrase(variant);
+    return ProductBagDaysNote(
+      days: days,
+      title: '$days gün',
+      body:
+          '$bag paket, $pet için günde $daily g tüketimle yaklaşık $days gün yeter.',
+    );
+  }
+
+  static String formatKg(double kg) {
+    if (kg < 1) return '${(kg * 1000).round()} g';
+    final rounded = (kg * 10).round() / 10;
+    final text = rounded == rounded.roundToDouble()
+        ? rounded.toStringAsFixed(0)
+        : rounded.toStringAsFixed(1).replaceAll('.', ',');
+    return '$text kg';
+  }
+
+  static String _typicalPetPhrase(FeedingVariant variant) {
+    return switch (variant) {
+      FeedingVariant.catAdult => '$typicalCatKg yetişkin bir kedi',
+      FeedingVariant.catKitten =>
+        '$typicalKittenKg, $typicalKittenMonths aylık bir yavru kedi',
+      FeedingVariant.dogAdult => '$typicalDogKg yetişkin bir köpek',
+      FeedingVariant.dogPuppy =>
+        '$typicalPuppyKg, $typicalPuppyMonths aylık bir yavru köpek',
+      FeedingVariant.dogMiniAdult => '$typicalMiniKg mini ırk yetişkin köpek',
+      FeedingVariant.dogMiniPuppy =>
+        '$typicalMiniPuppyKg, $typicalMiniPuppyMonths aylık mini ırk yavru köpek',
+    };
+  }
+
   static String storedValue({
     String? mainCategory,
     String? category,
@@ -144,4 +198,16 @@ abstract final class ProductBagDays {
     if (value >= 100) return value / 1000;
     return value;
   }
+}
+
+class ProductBagDaysNote {
+  const ProductBagDaysNote({
+    required this.days,
+    required this.title,
+    required this.body,
+  });
+
+  final int days;
+  final String title;
+  final String body;
 }

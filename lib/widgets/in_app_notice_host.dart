@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:geliyor_app/app_navigator.dart';
 import 'package:geliyor_app/screens/notifications_screen.dart';
 import 'package:geliyor_app/state/auth_store.dart';
 import 'package:geliyor_app/state/notifications_store.dart';
@@ -37,6 +38,10 @@ class _InAppNoticeHostState extends State<InAppNoticeHost> {
   }
 
   void _onStore() {
+    final notice = AuthStore.instance.takeSessionNotice();
+    if (notice != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _showSessionNotice(notice));
+    }
     final uid = AuthStore.instance.uid;
     if (uid != _uid) {
       _uid = uid;
@@ -62,6 +67,39 @@ class _InAppNoticeHostState extends State<InAppNoticeHost> {
       return;
     }
     _show(newest);
+  }
+
+  void _showSessionNotice(String message) {
+    final nav = appNavigatorKey.currentState;
+    final ctx = nav?.context;
+    if (ctx == null) return;
+    showDialog<void>(
+      context: ctx,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text(
+          'Oturum kapatıldı',
+          style: TextStyle(
+            color: AppColors.text,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        content: Text(
+          message,
+          style: const TextStyle(
+            color: AppColors.text,
+            fontWeight: FontWeight.w600,
+            height: 1.35,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Tamam'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _hide() {

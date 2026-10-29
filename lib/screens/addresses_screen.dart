@@ -13,6 +13,9 @@ import 'package:geliyor_app/widgets/app_back_button.dart';
 import 'package:geliyor_app/widgets/app_bottom_navbar.dart';
 import 'package:geliyor_app/widgets/app_page_frame.dart';
 import 'package:geliyor_app/widgets/app_pressable_button.dart';
+import 'package:geliyor_app/widgets/location_pick_map.dart';
+import 'package:geliyor_app/utils/customer_location.dart';
+import 'package:geolocator/geolocator.dart';
 
 enum _AddressMenuAction { makeDefault, edit, delete }
 
@@ -31,14 +34,21 @@ class AddressesScreen extends StatefulWidget {
 
 class _AddressesScreenState extends State<AddressesScreen> {
   bool _showForm = false;
+  bool _showLocationForm = false;
   String? _editingId;
+  String? _locationEditingId;
   String? _formError;
+  String? _locationError;
+  double? _draftLatitude;
+  double? _draftLongitude;
+  bool _locationBusy = false;
 
   final _titleController = TextEditingController();
   final _contactController = TextEditingController();
   final _addressController = TextEditingController();
   final _nationalIdController = TextEditingController();
   final _taxOfficeController = TextEditingController();
+  final _locationTitleController = TextEditingController();
   bool _formIsDefault = false;
   bool _formIsDelivery = true;
   bool _formIsInvoice = true;
@@ -55,6 +65,21 @@ class _AddressesScreenState extends State<AddressesScreen> {
 
   List<AddressData> get _addresses => AddressStore.instance.addresses;
 
+  List<AddressData> get _streetAddresses =>
+      _addresses.where((item) => !item.isLocation).toList();
+
+  List<AddressData> get _locationPins {
+    final unique = <AddressData>[];
+    final seen = <String>{};
+    for (final pin in _addresses.where((item) => item.isLocation)) {
+      final key = pin.hasLocation
+          ? '${pin.latitude!.toStringAsFixed(5)},${pin.longitude!.toStringAsFixed(5)}'
+          : pin.id;
+      if (seen.add(key)) unique.add(pin);
+    }
+    return unique;
+  }
+
   Timer? _addressHoldTimer;
   bool _addressHoldCompleted = false;
 
@@ -62,9 +87,9 @@ class _AddressesScreenState extends State<AddressesScreen> {
   void initState() {
     super.initState();
     AddressStore.instance.addListener(_onStoreChanged);
-    if (widget.selectForDelivery && AddressStore.instance.addresses.isEmpty) {
+    if (widget.selectForDelivery && _streetAddresses.isEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || AddressStore.instance.addresses.isNotEmpty) return;
+        if (!mounted || _streetAddresses.isNotEmpty) return;
         _openAddForm();
       });
     }
@@ -79,6 +104,7 @@ class _AddressesScreenState extends State<AddressesScreen> {
     _addressController.dispose();
     _nationalIdController.dispose();
     _taxOfficeController.dispose();
+    _locationTitleController.dispose();
     super.dispose();
   }
 
@@ -131,7 +157,7 @@ class _AddressesScreenState extends State<AddressesScreen> {
       _addressController.clear();
       _nationalIdController.clear();
       _taxOfficeController.clear();
-      _formIsDefault = _addresses.isEmpty;
+      _formIsDefault = _streetAddresses.isEmpty;
       _formIsDelivery = true;
       _formIsInvoice = true;
       _formIcon = Icons.home_rounded;
@@ -177,7 +203,37 @@ class _AddressesScreenState extends State<AddressesScreen> {
     });
   }
 
+  void _openLocationForm([AddressData? pin]) {
+    setState(() {
+      _showForm = false;
+      _showLocationForm = true;
+      _locationEditingId = pin?.id;
+      _locationError = null;
+      _draftLatitude = pin?.latitude;
+      _draftLongitude = pin?.longitude;
+      _locationTitleController.text =
+          pin == null || pin.title.trim().isEmpty ? 'Konumum' : pin.title;
+    });
+    if (pin == null || !pin.hasLocation) {
+      unawaited(_refreshLocationDraft());
+    }
+  }
+
+  void _closeLocationForm() {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _showLocationForm = false;
+      _locationEditingId = null;
+      _locationError = null;
+      _locationBusy = false;
+    });
+  }
+
   void _onBack() {
+    if (_showLocationForm) {
+      _closeLocationForm();
+      return;
+    }
     if (_showForm) {
       _closeForm();
       return;
@@ -208,8 +264,17 @@ class _AddressesScreenState extends State<AddressesScreen> {
 
   Future<void> _deleteAddress(String id) async {
     AddressStore.instance.remove(id);
-    await AddressStore.instance.persistNow();
+    final saved = await AddressStore.instance.persistNow();
     if (!mounted) return;
+    if (!saved) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Adres silinemedi. Tekrar deneyin.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Adres silindi.'),
@@ -312,8 +377,15 @@ class _AddressesScreenState extends State<AddressesScreen> {
     } else {
       AddressStore.instance.add(data);
     }
-    await AddressStore.instance.persistNow();
+    final saved = await AddressStore.instance.persistNow();
     if (!mounted) return;
+    if (!saved) {
+      setState(() {
+        _formError = 'Adres kaydedilemedi. Bağlantıyı kontrol edip tekrar deneyin.';
+        _showForm = true;
+      });
+      return;
+    }
 
     if (widget.selectForDelivery && !wasEditing) {
       Navigator.of(context).pop();
@@ -426,9 +498,14 @@ class _AddressesScreenState extends State<AddressesScreen> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: !_showForm,
+      canPop: !_showForm && !_showLocationForm,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && _showForm) _closeForm();
+        if (didPop) return;
+        if (_showLocationForm) {
+          _closeLocationForm();
+        } else if (_showForm) {
+          _closeForm();
+        }
       },
       child: Scaffold(
         backgroundColor: AppColors.background,
@@ -436,7 +513,17 @@ class _AddressesScreenState extends State<AddressesScreen> {
           backgroundColor: AppColors.background,
           activeTab: AppNavTab.profile,
           header: _buildHeader(),
-          content: _showForm
+          content: _showLocationForm
+              ? Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppPageFrame.contentHorizontalPadding,
+                    0,
+                    AppPageFrame.contentHorizontalPadding,
+                    8,
+                  ),
+                  child: _buildLocationForm(),
+                )
+              : _showForm
               ? Padding(
                   padding: const EdgeInsets.fromLTRB(
                     AppPageFrame.contentHorizontalPadding,
@@ -486,7 +573,11 @@ class _AddressesScreenState extends State<AddressesScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  _showForm
+                  _showLocationForm
+                      ? (_locationEditingId == null
+                          ? 'Konum Ekle'
+                          : 'Konum')
+                      : _showForm
                       ? (_isEditing ? 'Adres Düzenle' : 'Yeni Adres')
                       : (widget.selectForDelivery
                           ? 'Adres Seç'
@@ -497,7 +588,9 @@ class _AddressesScreenState extends State<AddressesScreen> {
                   style: AppTextStyles.pageHeader,
                 ),
                 Text(
-                  _showForm
+                  _showLocationForm
+                      ? 'Konum kutusundan kaydedin, güncelleyin veya silin.'
+                      : _showForm
                       ? 'Adres bilgilerini girin ve kaydedin.'
                       : (widget.selectForDelivery
                           ? 'Teslimat adresine dokunun, siparişe dönülür.'
@@ -526,7 +619,7 @@ class _AddressesScreenState extends State<AddressesScreen> {
       children: [
         _buildSectionHeader(),
         const SizedBox(height: 10),
-        if (_addresses.isEmpty)
+        if (_streetAddresses.isEmpty)
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),
@@ -535,8 +628,10 @@ class _AddressesScreenState extends State<AddressesScreen> {
               borderRadius: BorderRadius.circular(24),
               border: Border.all(color: AppColors.border),
             ),
-            child: const Text(
-              'Henüz kayıtlı adres yok. Yeni adres ekleyebilirsiniz.',
+            child: Text(
+              AddressStore.instance.isHydrated
+                  ? 'Henüz kayıtlı adres yok. Yeni adres ekleyebilirsiniz.'
+                  : 'Adresler yükleniyor...',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: AppColors.subText,
@@ -546,10 +641,19 @@ class _AddressesScreenState extends State<AddressesScreen> {
             ),
           )
         else
-          for (int i = 0; i < _addresses.length; i++) ...[
-            _buildAddressCard(_addresses[i]),
-            if (i != _addresses.length - 1) const SizedBox(height: 8),
+          for (int i = 0; i < _streetAddresses.length; i++) ...[
+            _buildAddressCard(_streetAddresses[i]),
+            if (i != _streetAddresses.length - 1) const SizedBox(height: 8),
           ],
+        if (!widget.selectForDelivery && _locationPins.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Text('Kayıtlı Konumlarım', style: AppTextStyles.sectionHeader),
+          const SizedBox(height: 8),
+          for (int i = 0; i < _locationPins.length; i++) ...[
+            _buildLocationCard(_locationPins[i]),
+            if (i != _locationPins.length - 1) const SizedBox(height: 8),
+          ],
+        ],
         const SizedBox(height: 10),
         _buildInfoBox(),
       ],
@@ -1202,29 +1306,66 @@ class _AddressesScreenState extends State<AddressesScreen> {
   }
 
   Widget _buildSectionHeader() {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Text(
-            widget.selectForDelivery
-                ? 'Teslimat adresi seçin'
-                : 'Kayıtlı Adreslerim',
-            style: AppTextStyles.sectionHeader,
-          ),
+        Text(
+          widget.selectForDelivery
+              ? 'Teslimat adresi seçin'
+              : 'Kayıtlı Adreslerim',
+          style: AppTextStyles.sectionHeader,
         ),
-        AppPressableButton.primary(
-          onTap: _openAddForm,
-          height: 32,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          borderRadius: 18,
-          child: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.add_rounded, size: 16),
-              SizedBox(width: 4),
-              Text('Yeni Adres Ekle', style: TextStyle(fontSize: 10)),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: AppPressableButton.primary(
+                onTap: _openAddForm,
+                height: 32,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.add_rounded, size: 16),
+                    SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        'Yeni Adres Ekle',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 10),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (!widget.selectForDelivery) ...[
+              const SizedBox(width: 8),
+              Expanded(
+                child: AppPressableButton.primary(
+                  onTap: () => _openLocationForm(),
+                  height: 32,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.my_location_rounded, size: 16),
+                      SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          'Konum Ekle',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 10),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
-          ),
+          ],
         ),
       ],
     );
@@ -1281,7 +1422,12 @@ class _AddressesScreenState extends State<AddressesScreen> {
         ),
       ),
     );
-    return card;
+    if (widget.selectForDelivery) return card;
+    return _swipeToDelete(
+      id: address.id,
+      message: 'Adres silindi.',
+      child: card,
+    );
   }
 
   Widget _buildAddressCardBody(AddressData address) {
@@ -1377,6 +1523,436 @@ class _AddressesScreenState extends State<AddressesScreen> {
           ),
         ],
       ],
+    );
+  }
+
+  Widget _swipeToDelete({
+    required String id,
+    required String message,
+    required Widget child,
+  }) {
+    return Dismissible(
+      key: ValueKey('swipe-$id'),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 18),
+        decoration: BoxDecoration(
+          color: AppColors.primary,
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: const Icon(
+          Icons.delete_outline_rounded,
+          color: AppColors.surface,
+        ),
+      ),
+      onDismissed: (_) {
+        AddressStore.instance.remove(id);
+        unawaited(_persistSwipeDelete(message));
+      },
+      child: child,
+    );
+  }
+
+  Future<void> _persistSwipeDelete(String message) async {
+    final saved = await AddressStore.instance.persistNow();
+    if (!mounted) return;
+    _showLocationMessage(saved ? message : 'Silinemedi. Tekrar deneyin.');
+  }
+
+  Widget _buildLocationCard(AddressData pin) {
+    final card = GestureDetector(
+      onTap: () => _openLocationForm(pin),
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.selected,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: AppColors.primary, width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 10, 8, 10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: AppColors.primaryLight),
+                ),
+                child: const Icon(
+                  Icons.my_location_rounded,
+                  color: AppColors.primary,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            pin.title.trim().isEmpty ? 'Konumum' : pin.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: AppColors.text,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          margin: const EdgeInsets.only(right: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: const Text(
+                            'Konum',
+                            style: TextStyle(
+                              color: AppColors.surface,
+                              fontSize: 8,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    SizedBox(
+                      height: 72,
+                      width: double.infinity,
+                      child: LocationMapPreview(
+                        latitude: pin.latitude,
+                        longitude: pin.longitude,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (widget.selectForDelivery) return card;
+    return _swipeToDelete(
+      id: pin.id,
+      message: 'Konum silindi.',
+      child: card,
+    );
+  }
+
+  Widget _buildLocationForm() {
+    final editing = _locationEditingId != null;
+    final locationName = _locationTitleController.text.trim();
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: AppColors.selected,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.primary, width: 1.5),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Konum',
+                        style: TextStyle(
+                          color: AppColors.text,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: const Text(
+                        'Konum',
+                        style: TextStyle(
+                          color: AppColors.surface,
+                          fontSize: 8,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    for (final name in ['Ev', 'İş', 'Diğer']) ...[
+                      if (name != 'Ev') const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildSelectChip(
+                          selected: locationName == name,
+                          icon: name == 'Ev'
+                              ? Icons.home_rounded
+                              : name == 'İş'
+                              ? Icons.work_outline_rounded
+                              : Icons.favorite_border_rounded,
+                          label: name,
+                          onTap: () {
+                            _locationTitleController.text = name;
+                            setState(() {});
+                          },
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 8),
+                _buildField(
+                  label: 'Konum adı',
+                  controller: _locationTitleController,
+                  hint: 'Ev, İş veya kendi adınız',
+                  onChanged: (_) => setState(() {}),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: LocationPickMap(
+                latitude: _draftLatitude,
+                longitude: _draftLongitude,
+                onPicked: (latitude, longitude) {
+                  setState(() {
+                    _draftLatitude = latitude;
+                    _draftLongitude = longitude;
+                    _locationError = null;
+                  });
+                },
+              ),
+            ),
+          ),
+          if (_locationError != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              child: Text(
+                _locationError!,
+                style: const TextStyle(
+                  color: AppColors.error,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+            child: Row(
+              children: [
+                if (editing) ...[
+                  Expanded(
+                    child: AppPressableButton(
+                      onTap: _locationBusy ? null : _deleteLocationPin,
+                      enabled: !_locationBusy,
+                      height: 36,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      backgroundColor: AppColors.surface,
+                      borderColor: AppColors.border,
+                      child: const Text(
+                        'Sil',
+                        style: TextStyle(
+                          color: AppColors.text,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                Expanded(
+                  child: AppPressableButton(
+                    onTap: _locationBusy ? null : _refreshLocationDraft,
+                    enabled: !_locationBusy,
+                    height: 36,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    backgroundColor: AppColors.surface,
+                    borderColor: AppColors.primaryLight,
+                    child: const Text(
+                      'Güncelle',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: AppPressableButton.primary(
+                    onTap: _locationBusy ? null : _saveLocationDraft,
+                    enabled: !_locationBusy,
+                    height: 36,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: const Text(
+                      'Kaydet',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _refreshLocationDraft() async {
+    setState(() {
+      _locationBusy = true;
+      _locationError = null;
+    });
+    final position = await _currentPosition();
+    if (!mounted) return;
+    setState(() {
+      _locationBusy = false;
+      if (position != null) {
+        _draftLatitude = position.latitude;
+        _draftLongitude = position.longitude;
+      }
+    });
+  }
+
+  Future<void> _saveLocationDraft() async {
+    if (!CustomerLocation.isValid(_draftLatitude, _draftLongitude)) {
+      setState(() => _locationError = 'Haritadan bir nokta işaretleyin.');
+      return;
+    }
+    final ok = await LoginGate.require(
+      context: context,
+      message: 'Konum kaydetmek için giriş yapmanız gerekir.',
+    );
+    if (!ok || !mounted) return;
+    final editing = _locationEditingId != null;
+    AddressStore.instance.saveLocationPin(
+      id: _locationEditingId,
+      title: _locationTitleController.text,
+      latitude: _draftLatitude!,
+      longitude: _draftLongitude!,
+    );
+    final saved = await AddressStore.instance.persistNow();
+    if (!mounted) return;
+    if (!saved) {
+      setState(() {
+        _locationError = 'Konum kaydedilemedi. Bağlantıyı kontrol edip tekrar deneyin.';
+      });
+      return;
+    }
+    _closeLocationForm();
+    _showLocationMessage(editing ? 'Konum güncellendi.' : 'Konum kaydedildi.');
+  }
+
+  Future<void> _deleteLocationPin() async {
+    final id = _locationEditingId;
+    if (id == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Konumu sil'),
+          content: const Text('Bu konum kutusu silinsin mi?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Vazgeç'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Sil'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true || !mounted) return;
+    AddressStore.instance.remove(id);
+    final saved = await AddressStore.instance.persistNow();
+    if (!mounted) return;
+    if (!saved) {
+      _showLocationMessage('Konum silinemedi. Tekrar deneyin.');
+      return;
+    }
+    _closeLocationForm();
+    _showLocationMessage('Konum silindi.');
+  }
+
+  Future<Position?> _currentPosition() async {
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        _showLocationMessage('Telefonun konum servisi kapalı.');
+        return null;
+      }
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        _showLocationMessage('Konum izni verilmedi.');
+        return null;
+      }
+      return Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+    } catch (_) {
+      _showLocationMessage('Konum alınamadı.');
+      return null;
+    }
+  }
+
+  void _showLocationMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        content: Text(message),
+      ),
     );
   }
 

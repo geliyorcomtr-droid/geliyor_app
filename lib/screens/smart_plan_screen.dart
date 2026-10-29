@@ -26,9 +26,10 @@ class SmartPlanScreen extends StatefulWidget {
 }
 
 class _SmartPlanScreenState extends State<SmartPlanScreen> {
-  /// Ana sayfa servis kartlarıyla aynı tonlar.
-  static const _easyOrderColor = AppColors.primary;
-  static const _knowledgeColor = AppColors.primary;
+  /// Üstteki üç kart görselinin iç rengi.
+  static const _autoOrderFrame = Color(0xFF00A840);
+  static const _reminderFrame = Color(0xFFF88818);
+  static const _foodTrackFrame = Color(0xFF8850F0);
   static const _hangiMamaColor = AppColors.primary;
 
   Color _buttonFill(Color color) =>
@@ -186,7 +187,7 @@ class _SmartPlanScreenState extends State<SmartPlanScreen> {
           child: Row(
             children: [
               _featureCard(
-                color: _easyOrderColor,
+                color: _autoOrderFrame,
                 cardPlacement: BannerPlacement.smartPlanAutoOrder,
                 detailPlacement: BannerPlacement.smartPlanAutoOrderDetail,
                 fallbackCard: 'assets/images/smart_plan_auto_order.jpg',
@@ -194,7 +195,7 @@ class _SmartPlanScreenState extends State<SmartPlanScreen> {
               ),
               const SizedBox(width: 8),
               _featureCard(
-                color: _knowledgeColor,
+                color: _reminderFrame,
                 cardPlacement: BannerPlacement.smartPlanReminder,
                 detailPlacement: BannerPlacement.smartPlanReminderDetail,
                 fallbackCard: 'assets/images/smart_plan_reminder.jpg',
@@ -202,7 +203,7 @@ class _SmartPlanScreenState extends State<SmartPlanScreen> {
               ),
               const SizedBox(width: 8),
               _featureCard(
-                color: _hangiMamaColor,
+                color: _foodTrackFrame,
                 cardPlacement: BannerPlacement.smartPlanFoodTrack,
                 detailPlacement: BannerPlacement.smartPlanFoodTrackDetail,
                 fallbackCard: 'assets/images/smart_plan_food_track.jpg',

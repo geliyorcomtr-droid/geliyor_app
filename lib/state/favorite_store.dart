@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:geliyor_app/data/favorite_index_repository.dart';
 import 'package:geliyor_app/data/firestore_collections.dart';
 import 'package:geliyor_app/data/user_doc_persist.dart';
 import 'package:geliyor_app/state/cart_store.dart';
@@ -92,6 +93,7 @@ class FavoriteStore extends ChangeNotifier {
   }
 
   void applyRemote(List<Map<String, dynamic>> rows) {
+    final before = _items.map((item) => item.id).toSet();
     _suppressPersist = true;
     _hasRemote = true;
     _items
@@ -103,9 +105,16 @@ class FavoriteStore extends ChangeNotifier {
       );
     _suppressPersist = false;
     notifyListeners();
+    unawaited(
+      FavoriteIndexRepository.syncUser(
+        before: before,
+        after: _items.map((item) => item.id).toSet(),
+      ),
+    );
   }
 
   void add(FavoriteItem item) {
+    final before = _items.map((entry) => entry.id).toSet();
     final index = _items.indexWhere((entry) => entry.id == item.id);
     if (index >= 0) {
       _items[index] = item;
@@ -114,15 +123,27 @@ class FavoriteStore extends ChangeNotifier {
     }
     notifyListeners();
     _persist();
+    unawaited(
+      FavoriteIndexRepository.syncUser(
+        before: before,
+        after: _items.map((entry) => entry.id).toSet(),
+      ),
+    );
   }
 
   void remove(String id) {
+    final before = _items.map((entry) => entry.id).toSet();
     final removed = _items.length;
     _items.removeWhere((item) => item.id == id);
-    if (_items.length != removed) {
-      notifyListeners();
-      _persist();
-    }
+    if (_items.length == removed) return;
+    notifyListeners();
+    _persist();
+    unawaited(
+      FavoriteIndexRepository.syncUser(
+        before: before,
+        after: _items.map((entry) => entry.id).toSet(),
+      ),
+    );
   }
 
   void toggle(FavoriteItem item) {
@@ -134,6 +155,7 @@ class FavoriteStore extends ChangeNotifier {
   }
 
   void mergeGuestItems(List<FavoriteItem> guestItems) {
+    final before = _items.map((entry) => entry.id).toSet();
     var changed = false;
     for (final item in guestItems) {
       if (item.id.isEmpty || isFavorite(item.id)) continue;
@@ -143,6 +165,12 @@ class FavoriteStore extends ChangeNotifier {
     if (!changed) return;
     notifyListeners();
     _persist();
+    unawaited(
+      FavoriteIndexRepository.syncUser(
+        before: before,
+        after: _items.map((entry) => entry.id).toSet(),
+      ),
+    );
   }
 
   void _persist() {

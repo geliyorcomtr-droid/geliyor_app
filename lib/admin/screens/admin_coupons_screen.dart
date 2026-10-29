@@ -248,6 +248,41 @@ class _CatalogTab extends StatelessWidget {
     );
   }
 
+  Future<void> _delete(BuildContext context, AppCoupon coupon) async {
+    final label = coupon.code.trim().isEmpty ? coupon.title : coupon.code;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Kuponu sil'),
+        content: Text('"$label" kuponu silinsin mi?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('Sil'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    try {
+      await CouponRepository.instance.delete(coupon.id);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$label silindi.')),
+      );
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Silinemedi: $error')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<AppCoupon>>(
@@ -302,6 +337,14 @@ class _CatalogTab extends StatelessWidget {
                                   color: coupons[i].active
                                       ? AppColors.success
                                       : AppColors.subText,
+                                ),
+                                IconButton(
+                                  tooltip: 'Sil',
+                                  onPressed: () => _delete(context, coupons[i]),
+                                  icon: const Icon(
+                                    Icons.delete_outline_rounded,
+                                    color: AppColors.error,
+                                  ),
                                 ),
                                 Switch(
                                   value: coupons[i].active,
